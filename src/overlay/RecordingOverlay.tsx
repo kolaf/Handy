@@ -356,9 +356,13 @@ const RecordingOverlay: React.FC = () => {
           ? "overlay.noticeLearned"
           : notice.kind === "learned-none"
             ? "overlay.noticeLearnedNone"
-            : notice.kind === "fallback"
-              ? "overlay.noticeFallback"
-              : "overlay.noticePrompt",
+            : notice.kind === "synced"
+              ? "overlay.noticeSynced"
+              : notice.kind === "synced-failed"
+                ? "overlay.noticeSyncFailed"
+                : notice.kind === "fallback"
+                  ? "overlay.noticeFallback"
+                  : "overlay.noticePrompt",
     { value: noticeValue },
   );
   const workLabel =

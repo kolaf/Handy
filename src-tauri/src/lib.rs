@@ -12,6 +12,7 @@ mod extras;
 mod helpers;
 mod input;
 mod learn;
+mod listsync;
 mod llm_client;
 mod managers;
 mod memory;
@@ -855,7 +856,7 @@ pub fn run(cli_args: CliArgs) {
     // app is already open, so skip it in headless mode and run a standalone
     // instance instead.
     if !headless_mode {
-        builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
             // Settings flags come first so they can be combined with a toggle in one call,
             // e.g. `handy --set-language no --set-prompt email --toggle-post-process`.
             let mut handled_setting = false;
@@ -865,6 +866,10 @@ pub fn run(cli_args: CliArgs) {
             }
             if let Some(code) = signal_handle::flag_value(&args, "--set-language") {
                 actions::set_language_code(app, &code);
+                handled_setting = true;
+            }
+            if let Some(path) = signal_handle::flag_value(&args, "--sync-lists") {
+                listsync::run(app, &path, &cwd);
                 handled_setting = true;
             }
             if args.iter().any(|a| a == "--toggle-transcription") {

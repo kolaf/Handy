@@ -16,9 +16,9 @@ use tauri_plugin_clipboard_manager::ClipboardExt;
 
 /// Longest clipboard text passed into a prompt, and snippet limits.
 const MAX_CLIPBOARD_CHARS: usize = 6000;
-const MAX_SNIPPETS: usize = 100;
+pub(crate) const MAX_SNIPPETS: usize = 100;
 const MAX_SNIPPET_NAME_CHARS: usize = 50;
-const MAX_SNIPPET_TEXT_CHARS: usize = 5000;
+pub(crate) const MAX_SNIPPET_TEXT_CHARS: usize = 5000;
 
 static VARIABLE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"\$\{(vocabulary|snippets|clipboard|examples)\}").unwrap());
@@ -136,7 +136,7 @@ pub(crate) fn expand_snippets(text: &str, snippets: &[Snippet]) -> String {
         .into_owned()
 }
 
-fn is_valid_snippet_name(name: &str) -> bool {
+pub(crate) fn is_valid_snippet_name(name: &str) -> bool {
     let name = name.trim();
     !name.is_empty()
         && name.chars().count() <= MAX_SNIPPET_NAME_CHARS

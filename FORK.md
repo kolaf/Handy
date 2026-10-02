@@ -22,6 +22,7 @@ This is a fork of [cjpais/Handy](https://github.com/cjpais/Handy) that has delib
 | **Prompt variables** | `${vocabulary}` `${snippets}` `${clipboard}` `${examples}` in any prompt | Prompt editor |
 | **Prompt examples** | Optional examples box per prompt | Prompt editor |
 | **Re-run with next prompt** | `ctrl+alt+r` or `handy --rerun` | Post-processing page |
+| **Sync lists** | `handy --sync-lists FILE` | merges word list, snippets and learned corrections with a JSON file kept in git |
 | **Learn from correction** | `ctrl+alt+k` or `handy --learn` | Post-processing page; list under Advanced → Learned Corrections |
 | **Paste last dictation** | `ctrl+alt+v` or `handy --paste-last` | General page |
 | **Offline fallback** | Automatic when the language model call fails | n/a |
@@ -62,6 +63,14 @@ was a recognition mistake (`fork/prompts/learn_prompt.md`). Names and terms go i
 rules applied to future transcripts. Proposals are validated locally (the word must really appear in your text, ordinary-word
 swaps and rewordings are refused). Benchmark: `python3 fork/prompts/learn_bench.py --from-handy`.
 
+**Sync lists.** `handy --sync-lists FILE` (Handy must be running) merges your custom words, snippets and learned corrections
+with a JSON file, both ways, and rewrites the file in a stable sorted order so it diffs well in git. Keep the file in a
+private repo (it holds your snippet texts) and run the command on each machine after pulling, then commit the result. It only
+adds: deleting an entry on one machine does not delete it elsewhere (it would come back), so remove it everywhere or edit the
+file. If both sides have a snippet or correction with the same key but different content, this machine's version wins and the
+conflict is logged. Invalid entries in the file are skipped. Prompts are not in the file (they come from the repo:
+`fork/scripts/install-prompts.py`), and neither are keys or other settings.
+
 **Re-run with next prompt.** Takes the raw transcript of your most recent dictation from the history, advances to the next
 prompt, processes it and pastes the result. Select the earlier pasted text first to replace it; otherwise the result is
 inserted as a second copy.
@@ -81,7 +90,7 @@ Sent to the running instance (a second `handy` process forwards them and exits).
 handy --toggle-transcription | --toggle-post-process | --cancel      (upstream)
 handy --swap-language          handy --next-prompt
 handy --rerun                  handy --paste-last
-handy --learn
+handy --learn                  handy --sync-lists FILE
 handy --set-language CODE      handy --set-prompt ID                  (combinable, also with a toggle)
 handy --set-language no --set-prompt email --toggle-post-process
 ```

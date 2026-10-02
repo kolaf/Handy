@@ -123,7 +123,7 @@ pub fn parse_proposal(answer: &str) -> Option<Proposal> {
     serde_json::from_str(&answer[start..=end]).ok()
 }
 
-fn is_clean_term(s: &str) -> bool {
+pub(crate) fn is_clean_term(s: &str) -> bool {
     !s.is_empty()
         && s.chars().count() <= MAX_TERM_CHARS
         && !s

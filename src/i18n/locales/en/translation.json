@@ -757,7 +757,9 @@
     "noticeVocab": "Added to vocabulary: {{value}}",
     "noticeFallback": "Offline: basic cleanup only",
     "noticeLearned": "Learned: {{value}}",
-    "noticeLearnedNone": "Nothing new to learn"
+    "noticeLearnedNone": "Nothing new to learn",
+    "noticeSynced": "Lists synced: {{value}}",
+    "noticeSyncFailed": "Lists sync failed (see log)"
   },
   "secureInput": {
     "blockedWithCulprit_one": "{{name}} may be blocking 1 shortcut",

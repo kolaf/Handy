@@ -40,6 +40,10 @@ pub struct CliArgs {
     #[arg(long)]
     pub learn: bool,
 
+    /// Merge the word list, snippets and learned corrections with a shared JSON file, both ways (sent to running instance)
+    #[arg(long, value_name = "FILE")]
+    pub sync_lists: Option<String>,
+
     /// Paste the most recent dictation again (sent to running instance)
     #[arg(long)]
     pub paste_last: bool,

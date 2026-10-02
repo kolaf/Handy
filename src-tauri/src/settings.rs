@@ -97,7 +97,7 @@ pub struct Correction {
 
 /// A named block of text that the post-processing prompt can insert by name
 /// (`[[snippet: NAME]]`); see `extras.rs`.
-#[derive(Serialize, Deserialize, Debug, Clone, Type)]
+#[derive(Serialize, Deserialize, Debug, Clone, Type, PartialEq)]
 pub struct Snippet {
     pub name: String,
     pub text: String,

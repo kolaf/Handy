@@ -30,4 +30,4 @@ This build (`0.9.7-hotkeys.1`) adds features on top of Handy. The full reference
 
 ## Command line
 
-`handy --swap-language`, `--next-prompt`, `--rerun`, `--paste-last`, `--learn`, `--set-language no`, `--set-prompt email`. They work with a running Handy and can be combined with `--toggle-post-process`, for example from a window-manager key binding or Talon.
+`handy --swap-language`, `--next-prompt`, `--rerun`, `--paste-last`, `--learn`, `--sync-lists FILE` (merge words, snippets and learned corrections with a JSON file, e.g. one kept in git), `--set-language no`, `--set-prompt email`. They work with a running Handy and can be combined with `--toggle-post-process`, for example from a window-manager key binding or Talon.
