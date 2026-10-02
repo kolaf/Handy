@@ -187,6 +187,10 @@
           "cycle_prompt": {
             "name": "Cycle Prompt Shortcut",
             "description": "Switch to the next post-processing prompt."
+          },
+          "rerun_next_prompt": {
+            "name": "Re-run With Next Prompt Shortcut",
+            "description": "Re-process the last dictation with the next prompt and paste the result. Select the previously pasted text first to replace it."
           }
         },
         "errors": {
@@ -394,6 +398,16 @@
         "add": "Add",
         "remove": "Remove {{word}}",
         "duplicate": "\"{{word}}\" already exists"
+      },
+      "snippets": {
+        "title": "Snippets",
+        "description": "Named blocks of text the post-processing prompt can insert when you ask for them, for example \"insert my signature\". Only the names are sent to the language model; the text is inserted locally. The prompt must use the ${snippets} variable.",
+        "namePlaceholder": "Snippet name, e.g. signature",
+        "textPlaceholder": "Text to insert",
+        "add": "Add snippet",
+        "remove": "Remove {{name}}",
+        "removeShort": "Remove",
+        "duplicate": "A snippet named \"{{name}}\" already exists"
       },
       "voiceActivityDetection": {
         "title": "Voice Activity Detection",

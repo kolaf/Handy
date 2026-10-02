@@ -87,6 +87,14 @@ pub struct ShortcutBinding {
     pub current_binding: String,
 }
 
+/// A named block of text that the post-processing prompt can insert by name
+/// (`[[snippet: NAME]]`); see `extras.rs`.
+#[derive(Serialize, Deserialize, Debug, Clone, Type)]
+pub struct Snippet {
+    pub name: String,
+    pub text: String,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Type)]
 pub struct LLMPrompt {
     pub id: String,
@@ -456,6 +464,8 @@ pub struct AppSettings {
     pub post_process_api_keys: SecretMap,
     #[serde(default = "default_post_process_models")]
     pub post_process_models: HashMap<String, String>,
+    #[serde(default)]
+    pub snippets: Vec<Snippet>,
     #[serde(default = "default_post_process_prompts")]
     pub post_process_prompts: Vec<LLMPrompt>,
     #[serde(default)]
@@ -922,6 +932,17 @@ pub fn get_default_settings() -> AppSettings {
         },
     );
     bindings.insert(
+        "rerun_next_prompt".to_string(),
+        ShortcutBinding {
+            id: "rerun_next_prompt".to_string(),
+            name: "Re-run with Next Prompt".to_string(),
+            description: "Re-processes the last dictation with the next prompt and pastes it."
+                .to_string(),
+            default_binding: "ctrl+alt+r".to_string(),
+            current_binding: "ctrl+alt+r".to_string(),
+        },
+    );
+    bindings.insert(
         "cancel".to_string(),
         ShortcutBinding {
             id: "cancel".to_string(),
@@ -972,6 +993,7 @@ pub fn get_default_settings() -> AppSettings {
         post_process_providers: default_post_process_providers(),
         post_process_api_keys: default_post_process_api_keys(),
         post_process_models: default_post_process_models(),
+        snippets: Vec::new(),
         post_process_prompts: default_post_process_prompts(),
         post_process_selected_prompt_id: Some("super".to_string()),
         mute_while_recording: false,

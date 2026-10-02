@@ -101,6 +101,7 @@ handy --toggle-post-process     # Toggle recording with post-processing on/off
 handy --cancel                  # Cancel the current operation
 handy --swap-language           # Swap the selected language with the alternate language
 handy --next-prompt             # Switch to the next post-processing prompt
+handy --rerun                   # Re-run the last dictation with the next prompt
 handy --set-language no         # Set the dictation language (a code, or "auto")
 handy --set-prompt email        # Select a post-processing prompt by id
 ```

@@ -440,6 +440,11 @@ export const PostProcessingSettings: React.FC = () => {
           descriptionMode="tooltip"
           grouped={true}
         />
+        <ShortcutInput
+          shortcutId="rerun_next_prompt"
+          descriptionMode="tooltip"
+          grouped={true}
+        />
       </SettingsGroup>
 
       <SettingsGroup title={t("settings.postProcessing.api.title")}>

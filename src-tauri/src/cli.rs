@@ -32,6 +32,10 @@ pub struct CliArgs {
     #[arg(long)]
     pub next_prompt: bool,
 
+    /// Re-run the last dictation with the next post-processing prompt (sent to running instance)
+    #[arg(long)]
+    pub rerun: bool,
+
     /// Select a post-processing prompt by id (sent to running instance)
     #[arg(long, value_name = "ID")]
     pub set_prompt: Option<String>,

@@ -507,11 +507,18 @@ pub(crate) async fn process_transcription_output(
     }
 
     if post_process {
-        if let Some(processed_text) = post_process_transcription(&settings, &final_text).await {
+        // Prompt variables (${clipboard} etc.) are filled in on a copy so the stored prompt
+        // text, which goes into the history, never contains clipboard contents.
+        let prompt_settings = crate::extras::expand_prompt_variables(app, settings.clone());
+        if let Some(processed_text) =
+            post_process_transcription(&prompt_settings, &final_text).await
+        {
             let (processed_text, vocab_words) = extract_vocab_commands(&processed_text);
             if !vocab_words.is_empty() {
                 learn_vocabulary(app, &vocab_words);
             }
+            let processed_text =
+                crate::extras::expand_snippets(&processed_text, &settings.snippets);
             post_processed_text = Some(processed_text.clone());
             final_text = processed_text;
 
@@ -987,7 +994,7 @@ struct SwitchAction {
 
 /// Returns the entry after `current` in `items`, wrapping around. Starts at the first
 /// entry when `current` is not in the list.
-fn next_in_cycle<'a>(items: &'a [String], current: Option<&str>) -> Option<&'a String> {
+pub(crate) fn next_in_cycle<'a>(items: &'a [String], current: Option<&str>) -> Option<&'a String> {
     if items.is_empty() {
         return None;
     }
@@ -999,7 +1006,7 @@ fn next_in_cycle<'a>(items: &'a [String], current: Option<&str>) -> Option<&'a S
 
 /// Saves `settings`, tells the frontend, and shows the overlay notice for a setting
 /// that a shortcut or CLI flag just changed.
-fn announce_setting_change(
+pub(crate) fn announce_setting_change(
     app: &AppHandle,
     settings: AppSettings,
     setting: &str,
@@ -1159,6 +1166,10 @@ pub static ACTION_MAP: Lazy<HashMap<String, Arc<dyn ShortcutAction>>> = Lazy::ne
         Arc::new(SwitchAction {
             kind: SwitchKind::SwapLanguage,
         }) as Arc<dyn ShortcutAction>,
+    );
+    map.insert(
+        "rerun_next_prompt".to_string(),
+        Arc::new(crate::extras::RerunAction) as Arc<dyn ShortcutAction>,
     );
     map.insert(
         "cycle_prompt".to_string(),
