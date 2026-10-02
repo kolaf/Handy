@@ -98,14 +98,15 @@ All in `fork/prompts/`.
 
 ## Talon
 
-`fork/talon/` has a Talon bridge (`handy.py`, `handy.talon`, README): one key that starts/stops a dictation and mutes Talon
-meanwhile, voice commands for the flags, a "handy reply" command that copies the selection first, and optional per-app prompt
-switching. **Untested against a real Talon install.**
+The Talon files live in the community fork `kolaf/community`, folder `kolaf/` (not in this repo), so a clone of the fork
+carries them: a Talon bridge for Handy (disabled until you enable it), personal overrides (wake key `Ctrl+PageUp`,
+spoken wake commands disabled, `drowse`, `shock`), and the voice shell commands. Its `kolaf/README.md` has the setup for a
+new machine and how to merge upstream. **The spoken behaviour has not been tried; Talon loads the files without errors.**
 
 ## Voice shell
 
 `fork/voice-shell/` is separate from Handy: `hv`, a wrapper that turns a spoken request into one short Hermes Agent
-session (plan first, then `hv go`), with Talon commands (`hermes <request>`, `grab files`). Safety rules, measured
+session (plan first, then `hv go`), with Talon commands (`hermes <request>`, `grab files`) that live in the community fork. Safety rules, measured
 behaviour, what is unverified and how to install: `fork/voice-shell/README.md`.
 
 ## Building and installing

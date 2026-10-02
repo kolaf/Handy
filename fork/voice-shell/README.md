@@ -21,8 +21,8 @@ ambiguous, show exact full paths).
 
 - `ln -sf <repo>/fork/voice-shell/hv ~/.local/bin/hv` (done on this machine). Needs Hermes (`hermes`) configured.
 - Optional: `zoxide` for recent folders (`eval "$(zoxide init bash)"` in `.bashrc`).
-- Talon (copy into your Talon user folder, e.g. `%APPDATA%\talon\user\hv\`): `talon/hv.py`, `talon/hv.talon`,
-  `talon/hv_files.talon`. **Not yet installed or run.**
+- Talon: the commands are in the community fork, `kolaf/community`, folder `kolaf/hv/` (loaded automatically; no copying).
+  They are installed on the home machine and load without errors; the spoken behaviour is untried.
 
 ## Talon commands
 
@@ -55,7 +55,7 @@ State: the last session id, and a tab-separated journal of every request, in `~/
 
 ## What was not verified
 
-- The Talon files (never loaded in Talon). `hv_grab_selection` assumes `edit.copy`, `sleep` and `app.notify`.
+- The Talon files' spoken behaviour (they load without errors). `hv_grab_selection` assumes `edit.copy`, `sleep` and `app.notify`.
 - Executing a trash move, `--checkpoints` with `/rollback`, Hermes' own approval prompts (never triggered),
   long sessions, Norwegian requests, and whether the agent saves habits to memory (tests ran with `--ignore-rules`).
 
