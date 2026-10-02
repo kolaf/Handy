@@ -25,7 +25,8 @@ This is a fork of [cjpais/Handy](https://github.com/cjpais/Handy) that has delib
 | **Paste last dictation** | `ctrl+alt+v` or `handy --paste-last` | General page |
 | **Offline fallback** | Automatic when the language model call fails | n/a |
 | **Skip the model for short dictations** | Number of words below which the model is skipped | Post-processing page (0 = off) |
-| **Ten default prompts** | Baked in for fresh and portable installs | `fork/prompts/` |
+| **Edit by voice** | Copy text, press the post-processing key, say the change ("make it shorter", "translate to English"); the `edit` prompt pastes the result | `edit` prompt |
+| **Eleven default prompts** | Baked in for fresh and portable installs | `fork/prompts/` |
 | **Guide page** | Sidebar > Guide: what is new in this build and a quick reference | `src/content/fork-guide.md` (keep it in step with this file) |
 
 Default shortcuts are `ctrl+alt+l`, `ctrl+alt+p`, `ctrl+alt+r`, `ctrl+alt+v`; rebind them in Settings. On Wayland, desktops
@@ -78,7 +79,7 @@ handy --set-language no --set-prompt email --toggle-post-process
 ```
 
 Prompt ids: `simple`, `informal_message`, `email`, `note`, `meeting`, `super`, `reply`, `document`, `informal_text`,
-`formal_text`, plus any you create.
+`formal_text`, `edit`, plus any you create.
 
 ## Prompts and the test bench
 
@@ -94,7 +95,8 @@ All in `fork/prompts/`.
 - `bench.py` runs `bench_cases.json` (24 cases) the way Handy sends a request and checks the result:
   `python3 bench.py --from-handy` (endpoint, model and key from your Handy settings), `--prompt email`,
   `--case spell_exe -v`, `--dry` (print assembled prompts), `--mock` (check the checker without a model).
-  The checker itself is verified; **model behaviour is not**, until you run it against your model.
+  On 2 October 2026 all 29 cases passed against the real model (GPT 5.4 via the hosted gateway; one run, simple
+  checks, so treat it as strong evidence and not a guarantee). Rerun it after changing a prompt or the model.
 
 ## Talon
 
