@@ -36,6 +36,12 @@ without conflicts (community was reset to upstream on 2 October 2026; the old lo
 - `disable_wake_*.talon` + `personal.py`: override community's spoken wake commands ("wake up", "talon wake",
   "welcome back") with `skip()`. Each has community's context plus the tag `user.disable_voice_wake`, so it is more
   specific and wins. "wake up and listen" (leaving deep sleep) is left alone on purpose.
+- `special_key_extra.talon-list`: adds the spoken key name `shock` (presses Enter) to community's `special_key` list.
+  Lists with the same name from matching contexts merge, so community's own entries stay. A `.talon-list` file must
+  start with its `list:` header on line 1; comments go below the `-` line.
+- `drowse.talon`: `drowse` puts Talon to sleep, like community's "go to sleep" (wake with `Ctrl+PageUp`).
+- Not restored from the old setup: `junk` (Delete), `mixed mode`, and the Python word-case tweaks.
+
 - Verified: Talon loaded all files without errors and its registry lists both the community command and the `skip()`
   override for each phrase. Not verified: that the override wins in practice; test it by putting Talon to sleep
   with `Ctrl+PageUp`, saying "wake up" (nothing should happen), then `Ctrl+PageUp` again (Talon wakes).

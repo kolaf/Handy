@@ -1,0 +1,7 @@
+list: user.special_key
+os: windows
+os: linux
+-
+# Extra spoken names for keys. Lists with the same name from matching contexts are merged, so this adds to
+# community/core/keys/win/special_key.talon-list instead of replacing it. Say "shock" to press Enter.
+shock: enter
