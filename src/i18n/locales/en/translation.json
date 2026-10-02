@@ -716,7 +716,8 @@
     "transcribing": "Transcribing...",
     "processing": "Processing...",
     "noticeLanguage": "Language: {{value}}",
-    "noticePrompt": "Prompt: {{value}}"
+    "noticePrompt": "Prompt: {{value}}",
+    "noticeVocab": "Added to vocabulary: {{value}}"
   },
   "secureInput": {
     "blockedWithCulprit_one": "{{name}} may be blocking 1 shortcut",

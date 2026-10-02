@@ -17,6 +17,7 @@ use crate::TranscriptionCoordinator;
 use ferrous_opencc::{config::BuiltinConfig, OpenCC};
 use log::{debug, error, warn};
 use once_cell::sync::Lazy;
+use regex::Regex;
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::Arc;
@@ -420,6 +421,71 @@ fn resolve_effective_language(app: &AppHandle, settings: &AppSettings) -> String
     }
 }
 
+/// Most words one dictation may add to the vocabulary, and the longest a word may be.
+const MAX_VOCAB_COMMANDS: usize = 5;
+const MAX_VOCAB_WORD_CHARS: usize = 64;
+
+/// Splits `[[vocab: WORD]]` command tags from the post-processed text.
+///
+/// The post-processing prompt can append these tags when the speaker spells out a word
+/// or asks to add it to the vocabulary. The text comes from a model reading speech, so
+/// the words are validated: one line, bounded length, no brackets or control characters,
+/// at most [`MAX_VOCAB_COMMANDS`] per dictation. Returns the text without the tags and
+/// the accepted words.
+fn extract_vocab_commands(text: &str) -> (String, Vec<String>) {
+    static TAG: Lazy<Regex> = Lazy::new(|| Regex::new(r"\[\[\s*vocab\s*:([^\]\n]*)\]\]").unwrap());
+    let mut words: Vec<String> = Vec::new();
+    for capture in TAG.captures_iter(text) {
+        let word = capture[1]
+            .trim()
+            .trim_matches(|c| c == '"' || c == '\'')
+            .trim();
+        let valid = !word.is_empty()
+            && word.chars().count() <= MAX_VOCAB_WORD_CHARS
+            && !word.chars().any(|c| c.is_control() || c == '[' || c == ']');
+        if valid
+            && words.len() < MAX_VOCAB_COMMANDS
+            && !words.iter().any(|w| w.eq_ignore_ascii_case(word))
+        {
+            words.push(word.to_string());
+        }
+    }
+    // Tags sit on their own trailing line; drop the line break they leave behind.
+    (TAG.replace_all(text, "").trim_end().to_string(), words)
+}
+
+/// Adds `words` to the custom words list (skipping ones already there, ignoring case).
+fn learn_vocabulary(app: &AppHandle, words: &[String]) {
+    let mut settings = get_settings(app);
+    let mut added: Vec<String> = Vec::new();
+    for word in words {
+        if !settings
+            .custom_words
+            .iter()
+            .any(|known| known.eq_ignore_ascii_case(word))
+        {
+            settings.custom_words.push(word.clone());
+            added.push(word.clone());
+        }
+    }
+    if added.is_empty() {
+        return;
+    }
+    log::info!("Vocabulary command: added {:?}", added);
+    crate::settings::write_settings(app, settings);
+    let _ = app.emit(
+        "settings-changed",
+        serde_json::json!({ "setting": "custom_words", "value": added }),
+    );
+    // The overlay is still finishing this dictation; show the notice once it has faded.
+    let handle = app.clone();
+    let shown = added.join(", ");
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(700));
+        crate::overlay::show_notice_overlay(&handle, "vocab", &shown);
+    });
+}
+
 pub(crate) async fn process_transcription_output(
     app: &AppHandle,
     transcription: &str,
@@ -442,6 +508,10 @@ pub(crate) async fn process_transcription_output(
 
     if post_process {
         if let Some(processed_text) = post_process_transcription(&settings, &final_text).await {
+            let (processed_text, vocab_words) = extract_vocab_commands(&processed_text);
+            if !vocab_words.is_empty() {
+                learn_vocabulary(app, &vocab_words);
+            }
             post_processed_text = Some(processed_text.clone());
             final_text = processed_text;
 
@@ -1051,7 +1121,7 @@ pub static ACTION_MAP: Lazy<HashMap<String, Arc<dyn ShortcutAction>>> = Lazy::ne
 #[cfg(test)]
 mod tests {
     use super::{
-        complete_unless_cancelled, is_blank_transcription, next_in_cycle,
+        complete_unless_cancelled, extract_vocab_commands, is_blank_transcription, next_in_cycle,
         should_use_streaming_overlay, strip_think_block,
     };
     use crate::settings::OverlayStyle;
@@ -1079,6 +1149,47 @@ mod tests {
         );
         assert_eq!(next_in_cycle(&items, None).map(String::as_str), Some("en"));
         assert_eq!(next_in_cycle(&[], Some("en")), None);
+    }
+
+    #[test]
+    fn vocab_tag_is_stripped_and_word_collected() {
+        let (text, words) =
+            extract_vocab_commands("We talked about the DYST system.\n[[vocab: DYST]]");
+        assert_eq!(text, "We talked about the DYST system.");
+        assert_eq!(words, vec!["DYST".to_string()]);
+    }
+
+    #[test]
+    fn vocab_only_dictation_leaves_no_text() {
+        let (text, words) = extract_vocab_commands("[[vocab: Kubernetes]]");
+        assert_eq!(text, "");
+        assert_eq!(words, vec!["Kubernetes".to_string()]);
+    }
+
+    #[test]
+    fn vocab_words_are_validated_and_deduplicated() {
+        let long = "x".repeat(65);
+        let input = format!(
+            "Hi [[vocab: a]] [[vocab: A]] [[vocab: ]] [[vocab: {long}]] [[vocab: bad [x]]] [[vocab: \"quoted\"]]"
+        );
+        let (_, words) = extract_vocab_commands(&input);
+        assert_eq!(words, vec!["a".to_string(), "quoted".to_string()]);
+    }
+
+    #[test]
+    fn vocab_commands_are_capped() {
+        let input = (0..9)
+            .map(|i| format!("[[vocab: w{i}]]"))
+            .collect::<String>();
+        let (_, words) = extract_vocab_commands(&input);
+        assert_eq!(words.len(), 5);
+    }
+
+    #[test]
+    fn text_without_tags_is_unchanged() {
+        let (text, words) = extract_vocab_commands("Nothing special [here] or [[else]].");
+        assert_eq!(text, "Nothing special [here] or [[else]].");
+        assert!(words.is_empty());
     }
 
     #[test]
