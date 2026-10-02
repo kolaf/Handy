@@ -140,6 +140,8 @@ const settingUpdaters: {
   debug_mode: (value) => commands.changeDebugModeSetting(value as boolean),
   custom_words: (value) => commands.updateCustomWords(value as string[]),
   snippets: (value) => commands.updateSnippets(value as Snippet[]),
+  post_process_min_words: (value) =>
+    commands.changePostProcessMinWordsSetting(value as number),
   word_correction_threshold: (value) =>
     commands.changeWordCorrectionThresholdSetting(value as number),
   paste_delay_ms: (value) =>

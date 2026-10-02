@@ -100,6 +100,10 @@ pub struct LLMPrompt {
     pub id: String,
     pub name: String,
     pub prompt: String,
+    /// Optional examples (dictation -> expected output) shown to the model after the
+    /// instructions, or placed where the prompt says `${examples}`.
+    #[serde(default)]
+    pub examples: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Type)]
@@ -466,6 +470,9 @@ pub struct AppSettings {
     pub post_process_models: HashMap<String, String>,
     #[serde(default)]
     pub snippets: Vec<Snippet>,
+    /// Dictations with fewer words than this skip the language model (0 = always use it).
+    #[serde(default)]
+    pub post_process_min_words: u32,
     #[serde(default = "default_post_process_prompts")]
     pub post_process_prompts: Vec<LLMPrompt>,
     #[serde(default)]
@@ -943,6 +950,16 @@ pub fn get_default_settings() -> AppSettings {
         },
     );
     bindings.insert(
+        "paste_last".to_string(),
+        ShortcutBinding {
+            id: "paste_last".to_string(),
+            name: "Paste Last Dictation".to_string(),
+            description: "Pastes the most recent dictation again.".to_string(),
+            default_binding: "ctrl+alt+v".to_string(),
+            current_binding: "ctrl+alt+v".to_string(),
+        },
+    );
+    bindings.insert(
         "cancel".to_string(),
         ShortcutBinding {
             id: "cancel".to_string(),
@@ -994,6 +1011,7 @@ pub fn get_default_settings() -> AppSettings {
         post_process_api_keys: default_post_process_api_keys(),
         post_process_models: default_post_process_models(),
         snippets: Vec::new(),
+        post_process_min_words: 0,
         post_process_prompts: default_post_process_prompts(),
         post_process_selected_prompt_id: Some("super".to_string()),
         mute_while_recording: false,

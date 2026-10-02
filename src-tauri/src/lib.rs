@@ -690,6 +690,7 @@ pub fn run(cli_args: CliArgs) {
             shortcut::set_post_process_selected_prompt,
             shortcut::update_custom_words,
             extras::update_snippets,
+            shortcut::change_post_process_min_words_setting,
             shortcut::suspend_all_bindings,
             shortcut::resume_all_bindings,
             shortcut::change_mute_while_recording_setting,
@@ -876,6 +877,8 @@ pub fn run(cli_args: CliArgs) {
                 signal_handle::run_action(app, "cycle_prompt", "CLI");
             } else if args.iter().any(|a| a == "--rerun") {
                 signal_handle::run_action(app, "rerun_next_prompt", "CLI");
+            } else if args.iter().any(|a| a == "--paste-last") {
+                signal_handle::run_action(app, "paste_last", "CLI");
             } else if !handled_setting {
                 // A second process was launched without remote-control flags
                 // (e.g. the binary run from a shell). On macOS, relaunching the

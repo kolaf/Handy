@@ -506,7 +506,13 @@ pub(crate) async fn process_transcription_output(
         final_text = converted_text;
     }
 
-    if post_process {
+    if post_process && crate::extras::is_short_utterance(&settings, &final_text) {
+        // Too short to be worth a model call: basic local cleanup only.
+        final_text = crate::extras::local_cleanup(&final_text);
+        if final_text != transcription {
+            post_processed_text = Some(final_text.clone());
+        }
+    } else if post_process {
         // Prompt variables (${clipboard} etc.) are filled in on a copy so the stored prompt
         // text, which goes into the history, never contains clipboard contents.
         let prompt_settings = crate::extras::expand_prompt_variables(app, settings.clone());
@@ -531,6 +537,12 @@ pub(crate) async fn process_transcription_output(
                     post_process_prompt = Some(prompt.prompt.clone());
                 }
             }
+        } else if crate::extras::post_processing_configured(&settings, &final_text) {
+            // The request failed (offline, timeout, error): keep the dictation usable with
+            // local cleanup, and say so.
+            final_text = crate::extras::local_cleanup(&final_text);
+            post_processed_text = Some(final_text.clone());
+            crate::extras::notify_fallback(app);
         }
     } else if final_text != transcription {
         post_processed_text = Some(final_text.clone());
@@ -1166,6 +1178,10 @@ pub static ACTION_MAP: Lazy<HashMap<String, Arc<dyn ShortcutAction>>> = Lazy::ne
         Arc::new(SwitchAction {
             kind: SwitchKind::SwapLanguage,
         }) as Arc<dyn ShortcutAction>,
+    );
+    map.insert(
+        "paste_last".to_string(),
+        Arc::new(crate::extras::PasteLastAction) as Arc<dyn ShortcutAction>,
     );
     map.insert(
         "rerun_next_prompt".to_string(),

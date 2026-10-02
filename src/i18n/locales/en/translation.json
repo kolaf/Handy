@@ -188,6 +188,10 @@
             "name": "Cycle Prompt Shortcut",
             "description": "Switch to the next post-processing prompt."
           },
+          "paste_last": {
+            "name": "Paste Last Dictation Shortcut",
+            "description": "Paste the most recent dictation again, for example when a paste went to the wrong window."
+          },
           "rerun_next_prompt": {
             "name": "Re-run With Next Prompt Shortcut",
             "description": "Re-process the last dictation with the next prompt and paste the result. Select the previously pasted text first to replace it."
@@ -427,6 +431,11 @@
       }
     },
     "postProcessing": {
+      "minWords": {
+        "title": "Skip the model for short dictations",
+        "description": "Dictations with fewer words than this are not sent to the language model; only basic local cleanup (spoken punctuation, capital letters) is applied. 0 always uses the model.",
+        "unit": "words"
+      },
       "hotkey": {
         "title": "Hotkey"
       },
@@ -471,7 +480,10 @@
         "promptLabelPlaceholder": "Enter prompt name",
         "promptInstructions": "Prompt Instructions",
         "promptInstructionsPlaceholder": "Write the instructions to run after transcription. Example: Improve grammar and clarity for the following text: ${output}",
-        "promptTip": "Tip: Use <code>${output}</code> to insert the transcribed text in your prompt.",
+        "promptTip": "Tip: Use <code>${output}</code> to insert the transcribed text in your prompt. Other variables: <code>${vocabulary}</code>, <code>${snippets}</code>, <code>${clipboard}</code>, <code>${examples}</code>.",
+        "promptExamples": "Examples (optional)",
+        "promptExamplesPlaceholder": "Dictation: ...\nResult: ...\n---\nDictation: ...\nResult: ...",
+        "promptExamplesTip": "Show the model what you expect, especially for a fixed structure with [placeholders]. Examples are added after the instructions, or where you write <code>${examples}</code>.",
         "updatePrompt": "Update Prompt",
         "deletePrompt": "Delete Prompt",
         "createPrompt": "Create Prompt",
@@ -731,7 +743,8 @@
     "processing": "Processing...",
     "noticeLanguage": "Language: {{value}}",
     "noticePrompt": "Prompt: {{value}}",
-    "noticeVocab": "Added to vocabulary: {{value}}"
+    "noticeVocab": "Added to vocabulary: {{value}}",
+    "noticeFallback": "Offline: basic cleanup only"
   },
   "secureInput": {
     "blockedWithCulprit_one": "{{name}} may be blocking 1 shortcut",

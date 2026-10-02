@@ -20,6 +20,7 @@ import { ApiKeyField } from "../PostProcessingSettingsApi/ApiKeyField";
 import { ModelSelect } from "../PostProcessingSettingsApi/ModelSelect";
 import { usePostProcessProviderState } from "../PostProcessingSettingsApi/usePostProcessProviderState";
 import { ShortcutInput } from "../ShortcutInput";
+import { PostProcessMinWords } from "../PostProcessMinWords";
 import { useSettings } from "../../../hooks/useSettings";
 
 const PostProcessingSettingsApiComponent: React.FC = () => {
@@ -150,6 +151,7 @@ const PostProcessingSettingsPromptsComponent: React.FC = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [draftText, setDraftText] = useState("");
+  const [draftExamples, setDraftExamples] = useState("");
 
   const prompts = getSetting("post_process_prompts") || [];
   const selectedPromptId = getSetting("post_process_selected_prompt_id") || "";
@@ -162,15 +164,18 @@ const PostProcessingSettingsPromptsComponent: React.FC = () => {
     if (selectedPrompt) {
       setDraftName(selectedPrompt.name);
       setDraftText(selectedPrompt.prompt);
+      setDraftExamples(selectedPrompt.examples ?? "");
     } else {
       setDraftName("");
       setDraftText("");
+      setDraftExamples("");
     }
   }, [
     isCreating,
     selectedPromptId,
     selectedPrompt?.name,
     selectedPrompt?.prompt,
+    selectedPrompt?.examples,
   ]);
 
   const handlePromptSelect = (promptId: string | null) => {
@@ -186,6 +191,7 @@ const PostProcessingSettingsPromptsComponent: React.FC = () => {
       const result = await commands.addPostProcessPrompt(
         draftName.trim(),
         draftText.trim(),
+        draftExamples.trim(),
       );
       if (result.status === "ok") {
         await refreshSettings();
@@ -205,6 +211,7 @@ const PostProcessingSettingsPromptsComponent: React.FC = () => {
         selectedPromptId,
         draftName.trim(),
         draftText.trim(),
+        draftExamples.trim(),
       );
       await refreshSettings();
     } catch (error) {
@@ -229,9 +236,11 @@ const PostProcessingSettingsPromptsComponent: React.FC = () => {
     if (selectedPrompt) {
       setDraftName(selectedPrompt.name);
       setDraftText(selectedPrompt.prompt);
+      setDraftExamples(selectedPrompt.examples ?? "");
     } else {
       setDraftName("");
       setDraftText("");
+      setDraftExamples("");
     }
   };
 
@@ -239,13 +248,15 @@ const PostProcessingSettingsPromptsComponent: React.FC = () => {
     setIsCreating(true);
     setDraftName("");
     setDraftText("");
+    setDraftExamples("");
   };
 
   const hasPrompts = prompts.length > 0;
   const isDirty =
     !!selectedPrompt &&
     (draftName.trim() !== selectedPrompt.name ||
-      draftText.trim() !== selectedPrompt.prompt.trim());
+      draftText.trim() !== selectedPrompt.prompt.trim() ||
+      draftExamples.trim() !== (selectedPrompt.examples ?? "").trim());
 
   return (
     <SettingContainer
@@ -323,6 +334,25 @@ const PostProcessingSettingsPromptsComponent: React.FC = () => {
               </p>
             </div>
 
+            <div className="space-y-2 flex flex-col">
+              <label className="text-sm font-semibold">
+                {t("settings.postProcessing.prompts.promptExamples")}
+              </label>
+              <Textarea
+                value={draftExamples}
+                onChange={(e) => setDraftExamples(e.target.value)}
+                placeholder={t(
+                  "settings.postProcessing.prompts.promptExamplesPlaceholder",
+                )}
+              />
+              <p className="text-xs text-mid-gray/70">
+                <Trans
+                  i18nKey="settings.postProcessing.prompts.promptExamplesTip"
+                  components={{ code: <code /> }}
+                />
+              </p>
+            </div>
+
             <div className="flex gap-2 pt-2">
               <Button
                 onClick={handleUpdatePrompt}
@@ -390,6 +420,25 @@ const PostProcessingSettingsPromptsComponent: React.FC = () => {
               </p>
             </div>
 
+            <div className="space-y-2 flex flex-col">
+              <label className="text-sm font-semibold">
+                {t("settings.postProcessing.prompts.promptExamples")}
+              </label>
+              <Textarea
+                value={draftExamples}
+                onChange={(e) => setDraftExamples(e.target.value)}
+                placeholder={t(
+                  "settings.postProcessing.prompts.promptExamplesPlaceholder",
+                )}
+              />
+              <p className="text-xs text-mid-gray/70">
+                <Trans
+                  i18nKey="settings.postProcessing.prompts.promptExamplesTip"
+                  components={{ code: <code /> }}
+                />
+              </p>
+            </div>
+
             <div className="flex gap-2 pt-2">
               <Button
                 onClick={handleCreatePrompt}
@@ -445,6 +494,7 @@ export const PostProcessingSettings: React.FC = () => {
           descriptionMode="tooltip"
           grouped={true}
         />
+        <PostProcessMinWords descriptionMode="tooltip" grouped={true} />
       </SettingsGroup>
 
       <SettingsGroup title={t("settings.postProcessing.api.title")}>

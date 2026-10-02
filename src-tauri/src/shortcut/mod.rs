@@ -838,6 +838,15 @@ pub fn change_whats_new_last_seen_version_setting(
 
 #[tauri::command]
 #[specta::specta]
+pub fn change_post_process_min_words_setting(app: AppHandle, words: u32) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.post_process_min_words = words.min(50);
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
 pub fn update_custom_words(app: AppHandle, words: Vec<String>) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
     settings.custom_words = words;
@@ -1128,6 +1137,7 @@ pub fn add_post_process_prompt(
     app: AppHandle,
     name: String,
     prompt: String,
+    examples: String,
 ) -> Result<LLMPrompt, String> {
     let mut settings = settings::get_settings(&app);
 
@@ -1138,6 +1148,7 @@ pub fn add_post_process_prompt(
         id: id.clone(),
         name,
         prompt,
+        examples,
     };
 
     settings.post_process_prompts.push(new_prompt.clone());
@@ -1153,6 +1164,7 @@ pub fn update_post_process_prompt(
     id: String,
     name: String,
     prompt: String,
+    examples: String,
 ) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
 
@@ -1163,6 +1175,7 @@ pub fn update_post_process_prompt(
     {
         existing_prompt.name = name;
         existing_prompt.prompt = prompt;
+        existing_prompt.examples = examples;
         settings::write_settings(&app, settings);
         Ok(())
     } else {
