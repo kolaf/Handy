@@ -851,6 +851,17 @@ pub fn run(cli_args: CliArgs) {
     // instance instead.
     if !headless_mode {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            // Settings flags come first so they can be combined with a toggle in one call,
+            // e.g. `handy --set-language no --set-prompt email --toggle-post-process`.
+            let mut handled_setting = false;
+            if let Some(id) = signal_handle::flag_value(&args, "--set-prompt") {
+                actions::set_prompt_by_id(app, &id);
+                handled_setting = true;
+            }
+            if let Some(code) = signal_handle::flag_value(&args, "--set-language") {
+                actions::set_language_code(app, &code);
+                handled_setting = true;
+            }
             if args.iter().any(|a| a == "--toggle-transcription") {
                 signal_handle::send_transcription_input(app, "transcribe", "CLI");
             } else if args.iter().any(|a| a == "--toggle-post-process") {
@@ -861,7 +872,7 @@ pub fn run(cli_args: CliArgs) {
                 signal_handle::run_action(app, "swap_language", "CLI");
             } else if args.iter().any(|a| a == "--next-prompt") {
                 signal_handle::run_action(app, "cycle_prompt", "CLI");
-            } else {
+            } else if !handled_setting {
                 // A second process was launched without remote-control flags
                 // (e.g. the binary run from a shell). On macOS, relaunching the
                 // bundle from Spotlight/Finder/Dock does not start a process —
