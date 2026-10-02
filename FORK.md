@@ -49,7 +49,7 @@ model to know the names.
 snippet names. `${clipboard}` is the clipboard text (read **only** when the prompt contains it; capped at 6000
 characters; never stored in history). `${examples}` is the prompt's examples. If a prompt has examples but does not place
 `${examples}`, they are appended after the instructions. Substituted text is never scanned for variables again.
-There is no native `${selection}`: copy the text first (a Talon command can do this, see `fork/talon/`).
+There is no native `${selection}`: copy the text first (a Talon command can do this: the `hermes`/`grab files` commands in the community fork, `kolaf/`).
 
 **Examples field.** For fixed structures: put the structure with `[placeholders]` in the prompt, then give one or two
 `Dictation: ... / Result: ...` pairs separated by `---`. The *Document template* prompt is a working sample.
