@@ -456,6 +456,19 @@
     transform: rotate(1turn);
   }
 }
+/* Caption under the controls: language (and prompt) of the current recording. */
+.scap {
+  height: 18px;
+  flex: none;
+  padding: 0 14px 4px;
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--s-muted);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .swork-label {
   font-size: 12px;
   color: var(--s-muted);

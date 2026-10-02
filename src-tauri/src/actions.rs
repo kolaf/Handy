@@ -536,6 +536,7 @@ impl ShortcutAction for TranscribeAction {
         // doesn't stream (or whose capability is not known yet) gets the compact
         // pill instead of an oversized transparent live window.
         let overlay_started = Instant::now();
+        crate::overlay::emit_recording_caption(app, self.post_process);
         match settings.overlay_style {
             OverlayStyle::Live if model_supports_streaming => utils::show_streaming_overlay(app),
             OverlayStyle::Live | OverlayStyle::Minimal => show_recording_overlay(app),
@@ -903,6 +904,78 @@ impl ShortcutAction for TranscribeAction {
     }
 }
 
+// Switch Action: swaps the language with the alternate language, or steps the
+// post-processing prompt to the next one.
+enum SwitchKind {
+    SwapLanguage,
+    NextPrompt,
+}
+
+struct SwitchAction {
+    kind: SwitchKind,
+}
+
+/// Returns the entry after `current` in `items`, wrapping around. Starts at the first
+/// entry when `current` is not in the list.
+fn next_in_cycle<'a>(items: &'a [String], current: Option<&str>) -> Option<&'a String> {
+    if items.is_empty() {
+        return None;
+    }
+    let idx = current
+        .and_then(|c| items.iter().position(|i| i == c))
+        .map_or(0, |i| (i + 1) % items.len());
+    items.get(idx)
+}
+
+impl ShortcutAction for SwitchAction {
+    fn start(&self, app: &AppHandle, _binding_id: &str, _shortcut_str: &str) {
+        let mut settings = get_settings(app);
+        // (setting name, new value, overlay notice kind, text shown in the notice)
+        let changed: Option<(&str, String, &str, String)> = match self.kind {
+            SwitchKind::SwapLanguage => {
+                std::mem::swap(
+                    &mut settings.selected_language,
+                    &mut settings.alternate_language,
+                );
+                let lang = settings.selected_language.clone();
+                Some(("selected_language", lang.clone(), "language", lang))
+            }
+            SwitchKind::NextPrompt => {
+                let ids: Vec<String> = settings
+                    .post_process_prompts
+                    .iter()
+                    .map(|p| p.id.clone())
+                    .collect();
+                next_in_cycle(&ids, settings.post_process_selected_prompt_id.as_deref())
+                    .cloned()
+                    .map(|id| {
+                        let name = settings
+                            .post_process_prompts
+                            .iter()
+                            .find(|p| p.id == id)
+                            .map_or_else(|| id.clone(), |p| p.name.clone());
+                        settings.post_process_selected_prompt_id = Some(id.clone());
+                        ("post_process_selected_prompt_id", id, "prompt", name)
+                    })
+            }
+        };
+        match changed {
+            Some((setting, value, kind, shown)) => {
+                log::info!("Switch shortcut: {} -> {}", setting, value);
+                crate::settings::write_settings(app, settings);
+                let _ = app.emit(
+                    "settings-changed",
+                    serde_json::json!({ "setting": setting, "value": value }),
+                );
+                crate::overlay::show_notice_overlay(app, kind, &shown);
+            }
+            None => log::warn!("Switch shortcut: nothing to switch"),
+        }
+    }
+
+    fn stop(&self, _app: &AppHandle, _binding_id: &str, _shortcut_str: &str) {}
+}
+
 // Cancel Action
 struct CancelAction;
 
@@ -957,6 +1030,18 @@ pub static ACTION_MAP: Lazy<HashMap<String, Arc<dyn ShortcutAction>>> = Lazy::ne
         Arc::new(CancelAction) as Arc<dyn ShortcutAction>,
     );
     map.insert(
+        "swap_language".to_string(),
+        Arc::new(SwitchAction {
+            kind: SwitchKind::SwapLanguage,
+        }) as Arc<dyn ShortcutAction>,
+    );
+    map.insert(
+        "cycle_prompt".to_string(),
+        Arc::new(SwitchAction {
+            kind: SwitchKind::NextPrompt,
+        }) as Arc<dyn ShortcutAction>,
+    );
+    map.insert(
         "test".to_string(),
         Arc::new(TestAction) as Arc<dyn ShortcutAction>,
     );
@@ -966,8 +1051,8 @@ pub static ACTION_MAP: Lazy<HashMap<String, Arc<dyn ShortcutAction>>> = Lazy::ne
 #[cfg(test)]
 mod tests {
     use super::{
-        complete_unless_cancelled, is_blank_transcription, should_use_streaming_overlay,
-        strip_think_block,
+        complete_unless_cancelled, is_blank_transcription, next_in_cycle,
+        should_use_streaming_overlay, strip_think_block,
     };
     use crate::settings::OverlayStyle;
     use std::future;
@@ -975,6 +1060,26 @@ mod tests {
     use std::sync::Arc;
     use std::thread;
     use std::time::Duration;
+
+    #[test]
+    fn cycle_steps_forward_and_wraps() {
+        let items: Vec<String> = ["en", "no", "sv"].iter().map(|s| s.to_string()).collect();
+        assert_eq!(
+            next_in_cycle(&items, Some("en")).map(String::as_str),
+            Some("no")
+        );
+        assert_eq!(
+            next_in_cycle(&items, Some("sv")).map(String::as_str),
+            Some("en")
+        );
+        // Current value not in the list (or unset): start at the first entry.
+        assert_eq!(
+            next_in_cycle(&items, Some("auto")).map(String::as_str),
+            Some("en")
+        );
+        assert_eq!(next_in_cycle(&items, None).map(String::as_str), Some("en"));
+        assert_eq!(next_in_cycle(&[], Some("en")), None);
+    }
 
     #[test]
     fn blank_transcription_is_detected() {

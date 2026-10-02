@@ -179,6 +179,14 @@
           "transcribe_with_post_process": {
             "name": "Post-Processing Hotkey",
             "description": "Optional: A dedicated hotkey that always applies AI post-processing to your transcription."
+          },
+          "swap_language": {
+            "name": "Swap Language Shortcut",
+            "description": "Swap the selected language with the alternate language."
+          },
+          "cycle_prompt": {
+            "name": "Cycle Prompt Shortcut",
+            "description": "Switch to the next post-processing prompt."
           }
         },
         "errors": {
@@ -186,6 +194,10 @@
           "set": "Failed to set shortcut: {{error}}",
           "reset": "Failed to reset shortcut to original value"
         }
+      },
+      "alternateLanguage": {
+        "title": "Alternate Language",
+        "description": "The language the Swap Language shortcut switches to. Pressing the shortcut swaps it with the selected language."
       },
       "language": {
         "title": "Language",
@@ -702,7 +714,9 @@
   },
   "overlay": {
     "transcribing": "Transcribing...",
-    "processing": "Processing..."
+    "processing": "Processing...",
+    "noticeLanguage": "Language: {{value}}",
+    "noticePrompt": "Prompt: {{value}}"
   },
   "secureInput": {
     "blockedWithCulprit_one": "{{name}} may be blocking 1 shortcut",

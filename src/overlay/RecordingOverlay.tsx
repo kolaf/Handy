@@ -11,12 +11,24 @@ import type {
 } from "@/bindings";
 import i18n, { syncLanguageFromSettings } from "@/i18n";
 import { getLanguageDirection } from "@/lib/utils/rtl";
+import { getLanguageLabel } from "@/lib/constants/languages";
 
-type OverlayState = "recording" | "streaming" | "transcribing" | "processing";
+type OverlayState =
+  | "recording"
+  | "streaming"
+  | "transcribing"
+  | "processing"
+  | "notice";
 
 // Number of reactive bars in the waveform (the simple, smoothed style shared by
-// every overlay form). Mic levels arrive as 16 FFT buckets; we take the first N.
+// every overlay form). Mic levels arrive as 16 FFT buckets; each bar shows the
+// loudest bucket in its share of the spectrum.
 const WAVE_BARS = 9;
+
+// Bars are scaled to the recent peak so a quiet microphone still visibly moves.
+// The floor keeps room noise from being amplified into full-height bars.
+const PEAK_FLOOR = 0.12;
+const PEAK_DECAY = 0.995;
 
 const RecordingOverlay: React.FC = () => {
   const { t } = useTranslation();
@@ -26,6 +38,12 @@ const RecordingOverlay: React.FC = () => {
   // Stay visually in an arming state until the backend processes the first
   // actual microphone sample chunk.
   const [captureReady, setCaptureReady] = useState(false);
+  const [notice, setNotice] = useState({ kind: "", value: "" });
+  const [caption, setCaption] = useState<{
+    language: string;
+    prompt: string | null;
+  }>({ language: "", prompt: null });
+  const peakRef = useRef(PEAK_FLOOR);
   const [levels, setLevels] = useState<number[]>(Array(WAVE_BARS).fill(0));
   const [streamText, setStreamText] = useState<StreamTextEvent>({
     committed: "",
@@ -62,6 +80,7 @@ const RecordingOverlay: React.FC = () => {
         if (overlayState === "recording" || overlayState === "streaming") {
           setCaptureReady(false);
           smoothedLevelsRef.current = Array(16).fill(0);
+          peakRef.current = PEAK_FLOOR;
           setLevels(Array(WAVE_BARS).fill(0));
           setStreamText({ committed: "", tentative: "" });
         }
@@ -89,6 +108,16 @@ const RecordingOverlay: React.FC = () => {
         setIsVisible(true);
       });
 
+      const unlistenNotice = await listen<{ kind: string; value: string }>(
+        "overlay-notice",
+        (event) => setNotice(event.payload),
+      );
+
+      const unlistenCaption = await listen<{
+        language: string;
+        prompt: string | null;
+      }>("overlay-caption", (event) => setCaption(event.payload));
+
       const unlistenHide = await listen("hide-overlay", () => {
         setIsVisible(false);
         setCaptureReady(false);
@@ -101,14 +130,28 @@ const RecordingOverlay: React.FC = () => {
 
       const unlistenLevel = await listen<number[]>("mic-level", (event) => {
         const newLevels = event.payload as number[];
-        // Exponential smoothing across the 16 buckets, then take the first N
-        // bars for the shared waveform.
+        // Track the recent peak and scale to it, so any speech clearly moves the bars.
+        const frameMax = Math.max(0, ...newLevels);
+        peakRef.current = Math.max(
+          PEAK_FLOOR,
+          frameMax,
+          peakRef.current * PEAK_DECAY,
+        );
+        const gain = 0.8 / peakRef.current;
+        // Exponential smoothing across the 16 buckets.
         const smoothed = smoothedLevelsRef.current.map((prev, i) => {
-          const target = newLevels[i] || 0;
+          const target = Math.min(1, (newLevels[i] || 0) * gain);
           return prev * 0.7 + target * 0.3;
         });
         smoothedLevelsRef.current = smoothed;
-        setLevels(smoothed.slice(0, WAVE_BARS));
+        // Each bar shows the loudest bucket in its slice of the spectrum.
+        setLevels(
+          Array.from({ length: WAVE_BARS }, (_, i) => {
+            const from = Math.floor((i * smoothed.length) / WAVE_BARS);
+            const to = Math.floor(((i + 1) * smoothed.length) / WAVE_BARS);
+            return Math.max(...smoothed.slice(from, Math.max(to, from + 1)));
+          }),
+        );
       });
 
       const unlistenStream = await events.streamTextEvent.listen((event) => {
@@ -123,6 +166,8 @@ const RecordingOverlay: React.FC = () => {
 
       return () => {
         unlistenShow();
+        unlistenNotice();
+        unlistenCaption();
         unlistenHide();
         unlistenReady();
         unlistenLevel();
@@ -215,6 +260,21 @@ const RecordingOverlay: React.FC = () => {
     </div>
   );
 
+  const languageName = (code: string) =>
+    getLanguageLabel(code) ??
+    (code === "auto" ? t("settings.general.language.auto") : code);
+
+  // Language (and prompt, when post-processing will run) for this recording.
+  const captionText = [
+    caption.language ? languageName(caption.language) : "",
+    caption.prompt ?? "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const captionRow = captionText ? (
+    <div className="scap">{captionText}</div>
+  ) : null;
+
   // spinner (left) | label (center) | cancel (right) — same 3-zone grid as the
   // listening row, so the label is centered.
   const workingRow = (label: string, showCancel: boolean) => (
@@ -274,6 +334,7 @@ const RecordingOverlay: React.FC = () => {
                 true,
               )
             : listeningRow(open, true)}
+          {!working && captionRow}
         </div>
       </div>
     );
@@ -283,6 +344,15 @@ const RecordingOverlay: React.FC = () => {
   // spinner + label (transcribing / processing). Never both. The pill animates its
   // width between them; the cancel button is in both rows so it stays put.
   const working = state === "transcribing" || state === "processing";
+  const showsNotice = state === "notice";
+  const noticeValue =
+    notice.kind === "language" ? languageName(notice.value) : notice.value;
+  const noticeText = t(
+    notice.kind === "language"
+      ? "overlay.noticeLanguage"
+      : "overlay.noticePrompt",
+    { value: noticeValue },
+  );
   const workLabel =
     state === "processing"
       ? t("overlay.processing")
@@ -294,9 +364,22 @@ const RecordingOverlay: React.FC = () => {
       className={`ov-stage ${position} ov-fade ${isVisible ? "show" : ""}`}
     >
       <div
-        className={`scard compact ${working && isVisible ? "cworking" : ""}`}
+        className={`scard compact ${(working || showsNotice) && isVisible ? "cworking" : ""}`}
       >
-        {working ? workingRow(workLabel, true) : listeningRow(false, true)}
+        {showsNotice ? (
+          <div className="sbase">
+            <div className="sbase-l" />
+            <span className="swork-label">{noticeText}</span>
+            <div className="sbase-r" />
+          </div>
+        ) : working ? (
+          workingRow(workLabel, true)
+        ) : (
+          <>
+            {listeningRow(false, true)}
+            {captionRow}
+          </>
+        )}
       </div>
     </div>
   );

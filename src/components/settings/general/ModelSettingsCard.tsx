@@ -50,6 +50,17 @@ export const ModelSettingsCard: React.FC = () => {
           }
         />
       )}
+      {showLanguageSelector && (
+        <LanguageSelector
+          settingKey="alternate_language"
+          descriptionMode="tooltip"
+          grouped={true}
+          supportedLanguages={currentModelInfo.supported_languages}
+          supportsLanguageDetection={
+            currentModelInfo.supports_language_detection
+          }
+        />
+      )}
       {supportsTranslation && (
         <TranslateToEnglish descriptionMode="tooltip" grouped={true} />
       )}

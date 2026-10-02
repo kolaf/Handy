@@ -419,6 +419,9 @@ pub struct AppSettings {
     pub translate_to_english: bool,
     #[serde(default = "default_selected_language")]
     pub selected_language: String,
+    /// The "Swap Language" shortcut swaps `selected_language` with this one.
+    #[serde(default = "default_alternate_language")]
+    pub alternate_language: String,
     #[serde(default = "default_overlay_position")]
     pub overlay_position: OverlayPosition,
     #[serde(default = "default_debug_mode")]
@@ -560,6 +563,10 @@ fn default_whats_new_last_seen_version() -> String {
 
 fn default_selected_language() -> String {
     "auto".to_string()
+}
+
+fn default_alternate_language() -> String {
+    "en".to_string()
 }
 
 fn default_overlay_position() -> OverlayPosition {
@@ -897,6 +904,26 @@ pub fn get_default_settings() -> AppSettings {
         },
     );
     bindings.insert(
+        "swap_language".to_string(),
+        ShortcutBinding {
+            id: "swap_language".to_string(),
+            name: "Swap Language".to_string(),
+            description: "Swaps the selected language with the alternate language.".to_string(),
+            default_binding: "ctrl+alt+l".to_string(),
+            current_binding: "ctrl+alt+l".to_string(),
+        },
+    );
+    bindings.insert(
+        "cycle_prompt".to_string(),
+        ShortcutBinding {
+            id: "cycle_prompt".to_string(),
+            name: "Cycle Post-Processing Prompt".to_string(),
+            description: "Switches to the next post-processing prompt.".to_string(),
+            default_binding: "ctrl+alt+p".to_string(),
+            current_binding: "ctrl+alt+p".to_string(),
+        },
+    );
+    bindings.insert(
         "cancel".to_string(),
         ShortcutBinding {
             id: "cancel".to_string(),
@@ -929,6 +956,7 @@ pub fn get_default_settings() -> AppSettings {
         selected_output_device: None,
         translate_to_english: false,
         selected_language: "auto".to_string(),
+        alternate_language: default_alternate_language(),
         overlay_position: default_overlay_position(),
         debug_mode: false,
         log_level: default_log_level(),

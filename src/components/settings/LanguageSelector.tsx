@@ -11,6 +11,9 @@ import {
 } from "../../lib/constants/languages";
 
 interface LanguageSelectorProps {
+  // Which setting this picker edits: the active language, or the one the
+  // "Swap Language" shortcut swaps it with.
+  settingKey?: "selected_language" | "alternate_language";
   descriptionMode?: "inline" | "tooltip";
   grouped?: boolean;
   supportedLanguages?: string[];
@@ -49,7 +52,9 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   grouped = false,
   supportedLanguages,
   supportsLanguageDetection = true,
+  settingKey = "selected_language",
 }) => {
+  const isAlternate = settingKey === "alternate_language";
   const { t } = useTranslation();
   const { getSetting, updateSetting, resetSetting, isUpdating } = useSettings();
   const [isOpen, setIsOpen] = useState(false);
@@ -59,12 +64,14 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
 
   // The persisted *intent* (auto | code). What's actually used/shown is the
   // effective value resolved against the current model's capabilities.
-  const intent = getSetting("selected_language") || "auto";
-  const selectedLanguage = effectiveLanguage(
-    intent,
-    supportedLanguages ?? [],
-    supportsLanguageDetection,
-  );
+  const intent = getSetting(settingKey) || (isAlternate ? "en" : "auto");
+  const selectedLanguage = isAlternate
+    ? pickerLanguage(intent)
+    : effectiveLanguage(
+        intent,
+        supportedLanguages ?? [],
+        supportsLanguageDetection,
+      );
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -111,17 +118,17 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
     getLanguageLabel(selectedLanguage) || t("settings.general.language.auto");
 
   const handleLanguageSelect = async (languageCode: string) => {
-    await updateSetting("selected_language", languageCode);
+    await updateSetting(settingKey, languageCode);
     setIsOpen(false);
     setSearchQuery("");
   };
 
   const handleReset = async () => {
-    await resetSetting("selected_language");
+    await resetSetting(settingKey);
   };
 
   const handleToggle = () => {
-    if (isUpdating("selected_language")) return;
+    if (isUpdating(settingKey)) return;
     setIsOpen(!isOpen);
   };
 
@@ -141,8 +148,16 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
 
   return (
     <SettingContainer
-      title={t("settings.general.language.title")}
-      description={t("settings.general.language.description")}
+      title={t(
+        isAlternate
+          ? "settings.general.alternateLanguage.title"
+          : "settings.general.language.title",
+      )}
+      description={t(
+        isAlternate
+          ? "settings.general.alternateLanguage.description"
+          : "settings.general.language.description",
+      )}
       descriptionMode={descriptionMode}
       grouped={grouped}
     >
@@ -151,12 +166,12 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
           <button
             type="button"
             className={`px-2 py-1 text-sm font-semibold bg-mid-gray/10 border border-mid-gray/80 rounded min-w-[200px] text-start flex items-center justify-between transition-all duration-150 ${
-              isUpdating("selected_language")
+              isUpdating(settingKey)
                 ? "opacity-50 cursor-not-allowed"
                 : "hover:bg-logo-primary/10 cursor-pointer hover:border-logo-primary"
             }`}
             onClick={handleToggle}
-            disabled={isUpdating("selected_language")}
+            disabled={isUpdating(settingKey)}
           >
             <span className="truncate">{selectedLanguageName}</span>
             <svg
@@ -176,7 +191,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
             </svg>
           </button>
 
-          {isOpen && !isUpdating("selected_language") && (
+          {isOpen && !isUpdating(settingKey) && (
             <div className="absolute top-full left-0 right-0 mt-1 bg-background border border-mid-gray/80 rounded shadow-lg z-50 max-h-60 overflow-hidden">
               {/* Search input */}
               <div className="p-2 border-b border-mid-gray/80">
@@ -218,12 +233,9 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
             </div>
           )}
         </div>
-        <ResetButton
-          onClick={handleReset}
-          disabled={isUpdating("selected_language")}
-        />
+        <ResetButton onClick={handleReset} disabled={isUpdating(settingKey)} />
       </div>
-      {isUpdating("selected_language") && (
+      {isUpdating(settingKey) && (
         <div className="absolute inset-0 bg-mid-gray/10 rounded flex items-center justify-center">
           <div className="w-4 h-4 border-2 border-logo-primary border-t-transparent rounded-full animate-spin"></div>
         </div>

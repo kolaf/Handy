@@ -47,11 +47,12 @@ tauri_panel! {
 // width from 172 (--ov-rest-w) to 216 (--ov-work-w) and expands from center, so
 // the window must fit the widest state plus a little slack.
 const OVERLAY_WIDTH: f64 = 256.0;
-const OVERLAY_HEIGHT: f64 = 50.0;
+// 50 + the 18px caption row under the controls.
+const OVERLAY_HEIGHT: f64 = 70.0;
 
 // Actual is 394x118, just a little extra
 const OVERLAY_STREAM_WIDTH: f64 = 400.0;
-const OVERLAY_STREAM_HEIGHT: f64 = 120.0;
+const OVERLAY_STREAM_HEIGHT: f64 = 140.0;
 
 /// Overlay window size (logical) for a given UI state.
 fn overlay_dimensions(state: &str) -> (f64, f64) {
@@ -684,6 +685,81 @@ fn update_overlay_position_on_main(app_handle: &AppHandle) {
 /// press the coordinator remembered while the pipeline was busy and started
 /// the instant it drained, well inside the 300 ms hide delay.
 static OVERLAY_SHOW_GENERATION: AtomicU64 = AtomicU64::new(0);
+
+/// Tells the overlay which language (and, when post-processing will run, which prompt)
+/// the recording that is about to start will use. Call before showing the overlay.
+pub fn emit_recording_caption(app_handle: &AppHandle, post_process: bool) {
+    if !OVERLAY_ENABLED.load(Ordering::Relaxed) {
+        return;
+    }
+    let settings = settings::get_settings(app_handle);
+    let prompt = if post_process {
+        settings
+            .post_process_selected_prompt_id
+            .as_ref()
+            .and_then(|id| settings.post_process_prompts.iter().find(|p| &p.id == id))
+            .map(|p| p.name.clone())
+    } else {
+        None
+    };
+    let _ = app_handle.emit_to(
+        "recording_overlay",
+        "overlay-caption",
+        serde_json::json!({ "language": settings.selected_language, "prompt": prompt }),
+    );
+}
+
+const NOTICE_DURATION_MS: u64 = 1500;
+static NOTICE_ACTIVE: AtomicBool = AtomicBool::new(false);
+static NOTICE_SEQ: AtomicU64 = AtomicU64::new(0);
+
+/// Briefly shows what a shortcut just switched to (e.g. kind "language", value "no")
+/// in the compact overlay. A notice never interrupts the overlay: it is skipped while
+/// the overlay is in use for recording or transcribing, and a newer notice replaces
+/// an older one that is still showing.
+pub fn show_notice_overlay(app_handle: &AppHandle, kind: &str, value: &str) {
+    if settings::get_settings(app_handle).overlay_style == OverlayStyle::None {
+        return;
+    }
+    let Some(overlay_window) = app_handle.get_webview_window("recording_overlay") else {
+        return;
+    };
+    let notice_active = NOTICE_ACTIVE.load(Ordering::SeqCst);
+    if !notice_active && overlay_window.is_visible().unwrap_or(true) {
+        return;
+    }
+
+    // Queue the text before the show so the overlay never flashes stale content.
+    let _ = app_handle.emit_to(
+        "recording_overlay",
+        "overlay-notice",
+        serde_json::json!({ "kind": kind, "value": value }),
+    );
+    let seq = NOTICE_SEQ.fetch_add(1, Ordering::SeqCst) + 1;
+    if !notice_active {
+        NOTICE_ACTIVE.store(true, Ordering::SeqCst);
+        show_overlay_state(app_handle, "notice");
+    }
+
+    let handle = app_handle.clone();
+    std::thread::spawn(move || {
+        // The show is queued onto the main thread; read the generation once it has landed.
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        let shown_at = OVERLAY_SHOW_GENERATION.load(Ordering::SeqCst);
+        std::thread::sleep(std::time::Duration::from_millis(NOTICE_DURATION_MS));
+        if NOTICE_SEQ.load(Ordering::SeqCst) != seq {
+            return; // a newer notice owns the overlay now
+        }
+        if OVERLAY_SHOW_GENERATION.load(Ordering::SeqCst) == shown_at {
+            hide_recording_overlay(&handle);
+            // Stay "active" through the fade-out so a quick follow-up reuses the window.
+            std::thread::sleep(std::time::Duration::from_millis(350));
+        }
+        if NOTICE_SEQ.load(Ordering::SeqCst) == seq {
+            NOTICE_ACTIVE.store(false, Ordering::SeqCst);
+        }
+    });
+}
 
 /// Hides the recording overlay window with fade-out animation
 pub fn hide_recording_overlay(app_handle: &AppHandle) {
