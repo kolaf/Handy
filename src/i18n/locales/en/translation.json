@@ -397,7 +397,7 @@
       },
       "customWords": {
         "title": "Custom Words",
-        "description": "Help supported models recognize names and specialized terms. Fuzzy correction is currently limited to words using A–Z and numbers.",
+        "description": "Help supported models recognize names and specialized terms. Fuzzy correction is currently limited to words using A–Z and numbers. With the post-processing shortcut you can also teach a word by spelling it after saying it, or by saying \"add to vocabulary\" and the word.",
         "placeholder": "Add a word",
         "add": "Add",
         "remove": "Remove {{word}}",

@@ -1,5 +1,7 @@
 # Handy
 
+> **This is a fork with its own features** (swap language, snippets, vocabulary by dictation, prompt variables, offline fallback and more). See [FORK.md](FORK.md) for what was added, how to build it, and how to merge upstream.
+
 [![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/invite/WVBeWsNXK4)
 
 **A free, open source, and extensible speech-to-text application that works completely offline.**

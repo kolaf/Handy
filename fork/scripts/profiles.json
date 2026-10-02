@@ -1,0 +1,12 @@
+{
+  "no-simple":   { "language": "no", "prompt": "simple" },
+  "no-formal":   { "language": "no", "prompt": "formal_text" },
+  "no-informal": { "language": "no", "prompt": "informal_text" },
+  "no-email":    { "language": "no", "prompt": "email" },
+  "no-super":    { "language": "no", "prompt": "super" },
+  "en-simple":   { "language": "en", "prompt": "simple" },
+  "en-formal":   { "language": "en", "prompt": "formal_text" },
+  "en-informal": { "language": "en", "prompt": "informal_text" },
+  "en-email":    { "language": "en", "prompt": "email" },
+  "en-super":    { "language": "en", "prompt": "super" }
+}
