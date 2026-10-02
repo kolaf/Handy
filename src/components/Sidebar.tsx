@@ -1,6 +1,14 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { Cog, FlaskConical, History, Info, Sparkles, Cpu } from "lucide-react";
+import {
+  BookOpen,
+  Cog,
+  FlaskConical,
+  History,
+  Info,
+  Sparkles,
+  Cpu,
+} from "lucide-react";
 import HandyTextLogo from "./icons/HandyTextLogo";
 import HandyHand from "./icons/HandyHand";
 import { useSettings } from "../hooks/useSettings";
@@ -10,6 +18,7 @@ import {
   HistorySettings,
   DebugSettings,
   AboutSettings,
+  GuideSettings,
   PostProcessingSettings,
   ModelsSettings,
 } from "./settings";
@@ -67,6 +76,12 @@ export const SECTIONS_CONFIG = {
     icon: FlaskConical,
     component: DebugSettings,
     enabled: (settings) => settings?.debug_mode ?? false,
+  },
+  guide: {
+    labelKey: "sidebar.guide",
+    icon: BookOpen,
+    component: GuideSettings,
+    enabled: () => true,
   },
   about: {
     labelKey: "sidebar.about",

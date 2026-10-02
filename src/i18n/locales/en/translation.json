@@ -16,6 +16,7 @@
     "postProcessing": "Post Process",
     "history": "History",
     "debug": "Debug",
+    "guide": "Guide",
     "about": "About"
   },
   "onboarding": {

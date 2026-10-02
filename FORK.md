@@ -26,6 +26,7 @@ This is a fork of [cjpais/Handy](https://github.com/cjpais/Handy) that has delib
 | **Offline fallback** | Automatic when the language model call fails | n/a |
 | **Skip the model for short dictations** | Number of words below which the model is skipped | Post-processing page (0 = off) |
 | **Ten default prompts** | Baked in for fresh and portable installs | `fork/prompts/` |
+| **Guide page** | Sidebar > Guide: what is new in this build and a quick reference | `src/content/fork-guide.md` (keep it in step with this file) |
 
 Default shortcuts are `ctrl+alt+l`, `ctrl+alt+p`, `ctrl+alt+r`, `ctrl+alt+v`; rebind them in Settings. On Wayland, desktops
 own global shortcuts, so bind the command-line flags instead (see below).
@@ -155,7 +156,8 @@ frontend: `LanguageSelector.tsx`, `ModelSettingsCard.tsx`, `PostProcessingSettin
 
 ## Known limits
 
-- New UI text exists in English only.
+- New UI text exists in English only; `bun run check:translations` therefore reports the new keys as missing in the other 24
+  languages (expected; the app falls back to English).
 - The vocabulary and snippet tags and the format commands depend on the model following the prompt; the bench measures this.
 - Wayland: global shortcuts must be bound to the flags in the desktop settings; typing into other apps needs `wtype`,
   `dotool` or `ydotool` (X11: `xdotool`).
