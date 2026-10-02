@@ -32,6 +32,14 @@ pub struct CliArgs {
     #[arg(long)]
     pub next_prompt: bool,
 
+    /// Select a post-processing prompt by id (sent to running instance)
+    #[arg(long, value_name = "ID")]
+    pub set_prompt: Option<String>,
+
+    /// Set the dictation language, e.g. `no`, `en`, `auto` (sent to running instance)
+    #[arg(long, value_name = "CODE")]
+    pub set_language: Option<String>,
+
     /// Enable debug mode with verbose logging
     #[arg(long)]
     pub debug: bool,
@@ -81,5 +89,14 @@ mod tests {
         assert!(args.swap_language);
         assert!(args.next_prompt);
         assert!(!CliArgs::try_parse_from(["handy"]).unwrap().swap_language);
+    }
+
+    #[test]
+    fn set_flags_take_values() {
+        let args = CliArgs::try_parse_from(["handy", "--set-prompt", "email", "--set-language=no"])
+            .unwrap();
+        assert_eq!(args.set_prompt.as_deref(), Some("email"));
+        assert_eq!(args.set_language.as_deref(), Some("no"));
+        assert!(CliArgs::try_parse_from(["handy", "--set-prompt"]).is_err());
     }
 }

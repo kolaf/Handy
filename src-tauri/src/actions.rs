@@ -997,6 +997,67 @@ fn next_in_cycle<'a>(items: &'a [String], current: Option<&str>) -> Option<&'a S
     items.get(idx)
 }
 
+/// Saves `settings`, tells the frontend, and shows the overlay notice for a setting
+/// that a shortcut or CLI flag just changed.
+fn announce_setting_change(
+    app: &AppHandle,
+    settings: AppSettings,
+    setting: &str,
+    value: &str,
+    kind: &str,
+    shown: &str,
+) {
+    log::info!("Switch: {} -> {}", setting, value);
+    crate::settings::write_settings(app, settings);
+    let _ = app.emit(
+        "settings-changed",
+        serde_json::json!({ "setting": setting, "value": value }),
+    );
+    crate::overlay::show_notice_overlay(app, kind, shown);
+}
+
+/// Selects a post-processing prompt by id (the `--set-prompt` CLI flag).
+pub(crate) fn set_prompt_by_id(app: &AppHandle, id: &str) {
+    let mut settings = get_settings(app);
+    let Some(name) = settings
+        .post_process_prompts
+        .iter()
+        .find(|p| p.id == id)
+        .map(|p| p.name.clone())
+    else {
+        log::warn!("--set-prompt: no prompt with id '{}'", id);
+        return;
+    };
+    settings.post_process_selected_prompt_id = Some(id.to_string());
+    announce_setting_change(
+        app,
+        settings,
+        "post_process_selected_prompt_id",
+        id,
+        "prompt",
+        &name,
+    );
+}
+
+/// Language codes are short ASCII (`no`, `en`, `zh-TW`, `auto`); anything else is rejected.
+fn is_valid_language_code(code: &str) -> bool {
+    !code.is_empty()
+        && code.len() <= 16
+        && code.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+}
+
+/// Sets the dictation language (the `--set-language` CLI flag).
+pub(crate) fn set_language_code(app: &AppHandle, code: &str) {
+    let code = code.trim();
+    if !is_valid_language_code(code) {
+        log::warn!("--set-language: invalid language code '{}'", code);
+        return;
+    }
+    let mut settings = get_settings(app);
+    settings.selected_language = code.to_string();
+    announce_setting_change(app, settings, "selected_language", code, "language", code);
+}
+
 impl ShortcutAction for SwitchAction {
     fn start(&self, app: &AppHandle, _binding_id: &str, _shortcut_str: &str) {
         let mut settings = get_settings(app);
@@ -1031,13 +1092,7 @@ impl ShortcutAction for SwitchAction {
         };
         match changed {
             Some((setting, value, kind, shown)) => {
-                log::info!("Switch shortcut: {} -> {}", setting, value);
-                crate::settings::write_settings(app, settings);
-                let _ = app.emit(
-                    "settings-changed",
-                    serde_json::json!({ "setting": setting, "value": value }),
-                );
-                crate::overlay::show_notice_overlay(app, kind, &shown);
+                announce_setting_change(app, settings, setting, &value, kind, &shown);
             }
             None => log::warn!("Switch shortcut: nothing to switch"),
         }
@@ -1130,6 +1185,16 @@ mod tests {
     use std::sync::Arc;
     use std::thread;
     use std::time::Duration;
+
+    #[test]
+    fn language_codes_are_validated() {
+        for ok in ["no", "en", "auto", "zh-TW"] {
+            assert!(super::is_valid_language_code(ok), "{ok}");
+        }
+        for bad in ["", "n o", "no;rm", "waytoolongcodeforalanguage", "æø"] {
+            assert!(!super::is_valid_language_code(bad), "{bad}");
+        }
+    }
 
     #[test]
     fn cycle_steps_forward_and_wraps() {
