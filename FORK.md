@@ -159,6 +159,23 @@ libayatana-appindicator3-dev librsvg2-dev libgtk-layer-shell0 libgtk-layer-shell
 help quickly (reputation builds with usage, per file). See the discussion in the project history; options are an IT-approved
 folder, the official signed Handy with our prompts and `fork/scripts/handy-profile.ps1`, or Linux.
 
+## Syncing between machines
+
+| What | Lives in | How it gets to a new machine |
+|---|---|---|
+| Handy code, prompts, `hv`, docs, build scripts | `kolaf/Handy`, branch `dev/hotkeys-build` (public) | `git clone`; deploy a build with `fork/scripts/deploy-portable.ps1`, or install the `.deb` |
+| Talon user files: wake key, `shock`/`drowse`, `sleep.py`, voice shell commands, disabled Handy bridge | `kolaf/community` (public), folder `kolaf/` | clone the fork into Talon's `user/` folder; see `kolaf/README.md` there |
+| Other Talon packages (Cursorless, Rango) | their own upstream repos (old checkouts) | listed in `kolaf/README.md`; not synced from here |
+| Hermes custom skills (15, private project notes) | `kolaf/hermes-skills` (**private**) | `hermes-skills-sync` (per-file three-way sync, conflicts reported, deletions opt-in) |
+| Hermes memories | the Hindsight server (`hermes-hindsight.kolaf.net`, bank `hermes`) | nothing to sync: point `~/.hermes/hindsight/config.json` at the same server |
+| Handy settings (endpoint, key, prompts in use, custom words, snippets, language) | each machine's own `settings_store.json` | prompts: `fork/scripts/install-prompts.py`; the rest by hand (no export tool yet) |
+| Secrets: Handy API key, Hindsight key, Hermes auth | never in git | 1Password (`op` is installed on the home WSL); not automated yet |
+| `user/settings.talon` (speech timeout) | the machine only | recreate by hand |
+
+Not decided yet: whether `kolaf/dotfiles` (public Ansible setup for WSL) becomes the provisioning hub. It must not hold anything private.
+Dropped on purpose: `talon-ai-tools`, replaced by the Handy `edit` prompt, so the GPT key is no longer in Talon at all. The old
+copy and its key file were moved (not deleted) to `%APPDATA%\talon\disabled\`.
+
 ## Where data lives
 
 | | Installed (Windows) | Portable | Linux |
