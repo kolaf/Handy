@@ -350,7 +350,9 @@ const RecordingOverlay: React.FC = () => {
   const noticeText = t(
     notice.kind === "language"
       ? "overlay.noticeLanguage"
-      : "overlay.noticePrompt",
+      : notice.kind === "vocab"
+        ? "overlay.noticeVocab"
+        : "overlay.noticePrompt",
     { value: noticeValue },
   );
   const workLabel =
