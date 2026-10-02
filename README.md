@@ -101,7 +101,12 @@ handy --toggle-post-process     # Toggle recording with post-processing on/off
 handy --cancel                  # Cancel the current operation
 handy --swap-language           # Swap the selected language with the alternate language
 handy --next-prompt             # Switch to the next post-processing prompt
+handy --set-language no         # Set the dictation language (a code, or "auto")
+handy --set-prompt email        # Select a post-processing prompt by id
 ```
+
+The `--set-*` flags can be combined with each other and with a toggle, for example
+`handy --set-language no --set-prompt email --toggle-post-process`.
 
 **Startup flags:**
 

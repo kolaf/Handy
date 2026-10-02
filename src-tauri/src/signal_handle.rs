@@ -23,6 +23,21 @@ pub fn send_transcription_input(app: &AppHandle, binding_id: &str, source: &str)
     }
 }
 
+/// Returns the value of `--name value` or `--name=value` from raw process arguments.
+pub fn flag_value(args: &[String], name: &str) -> Option<String> {
+    let prefix = format!("{name}=");
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        if let Some(value) = arg.strip_prefix(&prefix) {
+            return Some(value.to_string());
+        }
+        if arg == name {
+            return iter.next().cloned();
+        }
+    }
+    None
+}
+
 /// Runs a shortcut action by binding id, exactly as if its hotkey had been pressed.
 /// Used by CLI flags for actions that are not part of the transcription pipeline.
 pub fn run_action(app: &AppHandle, binding_id: &str, source: &str) {
@@ -64,4 +79,29 @@ pub fn setup_signal_handler(app_handle: AppHandle) {
             send_transcription_input(&app_handle, binding_id, signal_name);
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::flag_value;
+
+    fn args(list: &[&str]) -> Vec<String> {
+        list.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn flag_value_reads_both_forms() {
+        let a = args(&["handy", "--set-prompt", "email", "--set-language=no"]);
+        assert_eq!(flag_value(&a, "--set-prompt").as_deref(), Some("email"));
+        assert_eq!(flag_value(&a, "--set-language").as_deref(), Some("no"));
+        assert_eq!(flag_value(&a, "--cancel"), None);
+    }
+
+    #[test]
+    fn flag_value_without_a_value_is_none() {
+        assert_eq!(
+            flag_value(&args(&["handy", "--set-prompt"]), "--set-prompt"),
+            None
+        );
+    }
 }
