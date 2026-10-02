@@ -5,6 +5,12 @@
   leaving Target\Data (settings, models, history, recordings) alone. Refuses to run while that copy
   of Handy is running, because Windows cannot replace a running exe.
 
+  -Restart: if that copy is running, stop it (any dictation in progress is lost), deploy, and start it
+  again hidden in the tray. Without -Restart the script refuses to run while the copy is open.
+
+  Tip: run Handy from this deployed folder, not from the build output or the staging folder. Builds then
+  never collide with a running Handy, and you only stop it for the moment of the deploy.
+
   First time only: -SeedFromInstalled copies settings_store.json and the models folder from the normal
   (non-portable) profile in %APPDATA%\com.pais.handy into Target\Data, so your endpoint, key, prompts
   and downloaded models carry over. It never overwrites an existing Data folder.
@@ -14,7 +20,8 @@
 param(
   [Parameter(Mandatory = $true)][string]$Target,
   [string]$Source = 'C:\dev\Handy-dev-portable',
-  [switch]$SeedFromInstalled
+  [switch]$SeedFromInstalled,
+  [switch]$Restart
 )
 $ErrorActionPreference = 'Stop'
 if (-not (Test-Path (Join-Path $Source 'handy.exe'))) { throw "No build staged in $Source. Run build-portable.ps1 first." }
@@ -22,7 +29,12 @@ if (-not (Test-Path (Join-Path $Source 'handy.exe'))) { throw "No build staged i
 $targetExe = Join-Path $Target 'handy.exe'
 $fullTarget = [IO.Path]::GetFullPath($targetExe)
 $running = Get-Process -Name handy -ErrorAction SilentlyContinue | Where-Object { $_.Path -and [string]::Equals($_.Path, $fullTarget, [StringComparison]::OrdinalIgnoreCase) }
-if ($running) { throw "Handy is running from $Target. Close it first." }
+$wasRunning = [bool]$running
+if ($running) {
+  if (-not $Restart) { throw "Handy is running from $Target. Close it first, or use -Restart." }
+  $running | Stop-Process -Force
+  $running | Wait-Process -Timeout 15 -ErrorAction SilentlyContinue
+}
 
 New-Item -ItemType Directory -Force -Path $Target | Out-Null
 # /E subfolders, /XD Data never touches the data folder, /NFL /NDL /NJH quiet output
@@ -50,4 +62,8 @@ if ($SeedFromInstalled) {
   }
 }
 $exe = Get-Item $targetExe
+if ($Restart -and $wasRunning) {
+  Start-Process -FilePath $targetExe -ArgumentList '--start-hidden'
+  Write-Host 'Restarted.'
+}
 Write-Host "Deployed to $Target  (handy.exe $($exe.LastWriteTime))  Data preserved: $(Test-Path $data)"

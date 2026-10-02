@@ -106,7 +106,8 @@ switching. **Untested against a real Talon install.**
 
 Windows prerequisites: Visual Studio 2026 with the *Desktop development with C++* workload (MSVC x64/x86 build tools),
 Windows SDK 10.0.26100, Rust (MSVC), Bun, CMake, Vulkan SDK. Run builds from a Visual Studio developer prompt.
-**Close Handy first**: an open `handy.exe` cannot be replaced and the build fails.
+**Close Handy first** if you run it from `target\release`: an open `handy.exe` cannot be replaced and the build fails. If you run a
+*deployed copy in its own folder* (see below), builds never collide with it.
 
 ```
 bun install
@@ -132,6 +133,10 @@ while another is open just hands over to the first and exits. So pick one copy t
   (settings, models, history). The first time, add `-SeedFromInstalled` to copy your existing settings (endpoint, key, prompts) and
   models from the normal profile into `Data`; it refuses to seed if `Data` already exists. Close the portable copy first (the script
   checks). Do not delete and recreate the folder, or `Data` goes with it, and unzipping a release zip *over* the folder is safe.
+  Add `-Restart` to stop a running copy, deploy, and start it again hidden in the tray (a dictation in progress is lost).
+  The intended loop: keep running `D:\Handy\handy.exe`, build as often as you like (Handy can stay open), then
+  `deploy-portable.ps1 -Target D:\Handy -Restart`. Run from a folder that is not the staging folder
+  (`C:\dev\Handy-dev-portable`), which the build script recreates each time.
 - A portable copy's autostart entry lives in the registry and points at the exe path; see the notes in the project history.
   Autostart entries use the same name for every copy of Handy, so enable it in only one.
 
