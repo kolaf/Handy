@@ -52,7 +52,7 @@ const OVERLAY_HEIGHT: f64 = 70.0;
 
 // Actual is 394x118, just a little extra
 const OVERLAY_STREAM_WIDTH: f64 = 400.0;
-const OVERLAY_STREAM_HEIGHT: f64 = 140.0;
+const OVERLAY_STREAM_HEIGHT: f64 = 144.0;
 
 /// Overlay window size (logical) for a given UI state.
 fn overlay_dimensions(state: &str) -> (f64, f64) {
@@ -900,7 +900,7 @@ mod tests {
                 OVERLAY_HEIGHT,
                 OverlayPosition::Bottom,
             ),
-            (3648, 2025, 384, 75)
+            (3648, 1995, 384, 105)
         );
         assert_eq!(
             windows_overlay_bounds(
@@ -912,7 +912,7 @@ mod tests {
                 OVERLAY_HEIGHT,
                 OverlayPosition::Top,
             ),
-            (3648, 6, 384, 75)
+            (3648, 6, 384, 105)
         );
     }
 
@@ -929,7 +929,7 @@ mod tests {
                 OVERLAY_STREAM_HEIGHT,
                 OverlayPosition::Bottom,
             ),
-            (-1530, 1040, 500, 150)
+            (-1530, 1010, 500, 180)
         );
     }
 
@@ -948,9 +948,9 @@ mod tests {
             OVERLAY_STREAM_HEIGHT,
             OverlayPosition::Bottom,
         );
-        // 400x120 logical at 1.25 DPI x 1.1 text, still centered horizontally.
-        assert_eq!((x, y, width, height), (-1555, 1025, 550, 165));
-        // Bottom edge unchanged from the 1.0 case above (1040 + 150).
+        // 400x144 logical at 1.25 DPI x 1.1 text, still centered horizontally.
+        assert_eq!((x, y, width, height), (-1555, 992, 550, 198));
+        // Bottom edge unchanged from the 1.0 case above (1010 + 180).
         assert_eq!(y + height, 1190);
 
         let (_, top_y, _, _) = windows_overlay_bounds(
