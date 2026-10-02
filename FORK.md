@@ -102,6 +102,12 @@ All in `fork/prompts/`.
 meanwhile, voice commands for the flags, a "handy reply" command that copies the selection first, and optional per-app prompt
 switching. **Untested against a real Talon install.**
 
+## Voice shell
+
+`fork/voice-shell/` is separate from Handy: `hv`, a wrapper that turns a spoken request into one short Hermes Agent
+session (plan first, then `hv go`), with Talon commands (`hermes <request>`, `grab files`). Safety rules, measured
+behaviour, what is unverified and how to install: `fork/voice-shell/README.md`.
+
 ## Building and installing
 
 Windows prerequisites: Visual Studio 2026 with the *Desktop development with C++* workload (MSVC x64/x86 build tools),

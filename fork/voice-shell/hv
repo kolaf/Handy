@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+# hv - a voice-friendly front end for Hermes Agent: one short session per spoken request.
+#
+#   hv "copy this file to the reports folder"   new session, PLAN phase (read-only), ends with "Go ahead?"
+#   hv go                                       continue the last session: execute the approved plan
+#   hv again "no, the other folder"             continue the last session with a correction (plans again)
+#   hv ask "what is in the folder I used yesterday"   new session, read-only question
+#   hv --dry ...                                show what would be sent, call nothing
+#
+# Each request adds a small context (working directory, selected paths, recent folders, your places file)
+# and a terminal-safety preamble (preamble.md). Environment overrides: HV_HERMES, HV_TOOLSETS, HV_MAX_TURNS,
+# HV_SOURCE, HV_PREAMBLE, HV_SELECTION_FILE, HV_SELECTION_TTL, HV_STATE_DIR, HV_CONFIG_DIR, HV_EXTRA_ARGS.
+set -uo pipefail
+
+SELF="$(readlink -f "${BASH_SOURCE[0]}")"
+HERE="$(dirname "$SELF")"
+STATE_DIR="${HV_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/hv}"
+CONFIG_DIR="${HV_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/hv}"
+HERMES="${HV_HERMES:-hermes}"
+TOOLSETS="${HV_TOOLSETS:-terminal,file,memory,skills}"
+MAX_TURNS="${HV_MAX_TURNS:-12}"
+SOURCE_TAG="${HV_SOURCE:-voice}"
+PREAMBLE="${HV_PREAMBLE:-$HERE/preamble.md}"
+SELECTION_TTL="${HV_SELECTION_TTL:-180}"
+PLACES_FILE="$CONFIG_DIR/places.md"
+
+die() { printf 'hv: %s\n' "$*" >&2; exit 2; }
+usage() { sed -n '2,10p' "$SELF" | sed 's/^# \{0,1\}//'; }
+
+# --- context ---------------------------------------------------------------------------------------------
+selection_file() {
+  if [[ -n "${HV_SELECTION_FILE:-}" ]]; then printf '%s' "$HV_SELECTION_FILE"; return; fi
+  local f="$HOME/.cache/hv/selection.txt"
+  if [[ ! -e "$f" ]] && grep -qi microsoft /proc/version 2>/dev/null && command -v cmd.exe >/dev/null 2>&1; then
+    local win; win="$(cmd.exe /c 'echo %USERPROFILE%' 2>/dev/null | tr -d '\r')"
+    [[ -n "$win" ]] && f="$(wslpath -u "$win" 2>/dev/null)/.cache/hv/selection.txt"
+  fi
+  printf '%s' "$f"
+}
+
+selected_paths() {  # fresh selection only; Windows paths converted for WSL
+  local f; f="$(selection_file)"
+  [[ -f "$f" ]] || return 0
+  local age=$(( $(date +%s) - $(stat -c %Y "$f") ))
+  (( age <= SELECTION_TTL )) || return 0
+  local line
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%$'\r'}"; [[ -z "$line" ]] && continue
+    if [[ "$line" =~ ^[A-Za-z]:\\ ]] && command -v wslpath >/dev/null 2>&1; then line="$(wslpath -u "$line")"; fi
+    printf '%s\n' "$line"
+  done < "$f"
+}
+
+recent_dirs() { command -v zoxide >/dev/null 2>&1 && zoxide query -l 2>/dev/null | head -8; true; }
+
+places() {  # the user's own aliases and habits, comments stripped
+  [[ -f "$PLACES_FILE" ]] || return 0
+  grep -v -E '^\s*(#|$)' "$PLACES_FILE" || true
+}
+
+ensure_config() {
+  mkdir -p "$CONFIG_DIR" "$STATE_DIR"
+  [[ -f "$PLACES_FILE" ]] || cat > "$PLACES_FILE" <<'EOT'
+# Your places and habits, one per line, in plain words. They are sent with every request.
+# Examples (delete the # to use):
+# reports = ~/work/reports
+# the usual place for invoices = /mnt/d/Documents/Invoices
+# I never keep files in Downloads; move them somewhere sensible
+EOT
+}
+
+build_context() {
+  local sel recent pl
+  sel="$(selected_paths)"; recent="$(recent_dirs)"; pl="$(places)"
+  printf 'Context\n- Working directory: %s\n' "$PWD"
+  if [[ -n "$sel" ]]; then printf -- '- Selected paths:\n'; while IFS= read -r l; do printf '    %s\n' "$l"; done <<< "$sel"; else printf -- '- Selected paths: (none)\n'; fi
+  if [[ -n "$recent" ]]; then printf -- '- Recent folders:\n'; while IFS= read -r l; do printf '    %s\n' "$l"; done <<< "$recent"; else printf -- '- Recent folders: (unknown)\n'; fi
+  if [[ -n "$pl" ]]; then printf -- '- Places and habits:\n'; while IFS= read -r l; do printf '    %s\n' "$l"; done <<< "$pl"; else printf -- '- Places and habits: (none)\n'; fi
+}
+
+# --- arguments -------------------------------------------------------------------------------------------
+dry=0
+while [[ "${1:-}" == --* || "${1:-}" == -h ]]; do
+  case "$1" in
+    --dry) dry=1 ;;
+    -h|--help) usage; exit 0 ;;
+    *) die "unknown option: $1" ;;
+  esac
+  shift
+done
+[[ $# -ge 1 ]] || { usage >&2; exit 2; }
+
+resume=0; phase=plan; request=""
+case "$1" in
+  go) if [[ $# -eq 1 ]]; then phase=execute; resume=1; request="The user approved the plan. Execute exactly that plan now, nothing else."; else request="$*"; fi ;;
+  again) shift; [[ $# -ge 1 ]] || die "again needs a correction, e.g.: hv again \"no, the other folder\""; phase=followup; resume=1; request="$*" ;;
+  ask)   shift; [[ $# -ge 1 ]] || die "ask needs a question"; phase=ask; request="$*" ;;
+  *)     request="$*" ;;
+esac
+
+ensure_config
+LAST_FILE="$STATE_DIR/last_session"
+sid=""
+if (( resume )); then
+  sid="$(cat "$LAST_FILE" 2>/dev/null || true)"
+  [[ -n "$sid" ]] || die "there is no earlier hv session to continue"
+fi
+
+case "$phase" in
+  plan)     phase_text="PHASE: PLAN. Change nothing yet. Inspect read-only if needed, then give the numbered plan and end with: Go ahead?" ;;
+  followup) phase_text="PHASE: PLAN (follow-up). This corrects the previous request. Change nothing yet; give the updated numbered plan and end with: Go ahead?" ;;
+  ask)      phase_text="PHASE: ASK. Read-only. Answer briefly. Change nothing." ;;
+  execute)  phase_text="PHASE: EXECUTE." ;;
+esac
+
+prompt=""
+if (( ! resume )); then prompt+="$(cat "$PREAMBLE")"$'\n\n'; fi
+prompt+="$phase_text"$'\n\n'"$(build_context)"$'\n\n'"Request: $request"
+
+args=(chat -Q -q "$prompt" -t "$TOOLSETS" --checkpoints --max-turns "$MAX_TURNS" --source "$SOURCE_TAG")
+(( resume )) && args+=(--resume "$sid")
+# shellcheck disable=SC2206  # HV_EXTRA_ARGS is deliberately word-split
+[[ -n "${HV_EXTRA_ARGS:-}" ]] && args+=($HV_EXTRA_ARGS)
+
+if (( dry )); then
+  printf 'command:'; printf ' %q' "$HERMES" "${args[@]:0:3}"; printf ' [prompt omitted]'; printf ' %q' "${args[@]:4}"; printf '\n'
+  printf -- '---- prompt ----\n%s\n' "$prompt"
+  exit 0
+fi
+
+err="$(mktemp)"; trap 'rm -f "$err"' EXIT
+out="$("$HERMES" "${args[@]}" 2>"$err")"; rc=$?
+new_sid="$(sed -n 's/^session_id: *//p' "$err" | tail -1)"
+[[ -n "$new_sid" ]] && printf '%s' "$new_sid" > "$LAST_FILE"
+printf '%s\n' "$out"
+# anything on stderr other than the session line is worth showing when something went wrong
+(( rc != 0 )) && grep -v -E '^(session_id:|$)' "$err" >&2
+printf '%s\t%s\t%s\t%s\t%s\n' "$(date -Is)" "$phase" "${new_sid:-$sid}" "$rc" "${request//$'\n'/ }" >> "$STATE_DIR/journal.tsv"
+exit "$rc"
