@@ -23,6 +23,15 @@ pub fn send_transcription_input(app: &AppHandle, binding_id: &str, source: &str)
     }
 }
 
+/// Runs a shortcut action by binding id, exactly as if its hotkey had been pressed.
+/// Used by CLI flags for actions that are not part of the transcription pipeline.
+pub fn run_action(app: &AppHandle, binding_id: &str, source: &str) {
+    match crate::actions::ACTION_MAP.get(binding_id) {
+        Some(action) => action.start(app, binding_id, source),
+        None => warn!("No action registered for '{}'", binding_id),
+    }
+}
+
 /// Listen for Unix signals that remotely toggle transcription.
 ///
 /// SIGUSR2 toggles plain transcription on all Unix platforms. SIGUSR1

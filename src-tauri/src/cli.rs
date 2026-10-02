@@ -24,6 +24,14 @@ pub struct CliArgs {
     #[arg(long)]
     pub cancel: bool,
 
+    /// Swap the selected language with the alternate language (sent to running instance)
+    #[arg(long)]
+    pub swap_language: bool,
+
+    /// Switch to the next post-processing prompt (sent to running instance)
+    #[arg(long)]
+    pub next_prompt: bool,
+
     /// Enable debug mode with verbose logging
     #[arg(long)]
     pub debug: bool,
@@ -60,4 +68,18 @@ pub struct CliArgs {
     /// Emit --transcribe-file results as JSON.
     #[arg(long)]
     pub json: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CliArgs;
+    use clap::Parser;
+
+    #[test]
+    fn switch_flags_parse() {
+        let args = CliArgs::try_parse_from(["handy", "--swap-language", "--next-prompt"]).unwrap();
+        assert!(args.swap_language);
+        assert!(args.next_prompt);
+        assert!(!CliArgs::try_parse_from(["handy"]).unwrap().swap_language);
+    }
 }
