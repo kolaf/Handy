@@ -857,6 +857,10 @@ pub fn run(cli_args: CliArgs) {
                 signal_handle::send_transcription_input(app, "transcribe_with_post_process", "CLI");
             } else if args.iter().any(|a| a == "--cancel") {
                 crate::utils::cancel_current_operation(app);
+            } else if args.iter().any(|a| a == "--swap-language") {
+                signal_handle::run_action(app, "swap_language", "CLI");
+            } else if args.iter().any(|a| a == "--next-prompt") {
+                signal_handle::run_action(app, "cycle_prompt", "CLI");
             } else {
                 // A second process was launched without remote-control flags
                 // (e.g. the binary run from a shell). On macOS, relaunching the
