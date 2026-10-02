@@ -24,3 +24,19 @@ Design notes
   interpreted as Talon commands. Press it again to stop and wake Talon. If Talon stays muted after a
   failed dictation, use your normal Talon wake command.
 - `handy auto styles on` switches Handy's prompt when the focused app changes (see `APP_PROMPTS`).
+
+## Personal overrides (`personal/`)
+
+Installed in the Talon user folder as `user\personal\`, outside the community folder so community can be updated
+without conflicts (community was reset to upstream on 2 October 2026; the old local edits are in the backup branch
+`backup/pre-upstream-sync-20261002` of `kolaf/community`).
+
+- `wake_key_and_tag.talon`: `Ctrl+PageUp` toggles speech (the way to wake Talon now), and switches on the tag below.
+  If voice wake ever needs to come back, delete this file's `tag()` line or the `disable_wake_*.talon` files.
+- `disable_wake_*.talon` + `personal.py`: override community's spoken wake commands ("wake up", "talon wake",
+  "welcome back") with `skip()`. Each has community's context plus the tag `user.disable_voice_wake`, so it is more
+  specific and wins. "wake up and listen" (leaving deep sleep) is left alone on purpose.
+- Verified: Talon loaded all files without errors and its registry lists both the community command and the `skip()`
+  override for each phrase. Not verified: that the override wins in practice; test it by putting Talon to sleep
+  with `Ctrl+PageUp`, saying "wake up" (nothing should happen), then `Ctrl+PageUp` again (Talon wakes).
+- If locked out: the Talon tray icon menu can re-enable speech.
