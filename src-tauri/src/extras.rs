@@ -228,8 +228,15 @@ static SPOKEN_PUNCTUATION_RES: Lazy<Vec<(Regex, &'static str)>> = Lazy::new(|| {
     SPOKEN_PUNCTUATION
         .iter()
         .map(|(word, symbol)| {
-            // Eat the spaces around the word and any punctuation the recognizer added itself.
-            let pattern = format!(r"(?i)[ \t]*\b{}\b[ \t]*[,.;:!?]?", regex::escape(word));
+            // Eat the space before the word and any punctuation the recognizer attached to it.
+            // The space after stays (so "coming? I hope" keeps its gap); line breaks also
+            // swallow the spaces after them.
+            let after = if symbol.starts_with('\n') {
+                r"[ \t]*[,.;:!?]?[ \t]*"
+            } else {
+                r"[,.;:!?]?"
+            };
+            let pattern = format!(r"(?i)[ \t]*\b{}\b{}", regex::escape(word), after);
             (Regex::new(&pattern).unwrap(), *symbol)
         })
         .collect()
