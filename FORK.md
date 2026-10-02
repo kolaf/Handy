@@ -120,6 +120,21 @@ its paths assume `C:\dev\Handy`. **Portable layout**: `handy.exe`, the DLLs from
 VC runtime DLLs, and a file named `portable` containing `Handy Portable Mode`. Data then lives in `Data\` next to the exe
 (custom Whisper models: `Data\models`).
 
+### Day-to-day local use (no installer)
+
+Handy allows **one running instance per app identity**: starting a second copy (installed, portable, or `target\release\handy.exe`)
+while another is open just hands over to the first and exits. So pick one copy to run at a time.
+
+- **Simplest, nothing to copy:** run `src-tauri\target\release\handy.exe` after each build. With no `portable` file next to it, it
+  uses the normal profile in `%APPDATA%\com.pais.handy` (the same settings and models as an installed Handy).
+- **A stable portable folder you refresh after each build:** `build-portable.ps1` stages the build in `C:\dev\Handy-dev-portable`;
+  then `fork\scripts\deploy-portable.ps1 -Target D:\Handy` copies it over the folder and **never touches `Target\Data`**
+  (settings, models, history). The first time, add `-SeedFromInstalled` to copy your existing settings (endpoint, key, prompts) and
+  models from the normal profile into `Data`; it refuses to seed if `Data` already exists. Close the portable copy first (the script
+  checks). Do not delete and recreate the folder, or `Data` goes with it, and unzipping a release zip *over* the folder is safe.
+- A portable copy's autostart entry lives in the registry and points at the exe path; see the notes in the project history.
+  Autostart entries use the same name for every copy of Handy, so enable it in only one.
+
 Linux (Ubuntu 24.04): `sudo apt install build-essential clang libclang-dev libevdev-dev libasound2-dev pkg-config libssl-dev
 libvulkan-dev vulkan-tools glslc spirv-headers glslang-tools libgtk-3-dev libwebkit2gtk-4.1-dev
 libayatana-appindicator3-dev librsvg2-dev libgtk-layer-shell0 libgtk-layer-shell-dev patchelf cmake file xdg-utils rpm`, then
