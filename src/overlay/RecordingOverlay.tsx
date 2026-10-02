@@ -352,9 +352,13 @@ const RecordingOverlay: React.FC = () => {
       ? "overlay.noticeLanguage"
       : notice.kind === "vocab"
         ? "overlay.noticeVocab"
-        : notice.kind === "fallback"
-          ? "overlay.noticeFallback"
-          : "overlay.noticePrompt",
+        : notice.kind === "learned"
+          ? "overlay.noticeLearned"
+          : notice.kind === "learned-none"
+            ? "overlay.noticeLearnedNone"
+            : notice.kind === "fallback"
+              ? "overlay.noticeFallback"
+              : "overlay.noticePrompt",
     { value: noticeValue },
   );
   const workLabel =

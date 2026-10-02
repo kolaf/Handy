@@ -492,7 +492,9 @@ pub(crate) async fn process_transcription_output(
     post_process: bool,
 ) -> ProcessedTranscription {
     let settings = get_settings(app);
-    let mut final_text = transcription.to_string();
+    // Learned corrections (see learn.rs) fix known mishearings before anything else sees the text.
+    let heard = crate::learn::apply_corrections(transcription, &settings.corrections);
+    let mut final_text = heard.clone();
     let mut post_processed_text: Option<String> = None;
     let mut post_process_prompt: Option<String> = None;
 
@@ -500,9 +502,7 @@ pub(crate) async fn process_transcription_output(
     // intent coerced against the loaded model's capabilities) so OpenCC keys off
     // the effective language rather than a possibly-stale intent.
     let effective_language = resolve_effective_language(app, &settings);
-    if let Some(converted_text) =
-        maybe_convert_chinese_variant(&effective_language, transcription).await
-    {
+    if let Some(converted_text) = maybe_convert_chinese_variant(&effective_language, &heard).await {
         final_text = converted_text;
     }
 
@@ -1178,6 +1178,10 @@ pub static ACTION_MAP: Lazy<HashMap<String, Arc<dyn ShortcutAction>>> = Lazy::ne
         Arc::new(SwitchAction {
             kind: SwitchKind::SwapLanguage,
         }) as Arc<dyn ShortcutAction>,
+    );
+    map.insert(
+        "learn_correction".to_string(),
+        Arc::new(crate::learn::LearnAction) as Arc<dyn ShortcutAction>,
     );
     map.insert(
         "paste_last".to_string(),

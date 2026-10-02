@@ -193,6 +193,10 @@
             "name": "Paste Last Dictation Shortcut",
             "description": "Paste the most recent dictation again, for example when a paste went to the wrong window."
           },
+          "learn_correction": {
+            "name": "Learn From Correction Shortcut",
+            "description": "Select text you have corrected after a dictation and press this shortcut. Handy compares it with what was heard and learns new vocabulary and recurring mistakes."
+          },
           "rerun_next_prompt": {
             "name": "Re-run With Next Prompt Shortcut",
             "description": "Re-process the last dictation with the next prompt and paste the result. Select the previously pasted text first to replace it."
@@ -403,6 +407,12 @@
         "add": "Add",
         "remove": "Remove {{word}}",
         "duplicate": "\"{{word}}\" already exists"
+      },
+      "corrections": {
+        "title": "Learned Corrections",
+        "description": "Mistakes Handy has learned to fix automatically (heard → correct). Added by the Learn From Correction shortcut; remove any that are wrong.",
+        "remove": "Remove {{wrong}}",
+        "removeShort": "Remove"
       },
       "snippets": {
         "title": "Snippets",
@@ -745,7 +755,9 @@
     "noticeLanguage": "Language: {{value}}",
     "noticePrompt": "Prompt: {{value}}",
     "noticeVocab": "Added to vocabulary: {{value}}",
-    "noticeFallback": "Offline: basic cleanup only"
+    "noticeFallback": "Offline: basic cleanup only",
+    "noticeLearned": "Learned: {{value}}",
+    "noticeLearnedNone": "Nothing new to learn"
   },
   "secureInput": {
     "blockedWithCulprit_one": "{{name}} may be blocking 1 shortcut",

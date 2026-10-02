@@ -87,6 +87,14 @@ pub struct ShortcutBinding {
     pub current_binding: String,
 }
 
+/// A learned fix for a recurring mishearing: `wrong` (as the recognizer spells it) becomes `right` in every new
+/// transcript, as a whole word and ignoring case. See `learn.rs`.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Type)]
+pub struct Correction {
+    pub wrong: String,
+    pub right: String,
+}
+
 /// A named block of text that the post-processing prompt can insert by name
 /// (`[[snippet: NAME]]`); see `extras.rs`.
 #[derive(Serialize, Deserialize, Debug, Clone, Type)]
@@ -470,6 +478,9 @@ pub struct AppSettings {
     pub post_process_models: HashMap<String, String>,
     #[serde(default)]
     pub snippets: Vec<Snippet>,
+    /// Learned `wrong -> right` fixes applied to each new transcript.
+    #[serde(default)]
+    pub corrections: Vec<Correction>,
     /// Dictations with fewer words than this skip the language model (0 = always use it).
     #[serde(default)]
     pub post_process_min_words: u32,
@@ -960,6 +971,17 @@ pub fn get_default_settings() -> AppSettings {
         },
     );
     bindings.insert(
+        "learn_correction".to_string(),
+        ShortcutBinding {
+            id: "learn_correction".to_string(),
+            name: "Learn From Correction".to_string(),
+            description: "Select the text you corrected after a dictation; Handy learns the new words and fixes."
+                .to_string(),
+            default_binding: "ctrl+alt+k".to_string(),
+            current_binding: "ctrl+alt+k".to_string(),
+        },
+    );
+    bindings.insert(
         "cancel".to_string(),
         ShortcutBinding {
             id: "cancel".to_string(),
@@ -1011,6 +1033,7 @@ pub fn get_default_settings() -> AppSettings {
         post_process_api_keys: default_post_process_api_keys(),
         post_process_models: default_post_process_models(),
         snippets: Vec::new(),
+        corrections: Vec::new(),
         post_process_min_words: 0,
         post_process_prompts: default_post_process_prompts(),
         post_process_selected_prompt_id: Some("super".to_string()),

@@ -105,6 +105,7 @@ handy --swap-language           # Swap the selected language with the alternate 
 handy --next-prompt             # Switch to the next post-processing prompt
 handy --rerun                   # Re-run the last dictation with the next prompt
 handy --paste-last              # Paste the most recent dictation again
+handy --learn                   # Learn words and fixes from the selected, corrected text
 handy --set-language no         # Set the dictation language (a code, or "auto")
 handy --set-prompt email        # Select a post-processing prompt by id
 ```

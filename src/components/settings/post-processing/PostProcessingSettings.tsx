@@ -494,6 +494,11 @@ export const PostProcessingSettings: React.FC = () => {
           descriptionMode="tooltip"
           grouped={true}
         />
+        <ShortcutInput
+          shortcutId="learn_correction"
+          descriptionMode="tooltip"
+          grouped={true}
+        />
         <PostProcessMinWords descriptionMode="tooltip" grouped={true} />
       </SettingsGroup>
 

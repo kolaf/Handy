@@ -22,6 +22,7 @@ This is a fork of [cjpais/Handy](https://github.com/cjpais/Handy) that has delib
 | **Prompt variables** | `${vocabulary}` `${snippets}` `${clipboard}` `${examples}` in any prompt | Prompt editor |
 | **Prompt examples** | Optional examples box per prompt | Prompt editor |
 | **Re-run with next prompt** | `ctrl+alt+r` or `handy --rerun` | Post-processing page |
+| **Learn from correction** | `ctrl+alt+k` or `handy --learn` | Post-processing page; list under Advanced → Learned Corrections |
 | **Paste last dictation** | `ctrl+alt+v` or `handy --paste-last` | General page |
 | **Offline fallback** | Automatic when the language model call fails | n/a |
 | **Skip the model for short dictations** | Number of words below which the model is skipped | Post-processing page (0 = off) |
@@ -55,6 +56,12 @@ There is no native `${selection}`: copy the text first (a Talon command can do t
 **Examples field.** For fixed structures: put the structure with `[placeholders]` in the prompt, then give one or two
 `Dictation: ... / Result: ...` pairs separated by `---`. The *Document template* prompt is a working sample.
 
+**Learn from correction.** After fixing a dictation by hand, select the corrected passage and press the shortcut. Handy copies
+the selection (your clipboard is restored), finds the matching dictation in the history, and asks the post-processing model what
+was a recognition mistake (`fork/prompts/learn_prompt.md`). Names and terms go into the custom words; recurring mishearings become
+rules applied to future transcripts. Proposals are validated locally (the word must really appear in your text, ordinary-word
+swaps and rewordings are refused). Benchmark: `python3 fork/prompts/learn_bench.py --from-handy`.
+
 **Re-run with next prompt.** Takes the raw transcript of your most recent dictation from the history, advances to the next
 prompt, processes it and pastes the result. Select the earlier pasted text first to replace it; otherwise the result is
 inserted as a second copy.
@@ -74,6 +81,7 @@ Sent to the running instance (a second `handy` process forwards them and exits).
 handy --toggle-transcription | --toggle-post-process | --cancel      (upstream)
 handy --swap-language          handy --next-prompt
 handy --rerun                  handy --paste-last
+handy --learn
 handy --set-language CODE      handy --set-prompt ID                  (combinable, also with a toggle)
 handy --set-language no --set-prompt email --toggle-post-process
 ```

@@ -11,6 +11,7 @@ mod commands;
 mod extras;
 mod helpers;
 mod input;
+mod learn;
 mod llm_client;
 mod managers;
 mod memory;
@@ -690,6 +691,7 @@ pub fn run(cli_args: CliArgs) {
             shortcut::set_post_process_selected_prompt,
             shortcut::update_custom_words,
             extras::update_snippets,
+            learn::update_corrections,
             shortcut::change_post_process_min_words_setting,
             shortcut::suspend_all_bindings,
             shortcut::resume_all_bindings,
@@ -879,6 +881,8 @@ pub fn run(cli_args: CliArgs) {
                 signal_handle::run_action(app, "rerun_next_prompt", "CLI");
             } else if args.iter().any(|a| a == "--paste-last") {
                 signal_handle::run_action(app, "paste_last", "CLI");
+            } else if args.iter().any(|a| a == "--learn") {
+                signal_handle::run_action(app, "learn_correction", "CLI");
             } else if !handled_setting {
                 // A second process was launched without remote-control flags
                 // (e.g. the binary run from a shell). On macOS, relaunching the

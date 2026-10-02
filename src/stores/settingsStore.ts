@@ -8,6 +8,7 @@ import type {
   OrtAcceleratorSetting,
   ShortcutActivation,
   Snippet,
+  Correction,
   VadBackend,
 } from "@/bindings";
 import { commands } from "@/bindings";
@@ -140,6 +141,7 @@ const settingUpdaters: {
   debug_mode: (value) => commands.changeDebugModeSetting(value as boolean),
   custom_words: (value) => commands.updateCustomWords(value as string[]),
   snippets: (value) => commands.updateSnippets(value as Snippet[]),
+  corrections: (value) => commands.updateCorrections(value as Correction[]),
   post_process_min_words: (value) =>
     commands.changePostProcessMinWordsSetting(value as number),
   word_correction_threshold: (value) =>

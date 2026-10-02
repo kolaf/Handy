@@ -36,6 +36,10 @@ pub struct CliArgs {
     #[arg(long)]
     pub rerun: bool,
 
+    /// Learn from the selected, corrected text (sent to running instance)
+    #[arg(long)]
+    pub learn: bool,
+
     /// Paste the most recent dictation again (sent to running instance)
     #[arg(long)]
     pub paste_last: bool,
