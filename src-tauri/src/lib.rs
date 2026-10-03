@@ -696,6 +696,7 @@ pub fn run(cli_args: CliArgs) {
             learn::update_corrections,
             picker::picker_select,
             picker::picker_close,
+            picker::picker_state,
             shortcut::change_post_process_min_words_setting,
             shortcut::suspend_all_bindings,
             shortcut::resume_all_bindings,

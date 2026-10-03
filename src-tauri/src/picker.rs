@@ -27,16 +27,19 @@ static OPEN: AtomicBool = AtomicBool::new(false);
 static GENERATION: AtomicU64 = AtomicU64::new(0);
 /// Prompt ids shown, in order; entry `n - 1` is chosen by number `n`.
 static SHOWN: Mutex<Vec<String>> = Mutex::new(Vec::new());
+/// What the open picker shows. The window is created on first use and its page may not have loaded yet when the
+/// "picker-open" event is sent, so the page also asks for this when it starts.
+static CURRENT: Mutex<Option<OpenPayload>> = Mutex::new(None);
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, specta::Type)]
 struct Item {
     number: usize,
     id: String,
     name: String,
 }
 
-#[derive(Serialize, Clone)]
-struct OpenPayload {
+#[derive(Serialize, Clone, specta::Type)]
+pub struct OpenPayload {
     items: Vec<Item>,
     selected: Option<String>,
 }
@@ -179,13 +182,14 @@ fn open(app: &AppHandle) {
         *shown = items.iter().map(|i| i.id.clone()).collect();
     }
 
-    let _ = window.emit(
-        "picker-open",
-        OpenPayload {
-            items: items.clone(),
-            selected: settings.post_process_selected_prompt_id.clone(),
-        },
-    );
+    let payload = OpenPayload {
+        items: items.clone(),
+        selected: settings.post_process_selected_prompt_id.clone(),
+    };
+    if let Ok(mut current) = CURRENT.lock() {
+        *current = Some(payload.clone());
+    }
+    let _ = window.emit("picker-open", payload);
     let handle = app.clone();
     let win = window.clone();
     let count = items.len();
@@ -214,6 +218,9 @@ fn open(app: &AppHandle) {
 pub fn close(app: &AppHandle) {
     if !OPEN.swap(false, Ordering::SeqCst) {
         return;
+    }
+    if let Ok(mut current) = CURRENT.lock() {
+        *current = None;
     }
     let count = SHOWN.lock().map(|s| s.len()).unwrap_or(MAX_ITEMS);
     for binding in temp_bindings(count) {
@@ -288,6 +295,13 @@ impl ShortcutAction for PickerCloseAction {
 #[specta::specta]
 pub fn picker_select(app: AppHandle, number: usize) {
     std::thread::spawn(move || choose(&app, number));
+}
+
+/// The list to show right now, or nothing when the picker is closed (asked for by the page when it starts).
+#[tauri::command]
+#[specta::specta]
+pub fn picker_state() -> Option<OpenPayload> {
+    CURRENT.lock().ok().and_then(|current| current.clone())
 }
 
 #[tauri::command]

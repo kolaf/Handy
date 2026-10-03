@@ -22,6 +22,14 @@ const PromptPicker: React.FC = () => {
   const [selected, setSelected] = useState<string | null>(null);
 
   useEffect(() => {
+    // The window is created the first time the picker opens, so its page may load after the "picker-open" event
+    // was sent. Ask for the current list as well.
+    invoke<OpenPayload | null>("picker_state").then((state) => {
+      if (state) {
+        setItems(state.items);
+        setSelected(state.selected);
+      }
+    });
     const unlistenOpen = listen<OpenPayload>("picker-open", (event) => {
       setItems(event.payload.items);
       setSelected(event.payload.selected);
