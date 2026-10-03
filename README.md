@@ -106,6 +106,12 @@ handy --prompt-picker            # Open the numbered prompt picker
 handy --rerun                   # Re-run the last dictation with the next prompt
 handy --paste-last              # Paste the most recent dictation again
 handy --learn                   # Learn words and fixes from the selected, corrected text
+handy --reformat                # Run the selected text through the selected prompt and replace it
+handy --transform t_formal      # Run the selection (or the last dictation) through a prompt and replace it
+handy --use-prompt-once reply   # Use this prompt for the next dictation only
+handy --learn-repo FOLDER       # Add a project's names and terms to the custom words
+handy --import-words FILE       # Add the words of a text file (one per line) to the custom words
+handy --sync-lists FILE         # Merge words, snippets and learned corrections with a JSON file
 handy --set-language no         # Set the dictation language (a code, or "auto")
 handy --set-prompt email        # Select a post-processing prompt by id
 ```

@@ -1,37 +1,49 @@
 # What's new in this build
 
-This build (`0.9.7-hotkeys.1`) adds features on top of Handy. The full reference is `FORK.md` in the repository.
+This build (`0.9.7-hotkeys.1`) adds features on top of Handy. The full reference is `FORK.md` in the repository. The shortcuts below are the defaults; change them on the General and Post-Processing pages.
 
 ## Switching quickly
 
 - **Swap language** (`Ctrl+Alt+L`): swaps the language with the _Alternate Language_ you set on the General page.
-- **Next prompt** (`Ctrl+Alt+P`): steps through your post-processing prompts.
-- **Prompt picker** (`Ctrl+Alt+P`): a numbered list of your prompts; press a number or click to choose, Esc to close.
-- **Reformat selection** (`Ctrl+Alt+F`): run the selected text through the selected prompt and replace it.
-- **Prompt per app** (Post-processing page): choose the prompt by the app you dictate into (Windows).
-- **Transform** (`handy --transform ID`, or Talon: "make that formal" ...): rewrite the selection, or the last dictation.
-- **Learn from correction** (`Ctrl+Alt+K`): select text you corrected after a dictation and press it. Handy learns new vocabulary and recurring mishearings (see Advanced → Learned Corrections).
-- **Re-run with next prompt** (`Ctrl+Alt+R`): redo your last dictation with the next prompt. Select the text you pasted before to replace it.
+- **Prompt picker** (`Ctrl+Alt+P`): a numbered list of your prompts in a small window. Press a number key or click a row to choose, `Esc` (or `Ctrl+Alt+P` again) to close. The first nine prompts are listed; the one in use is highlighted. The window never takes focus, so your selection stays where it is.
+- **Prompt per app** (Post-Processing page): choose the prompt by the app you dictate into, for example Slack → _Informal message_. Rules are "program (+ optional part of the window title) → prompt"; the first matching rule wins, otherwise the selected prompt is used. Windows only. The Handy log shows the program name it saw.
 - **Paste last dictation** (`Ctrl+Alt+V`): paste your most recent dictation again.
 - A short notice and a caption under the recording controls show the current language and prompt.
+
+## Working on text you already have
+
+- **Reformat selection** (`Ctrl+Alt+F`): run the selected text through the selected prompt and replace it with the result.
+- **Transform** (`handy --transform ID`, or Talon: "make that formal"): run the selection, or with nothing selected the last dictation, through a one-purpose prompt and replace it. Built in: formal, informal, shorter, fuller, clearer, fix spelling and grammar, translate to Norwegian or English, bullet list, summary (the prompts whose id starts with `t_`; they are not in the picker). For the last dictation Handy first checks that the text before the cursor really is that dictation, and does nothing otherwise.
+- **Re-run with next prompt** (`Ctrl+Alt+R`): redo your last dictation with the next prompt in the list. Select the text you pasted before to replace it.
+- **Reply with context**: `handy --use-prompt-once reply --toggle-post-process` (Talon: "reply to this") makes the next dictation use the _Reply_ prompt, with the clipboard (the message you are answering) as context; the prompt is then forgotten.
 
 ## Teaching Handy your words
 
 - **By dictation** (post-processing shortcut): say a word and then spell it ("dyst, delta yankee sierra tango"), or say "add to vocabulary" followed by the word. It is added to Custom Words.
+- **Learn from correction** (`Ctrl+Alt+K`): fix a dictation by hand, select the fixed text and press the shortcut. Handy compares it with what was heard and learns new words and recurring mishearings.
+- **Learned Corrections** (Advanced): the list of mishearings it learned. A rule is either _Always_ (replaced automatically; only for heard text that is not a real word, like "Superwisper") or _Hint_ (only shown to the model, which applies it when the sentence fits; used for real words like "carry" for "Kari"). Click the button to switch a rule, or remove it.
 - **Snippets** (Advanced): store text such as a signature or link, then say "insert my signature". The text is inserted locally; only the snippet _names_ reach the language model.
+- **Learn a project's words**: `handy --learn-repo FOLDER` (Talon: "learn this repo" in the terminal) scans a folder and adds its names and terms to Custom Words; `handy --import-words FILE` adds the words in a text file.
+- **Sync between computers**: `handy --sync-lists FILE` merges Custom Words, Snippets and Learned Corrections with a JSON file you keep in git. It only adds entries, so deletions are not carried over.
 
 ## Writing prompts
 
-- Variables: `${output}` the transcript, `${vocabulary}` your Custom Words, `${snippets}` the snippet names, `${clipboard}` the clipboard text (read only if the prompt uses it), `${examples}` the prompt's examples.
+- Variables: `${output}` the transcript, `${vocabulary}` your Custom Words, `${corrections}` the learned mishearings ("X is Y" for _Always_ rules, "X may be Y" for hints), `${snippets}` the snippet names, `${clipboard}` the clipboard text (read only if the prompt uses it), `${examples}` the prompt's examples.
 - The **Examples** box is for fixed structures: put the structure with `[placeholders]` in the prompt, then add one or two `Dictation: ... / Result: ...` pairs separated by `---`.
 - The _Document template_ and _Reply_ prompts are working samples. _Reply_ uses the clipboard as the message you are answering.
 - Say a format at the end of a dictation ("...format as email", "...som punktliste") with the _Super_ prompt to choose the style.
+- A prompt whose id starts with `t_` is a transform: it works on written text and is left out of the picker and of "re-run with next prompt".
 
 ## When the model is not available
 
-- If the language model cannot be reached, Handy cleans the text locally (spoken punctuation and capital letters) and says "Offline: basic cleanup only".
-- **Skip the model for short dictations** (Post Process page) uses the same local cleanup for dictations under a number of words you choose.
+- If the language model cannot be reached, Handy cleans the text locally (spoken punctuation and capital letters) and says "Offline: basic cleanup only". Hint rules do nothing then; _Always_ rules still apply.
+- **Skip the model for short dictations** (Post-Processing page) uses the same local cleanup for dictations under a number of words you choose.
+
+## Together with Talon
+
+- While Handy records it writes `%USERPROFILE%\.cache\hv\handy-state.txt`; the Talon setup in `kolaf/handy` uses it to switch Talon's speech off during a dictation and on again afterwards, so your dictation is not taken for voice commands.
+- Talon commands in that setup: "make that formal|informal|shorter|fuller|clearer", "fix that up", "translate that to norwegian|english", "bullet that", "summarize that", "reply to this", and "learn this repo" (terminal).
 
 ## Command line
 
-`handy --swap-language`, `--rerun`, `--paste-last`, `--learn`, `--transform ID`, `--use-prompt-once ID`, `--learn-repo FOLDER`, `--import-words FILE`, `--prompt-picker`, `--reformat`, `--sync-lists FILE` (merge words, snippets and learned corrections with a JSON file, e.g. one kept in git), `--set-language no`, `--set-prompt email`. They work with a running Handy and can be combined with `--toggle-post-process`, for example from a window-manager key binding or Talon.
+`handy --swap-language`, `--prompt-picker`, `--reformat`, `--transform ID`, `--use-prompt-once ID`, `--rerun`, `--paste-last`, `--learn`, `--learn-repo FOLDER`, `--import-words FILE`, `--sync-lists FILE`, `--set-language no`, `--set-prompt email`. They work with a running Handy and can be combined with `--toggle-post-process`, for example from a window-manager key binding, a Logitech button or Talon.
