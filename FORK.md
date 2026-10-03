@@ -127,8 +127,13 @@ the start of every dictation would send Ctrl+C while you hold your dictation hot
 "edit this" copy the selection explicitly instead.
 
 **Scratch and redo.** `handy --scratch-last` deletes the last dictation and `handy --redo-with ID` replaces it by the same
-recording (the raw transcript from the history) processed with prompt `ID`. Both first select the last dictation backwards from
-the caret and verify it, exactly like `--transform` with nothing selected. Talon: "scratch dictation", "redo as email|message|
+recording (the raw transcript from the history) processed with prompt `ID`. Both work like Talon's "scratch that": Handy
+remembers what it last pasted as a dictation (the text, the window and the time) and takes it back by pressing Backspace once
+per character (plus one for the trailing space). Nothing is selected or copied, so it works in terminals and in VS Code's
+terminal panel without risking a Ctrl+C. It only runs if the same window still has focus (the program and the window; the title is
+ignored), the paste is at most 5 minutes old and at most 1500 characters long; otherwise it does nothing and the Activity page says
+why. It cannot see whether you moved the cursor inside that window, so use it right after dictating. After a scratch the memory
+is empty, so a second "scratch" does not eat more text. Paste-last and redo count as dictations; reformat results do not. Talon: "scratch dictation", "redo as email|message|
 note|meeting|document|formal|informal|simple".
 
 **Prompt per app.** Post-processing page → "Prompt per app": turn it on and add rules (program name such as `slack.exe`, an
@@ -144,9 +149,9 @@ forgets it (it expires after 3 minutes). Talon's "reply to this" copies the sele
 a dictation, so the reply is written with the message as context.
 
 **Transform.** `handy --transform ID` runs the selected text through prompt `ID` (without changing the selected prompt) and
-replaces it. With nothing selected it takes the last dictation: Handy selects it backwards from the caret (Shift+Left, at most
-1200 characters), copies it and checks that it is exactly the last dictation; if not (you clicked elsewhere) it puts the caret
-back and does nothing. The built-in transform prompts have ids starting with `t_` (formal, informal, shorter, longer, clearer,
+replaces it. With nothing selected it takes the last dictation Handy pasted (see "Scratch and redo": same
+window, at most 5 minutes old): the model works on that text, then the old text is removed with Backspace presses and the result
+is pasted. A selection is detected by copying it (Ctrl+C, or Ctrl+Shift+C in a recognised terminal). The built-in transform prompts have ids starting with `t_` (formal, informal, shorter, longer, clearer,
 fix, to_no, to_en, bullets, summary) and are left out of the prompt picker and "re-run with next prompt". Talon: "make that
 formal", "make that shorter", "fix that up", "translate that to norwegian", "bullet that", "summarize that" ...
 

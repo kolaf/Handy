@@ -46,6 +46,86 @@ pub fn focus_moved(target: Option<&AppContext>, now: Option<&AppContext>) -> boo
     }
 }
 
+/// What Handy last pasted as a dictation, so that "scratch dictation" and friends can take it back the way Talon's
+/// "scratch that" does: press Backspace once per character. No selecting and no copying, so it also works in
+/// terminals (where Ctrl+C would interrupt the running program).
+#[derive(Debug, Clone)]
+pub struct LastPaste {
+    /// The pasted text without the trailing space Handy may add.
+    pub text: String,
+    /// Backspace presses that remove it: the characters plus the trailing space.
+    pub chars: usize,
+    /// The window it was pasted into.
+    pub window: Option<AppContext>,
+    pasted_at: Instant,
+}
+
+static LAST_PASTE: Mutex<Option<LastPaste>> = Mutex::new(None);
+/// "Scratch" is for taking back what was just said; later than this the cursor has probably been used for other things.
+const UNDO_MAX_AGE: Duration = Duration::from_secs(5 * 60);
+/// Each character is a key press.
+const UNDO_MAX_CHARS: usize = 1500;
+
+/// Remembers a dictation that was just pasted into the window that has focus.
+pub fn note_paste(app: &tauri::AppHandle, text: &str) {
+    let trailing = usize::from(get_settings(app).append_trailing_space);
+    let last = LastPaste {
+        text: text.to_string(),
+        chars: text.chars().count() + trailing,
+        window: foreground(),
+        pasted_at: Instant::now(),
+    };
+    if let Ok(mut slot) = LAST_PASTE.lock() {
+        *slot = Some(last);
+    }
+}
+
+pub fn last_paste() -> Option<LastPaste> {
+    LAST_PASTE.lock().ok()?.clone()
+}
+
+pub fn clear_last_paste() {
+    if let Ok(mut slot) = LAST_PASTE.lock() {
+        *slot = None;
+    }
+}
+
+/// How many Backspace presses take the last paste back, or why that is not safe. `now` is the window with focus now
+/// (unknown on Wayland and macOS, where only the age is checked).
+pub fn undo_plan(
+    last: &LastPaste,
+    now: Option<&AppContext>,
+    age: Duration,
+) -> Result<usize, String> {
+    if age > UNDO_MAX_AGE {
+        return Err(format!(
+            "The last dictation was pasted more than {} minutes ago.",
+            UNDO_MAX_AGE.as_secs() / 60
+        ));
+    }
+    if last.chars == 0 || last.chars > UNDO_MAX_CHARS {
+        return Err(format!(
+            "The last dictation is empty or longer than {UNDO_MAX_CHARS} characters."
+        ));
+    }
+    if focus_moved(last.window.as_ref(), now) {
+        return Err(format!(
+            "The last dictation went into {}, but {} has focus now.",
+            describe(last.window.as_ref()),
+            describe(now)
+        ));
+    }
+    Ok(last.chars)
+}
+
+/// `undo_plan` for the last paste right now.
+pub fn current_undo_plan() -> Result<(LastPaste, usize), String> {
+    let last = last_paste().ok_or_else(|| "Handy has not pasted a dictation yet.".to_string())?;
+    let age = last.pasted_at.elapsed();
+    let n = undo_plan(&last, foreground().as_ref(), age)?;
+    Ok((last, n))
+}
+
 /// `slack.exe "Channel - Slack"` for messages and logs.
 pub fn describe(ctx: Option<&AppContext>) -> String {
     ctx.map_or_else(
@@ -606,6 +686,59 @@ mod tests {
             .to_string_lossy()
             .to_string();
         assert_eq!(seen.exe, own);
+    }
+
+    fn pasted(chars: usize, window: Option<AppContext>) -> LastPaste {
+        LastPaste {
+            text: "x".repeat(chars),
+            chars,
+            window,
+            pasted_at: Instant::now(),
+        }
+    }
+
+    #[test]
+    fn a_recent_paste_in_the_same_window_can_be_taken_back() {
+        let here = AppContext {
+            exe: "code.exe".into(),
+            title: "a".into(),
+            window: 7,
+        };
+        let last = pasted(40, Some(here.clone()));
+        let minute = Duration::from_secs(60);
+        assert_eq!(undo_plan(&last, Some(&here), minute), Ok(40));
+        // typing changes the title but not the window
+        let typed = AppContext {
+            title: "*a".into(),
+            ..here.clone()
+        };
+        assert_eq!(undo_plan(&last, Some(&typed), minute), Ok(40));
+        // unknown current window (Wayland): only the age is checked
+        assert_eq!(undo_plan(&last, None, minute), Ok(40));
+    }
+
+    #[test]
+    fn an_old_a_moved_or_huge_paste_is_not_taken_back() {
+        let here = AppContext {
+            exe: "code.exe".into(),
+            title: "a".into(),
+            window: 7,
+        };
+        let elsewhere = AppContext {
+            exe: "slack.exe".into(),
+            title: "b".into(),
+            window: 9,
+        };
+        let last = pasted(40, Some(here.clone()));
+        assert!(undo_plan(&last, Some(&here), Duration::from_secs(10 * 60)).is_err());
+        assert!(undo_plan(&last, Some(&elsewhere), Duration::from_secs(5)).is_err());
+        assert!(undo_plan(&pasted(0, Some(here.clone())), Some(&here), Duration::ZERO).is_err());
+        assert!(undo_plan(
+            &pasted(5000, Some(here.clone())),
+            Some(&here),
+            Duration::ZERO
+        )
+        .is_err());
     }
 
     #[test]

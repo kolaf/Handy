@@ -405,8 +405,9 @@ impl ShortcutAction for PasteLastAction {
         }
         let handle = app.clone();
         let _ = app.run_on_main_thread(move || {
-            if let Err(err) = crate::utils::paste(text, handle.clone()) {
-                warn!("Paste last: failed to paste: {}", err);
+            match crate::utils::paste(text.clone(), handle.clone()) {
+                Ok(()) => crate::context::note_paste(&handle, &text),
+                Err(err) => warn!("Paste last: failed to paste: {}", err),
             }
         });
     }
@@ -494,48 +495,14 @@ async fn rerun_with_next_prompt(app: &AppHandle) {
 /// Replaces the selected text with the result of running it through the selected post-processing prompt.
 pub(crate) struct ReformatAction;
 
-/// Most characters of the last dictation that are selected backwards by key presses (each is a key event).
-const MAX_SELECT_BACK: usize = 1200;
-
-/// How many Shift+Left presses select the text that was just pasted (text plus the trailing space Handy may add).
-pub(crate) fn selection_length(pasted: &str, trailing_space: bool) -> usize {
-    pasted.chars().count() + usize::from(trailing_space)
-}
-
-/// Do two texts match once line endings and trailing whitespace are ignored?
-pub(crate) fn same_text(a: &str, b: &str) -> bool {
-    let norm = |s: &str| s.replace("\r\n", "\n").trim_end().to_string();
-    norm(a) == norm(b)
-}
-
-/// Selects the last dictation backwards from the caret and checks that the selection really is that text. Returns the
-/// selected text, or nothing (and leaves the caret where it was) when the text at the caret is something else, for
-/// example because the user clicked elsewhere since. Runs on the main thread.
-fn select_last_dictation(app: &AppHandle) -> Option<String> {
-    let history = app.state::<Arc<HistoryManager>>();
-    let entry = history.get_latest_completed_entry().ok().flatten()?;
-    let expected = entry
-        .post_processed_text
-        .filter(|t| !t.trim().is_empty())
-        .unwrap_or(entry.transcription_text);
-    let count = selection_length(&expected, get_settings(app).append_trailing_space);
-    if expected.trim().is_empty() || count > MAX_SELECT_BACK {
-        return None;
-    }
-    if crate::clipboard::with_enigo(app, |enigo| crate::input::send_select_left(enigo, count))
-        .is_err()
-    {
-        return None;
-    }
-    std::thread::sleep(std::time::Duration::from_millis(80));
-    match crate::learn::capture_selection(app) {
-        Some((text, true)) if same_text(&text, &expected) => Some(text),
-        _ => {
-            // Not what we expected: put the caret back instead of leaving a wrong selection.
-            let _ = crate::clipboard::with_enigo(app, crate::input::send_arrow_right);
-            None
-        }
-    }
+/// Takes the last pasted dictation back by pressing Backspace once per character, after checking that it is safe: the same
+/// window still has focus and the paste is recent (see `context::undo_plan`). Nothing is selected or copied, so this is safe
+/// in terminals too. Runs on the main thread. Returns the text that was removed.
+fn take_back_last_paste(app: &AppHandle) -> Result<crate::context::LastPaste, String> {
+    let (last, count) = crate::context::current_undo_plan()?;
+    crate::clipboard::with_enigo(app, |enigo| crate::input::send_backspaces(enigo, count))?;
+    crate::context::clear_last_paste();
+    Ok(last)
 }
 
 impl ReformatAction {
@@ -550,35 +517,32 @@ pub(crate) fn run_transform(app: &AppHandle, prompt_id: Option<String>) {
     run_reformat(app, prompt_id, true);
 }
 
-/// `handy --scratch-last`: deletes the last dictation, if it is really the text just before the cursor.
+/// `handy --scratch-last`: takes back the last dictation.
 pub(crate) fn run_scratch(app: &AppHandle) {
     let app = app.clone();
     std::thread::spawn(move || {
         let (tx, rx) = std::sync::mpsc::channel();
         let handle = app.clone();
         let _ = app.run_on_main_thread(move || {
-            let removed = select_last_dictation(&handle).is_some()
-                && crate::clipboard::with_enigo(&handle, crate::input::send_backspace).is_ok();
-            let _ = tx.send(removed);
+            let _ = tx.send(take_back_last_paste(&handle));
         });
-        let removed = rx
-            .recv_timeout(std::time::Duration::from_secs(15))
-            .unwrap_or(false);
-        if removed {
-            crate::learn::announce_with(
+        match rx.recv_timeout(std::time::Duration::from_secs(15)) {
+            Ok(Ok(last)) => crate::learn::announce_with(
                 &app,
                 "scratched",
                 "Last dictation removed".to_string(),
-                String::new(),
-            );
-        } else {
-            crate::learn::announce(&app, "transform-moved", String::new());
+                format!("Removed: {}", last.text),
+            ),
+            Ok(Err(reason)) => {
+                crate::learn::announce_with(&app, "transform-moved", String::new(), reason)
+            }
+            Err(_) => crate::learn::announce(&app, "transform-moved", String::new()),
         }
     });
 }
 
-/// `handy --redo-with ID`: replaces the last dictation (if it is really the text just before the cursor) by the same
-/// recording processed again with prompt `ID`. The raw transcript is processed, not the already formatted text.
+/// `handy --redo-with ID`: replaces the last dictation by the same recording processed again with prompt `ID`. The
+/// raw transcript from the history is processed, not the already formatted text.
 pub(crate) fn run_redo(app: &AppHandle, prompt_id: String) {
     let app = app.clone();
     std::thread::spawn(move || {
@@ -593,6 +557,11 @@ pub(crate) fn run_redo(app: &AppHandle, prompt_id: String) {
             crate::learn::announce(&app, "reformat-setup", String::new());
             return;
         }
+        // Check first, so that no model time is spent when it cannot be replaced anyway.
+        if let Err(reason) = crate::context::current_undo_plan() {
+            crate::learn::announce_with(&app, "transform-moved", String::new(), reason);
+            return;
+        }
         let raw = match app
             .state::<Arc<HistoryManager>>()
             .get_latest_completed_entry()
@@ -605,18 +574,6 @@ pub(crate) fn run_redo(app: &AppHandle, prompt_id: String) {
                 return;
             }
         };
-        let (tx, rx) = std::sync::mpsc::channel();
-        let handle = app.clone();
-        let _ = app.run_on_main_thread(move || {
-            let _ = tx.send(select_last_dictation(&handle).is_some());
-        });
-        if !rx
-            .recv_timeout(std::time::Duration::from_secs(15))
-            .unwrap_or(false)
-        {
-            crate::learn::announce(&app, "transform-moved", String::new());
-            return;
-        }
         crate::utils::show_processing_overlay(&app);
         crate::context::set_one_shot(&prompt_id);
         let processed =
@@ -625,8 +582,18 @@ pub(crate) fn run_redo(app: &AppHandle, prompt_id: String) {
         let text = processed.final_text;
         let _ = app.run_on_main_thread(move || {
             if !text.trim().is_empty() {
-                if let Err(err) = crate::utils::paste(text, handle.clone()) {
-                    warn!("Redo: failed to paste: {}", err);
+                // Checked again: the user may have moved on while the model worked.
+                match take_back_last_paste(&handle) {
+                    Ok(_) => match crate::utils::paste(text.clone(), handle.clone()) {
+                        Ok(()) => crate::context::note_paste(&handle, &text),
+                        Err(err) => warn!("Redo: failed to paste: {}", err),
+                    },
+                    Err(reason) => crate::learn::announce_with(
+                        &handle,
+                        "transform-moved",
+                        String::new(),
+                        reason,
+                    ),
                 }
             }
             crate::utils::hide_recording_overlay(&handle);
@@ -641,26 +608,32 @@ fn run_reformat(app: &AppHandle, prompt_id: Option<String>, fall_back_to_last_di
         let (tx, rx) = std::sync::mpsc::channel();
         let handle = app.clone();
         let _ = app.run_on_main_thread(move || {
-            let mut captured = crate::learn::capture_selection(&handle);
+            let captured = crate::learn::capture_selection(&handle);
             let real_selection = matches!(captured, Some((_, true)));
-            if !real_selection && fall_back_to_last_dictation {
-                captured = select_last_dictation(&handle).map(|t| (t, true));
-                if captured.is_none() {
-                    let _ = tx.send(Err(()));
-                    return;
-                }
-            }
-            let _ = tx.send(Ok(captured));
-        });
-        let captured = match rx.recv_timeout(std::time::Duration::from_secs(15)) {
-            Ok(Ok(captured)) => captured,
-            Ok(Err(())) => {
-                crate::learn::announce(&app, "transform-moved", String::new());
+            if real_selection || !fall_back_to_last_dictation {
+                let _ = tx.send(Ok((captured, false)));
                 return;
             }
-            Err(_) => None,
+            // Nothing selected: the last dictation (taken back and replaced later, after the model has answered).
+            let _ = tx.send(match crate::context::current_undo_plan() {
+                Ok((last, _)) => Ok((Some((last.text, true)), true)),
+                Err(reason) => Err(reason),
+            });
+        });
+        let (captured, replace_last) = match rx.recv_timeout(std::time::Duration::from_secs(15)) {
+            Ok(Ok(found)) => found,
+            Ok(Err(reason)) => {
+                crate::learn::announce_with(
+                    &app,
+                    "transform-moved",
+                    String::new(),
+                    format!("Nothing is selected, and the last dictation cannot be used: {reason}"),
+                );
+                return;
+            }
+            Err(_) => (None, false),
         };
-        tauri::async_runtime::block_on(reformat_selection(&app, captured, prompt_id));
+        tauri::async_runtime::block_on(reformat_selection(&app, captured, prompt_id, replace_last));
     });
 }
 
@@ -684,6 +657,7 @@ async fn reformat_selection(
     app: &AppHandle,
     captured: Option<(String, bool)>,
     prompt_id: Option<String>,
+    replace_last: bool,
 ) {
     // Only a real selection counts: pasting over "whatever was on the clipboard" would insert text, not replace it.
     let Some((text, true)) = captured else {
@@ -719,8 +693,27 @@ async fn reformat_selection(
             let out = expand_snippets(&out, &settings.snippets);
             let _ = app.run_on_main_thread(move || {
                 if !out.trim().is_empty() {
-                    if let Err(err) = crate::utils::paste(out, handle.clone()) {
-                        warn!("Reformat: failed to paste: {}", err);
+                    // The last dictation is replaced by Backspace (checked again now); a selection is simply pasted over.
+                    let ready = if replace_last {
+                        take_back_last_paste(&handle).map(|_| ())
+                    } else {
+                        Ok(())
+                    };
+                    match ready {
+                        Ok(()) => match crate::utils::paste(out.clone(), handle.clone()) {
+                            Ok(()) => {
+                                if replace_last {
+                                    crate::context::note_paste(&handle, &out);
+                                }
+                            }
+                            Err(err) => warn!("Reformat: failed to paste: {}", err),
+                        },
+                        Err(reason) => crate::learn::announce_with(
+                            &handle,
+                            "transform-moved",
+                            String::new(),
+                            reason,
+                        ),
                     }
                 }
                 crate::utils::hide_recording_overlay(&handle);
@@ -779,11 +772,7 @@ mod tests {
     }
 
     #[test]
-    fn last_dictation_selection_length_and_check() {
-        assert_eq!(selection_length("Hello wørld", true), 12);
-        assert_eq!(selection_length("Hello", false), 5);
-        assert!(same_text("Hello\r\nworld ", "Hello\nworld"));
-        assert!(!same_text("Hello world", "Hello there"));
+    fn transform_prompts_are_recognised() {
         assert!(is_transform_prompt("t_formal") && !is_transform_prompt("formal_text"));
     }
 

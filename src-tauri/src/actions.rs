@@ -980,11 +980,14 @@ impl ShortcutAction for TranscribeAction {
                                         }
                                     }
 
-                                    match utils::paste(final_text, ah_clone.clone()) {
-                                        Ok(()) => debug!(
-                                            "Text pasted successfully in {:?}",
-                                            paste_time.elapsed()
-                                        ),
+                                    match utils::paste(final_text.clone(), ah_clone.clone()) {
+                                        Ok(()) => {
+                                            crate::context::note_paste(&ah_clone, &final_text);
+                                            debug!(
+                                                "Text pasted successfully in {:?}",
+                                                paste_time.elapsed()
+                                            )
+                                        }
                                         Err(e) => {
                                             error!("Failed to paste transcription: {}", e);
                                             let _ = ah_clone.emit("paste-error", ());
