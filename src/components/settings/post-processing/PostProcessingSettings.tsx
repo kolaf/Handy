@@ -485,11 +485,6 @@ export const PostProcessingSettings: React.FC = () => {
           grouped={true}
         />
         <ShortcutInput
-          shortcutId="cycle_prompt"
-          descriptionMode="tooltip"
-          grouped={true}
-        />
-        <ShortcutInput
           shortcutId="rerun_next_prompt"
           descriptionMode="tooltip"
           grouped={true}

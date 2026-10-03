@@ -14,7 +14,6 @@ This is a fork of [cjpais/Handy](https://github.com/cjpais/Handy) that has delib
 | Feature | How to use it | Where to configure |
 |---|---|---|
 | **Swap language** | `ctrl+alt+l` or `handy --swap-language` swaps the language with the *alternate language* | General: Language and Alternate Language pickers |
-| **Next prompt** | `ctrl+alt+p` or `handy --next-prompt` | Post-processing page |
 | **Set exact values** | `handy --set-language no`, `handy --set-prompt email`; combinable with each other and a toggle | n/a (flags only) |
 | **Overlay feedback** | A caption under the controls shows the language (and the prompt, if post-processing runs); a short notice appears after a switch; the activity bars scale to your recent volume | Settings: overlay style |
 | **Vocabulary by dictation** | Spell a word after saying it, or say "add to vocabulary X" / "legg til i ordlisten X" | Custom Words (Advanced) |
@@ -22,7 +21,7 @@ This is a fork of [cjpais/Handy](https://github.com/cjpais/Handy) that has delib
 | **Prompt variables** | `${vocabulary}` `${snippets}` `${clipboard}` `${examples}` in any prompt | Prompt editor |
 | **Prompt examples** | Optional examples box per prompt | Prompt editor |
 | **Re-run with next prompt** | `ctrl+alt+r` or `handy --rerun` | Post-processing page |
-| **Prompt picker** | `ctrl+alt+o` or `handy --prompt-picker` | Post-processing page |
+| **Prompt picker** (replaces cycling) | `ctrl+alt+p` or `handy --prompt-picker` | Post-processing page |
 | **Reformat selection** | `ctrl+alt+f` or `handy --reformat` | Post-processing page |
 | **Sync lists** | `handy --sync-lists FILE` | merges word list, snippets and learned corrections with a JSON file kept in git |
 | **Learn from correction** | `ctrl+alt+k` or `handy --learn` | Post-processing page; list under Advanced → Learned Corrections |
@@ -33,7 +32,7 @@ This is a fork of [cjpais/Handy](https://github.com/cjpais/Handy) that has delib
 | **Eleven default prompts** | Baked in for fresh and portable installs | `fork/prompts/` |
 | **Guide page** | Sidebar > Guide: what is new in this build and a quick reference | `src/content/fork-guide.md` (keep it in step with this file) |
 
-Default shortcuts are `ctrl+alt+l`, `ctrl+alt+p`, `ctrl+alt+r`, `ctrl+alt+v`; rebind them in Settings. On Wayland, desktops
+Default shortcuts are `ctrl+alt+l`, `ctrl+alt+p` (prompt picker), `ctrl+alt+r`, `ctrl+alt+v`; rebind them in Settings. On Wayland, desktops
 own global shortcuts, so bind the command-line flags instead (see below).
 
 ### Details
@@ -65,12 +64,13 @@ was a recognition mistake (`fork/prompts/learn_prompt.md`). Names and terms go i
 rules applied to future transcripts. Proposals are validated locally (the word must really appear in your text, ordinary-word
 swaps and rewordings are refused). Benchmark: `python3 fork/prompts/learn_bench.py --from-handy`.
 
-**Prompt picker.** `Ctrl+Alt+O` opens a small floating window listing the first nine prompts with a number each (the
+**Prompt picker.** `Ctrl+Alt+P` opens a small floating window listing the first nine prompts with a number each (the
 current one is highlighted). Press a number key or click a row to switch to that prompt; Escape, the shortcut again, or 12
 seconds of nothing closes it. The window never takes focus, so the app you are dictating into keeps its selection. While it is
 open the digits 1-9 and Escape are temporary global shortcuts, swallowed so no digit is typed into the document (if the
 keyboard hook cannot block keys on your system, the digit would also reach the document). More than nine prompts: only the
-first nine are listed; use cycle or `--set-prompt` for the rest.
+first nine are listed; use `--set-prompt ID` for the rest. The old cycle-prompt shortcut is gone (its stored binding is
+removed on first start and `Ctrl+Alt+P` now opens the picker); "re-run with next prompt" still steps through the list.
 
 **Reformat selection.** `Ctrl+Alt+F` (or `handy --reformat`) copies the selected text (your clipboard is restored), runs it
 through the currently selected prompt exactly like a dictation would be, and pastes the result over the selection. Needs real
@@ -109,7 +109,7 @@ Sent to the running instance (a second `handy` process forwards them and exits).
 
 ```
 handy --toggle-transcription | --toggle-post-process | --cancel      (upstream)
-handy --swap-language          handy --next-prompt
+handy --swap-language          handy --prompt-picker
 handy --rerun                  handy --paste-last
 handy --learn                  handy --sync-lists FILE
 handy --set-language CODE      handy --set-prompt ID                  (combinable, also with a toggle)

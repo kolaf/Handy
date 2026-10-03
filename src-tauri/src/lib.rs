@@ -883,8 +883,6 @@ pub fn run(cli_args: CliArgs) {
                 crate::utils::cancel_current_operation(app);
             } else if args.iter().any(|a| a == "--swap-language") {
                 signal_handle::run_action(app, "swap_language", "CLI");
-            } else if args.iter().any(|a| a == "--next-prompt") {
-                signal_handle::run_action(app, "cycle_prompt", "CLI");
             } else if args.iter().any(|a| a == "--rerun") {
                 signal_handle::run_action(app, "rerun_next_prompt", "CLI");
             } else if args.iter().any(|a| a == "--paste-last") {

@@ -28,10 +28,6 @@ pub struct CliArgs {
     #[arg(long)]
     pub swap_language: bool,
 
-    /// Switch to the next post-processing prompt (sent to running instance)
-    #[arg(long)]
-    pub next_prompt: bool,
-
     /// Re-run the last dictation with the next post-processing prompt (sent to running instance)
     #[arg(long)]
     pub rerun: bool,
@@ -109,9 +105,10 @@ mod tests {
 
     #[test]
     fn switch_flags_parse() {
-        let args = CliArgs::try_parse_from(["handy", "--swap-language", "--next-prompt"]).unwrap();
+        let args =
+            CliArgs::try_parse_from(["handy", "--swap-language", "--prompt-picker"]).unwrap();
         assert!(args.swap_language);
-        assert!(args.next_prompt);
+        assert!(args.prompt_picker);
         assert!(!CliArgs::try_parse_from(["handy"]).unwrap().swap_language);
     }
 

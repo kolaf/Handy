@@ -6,7 +6,7 @@ This build (`0.9.7-hotkeys.1`) adds features on top of Handy. The full reference
 
 - **Swap language** (`Ctrl+Alt+L`): swaps the language with the _Alternate Language_ you set on the General page.
 - **Next prompt** (`Ctrl+Alt+P`): steps through your post-processing prompts.
-- **Prompt picker** (`Ctrl+Alt+O`): a numbered list of your prompts; press a number or click to choose, Esc to close.
+- **Prompt picker** (`Ctrl+Alt+P`): a numbered list of your prompts; press a number or click to choose, Esc to close.
 - **Reformat selection** (`Ctrl+Alt+F`): run the selected text through the selected prompt and replace it.
 - **Learn from correction** (`Ctrl+Alt+K`): select text you corrected after a dictation and press it. Handy learns new vocabulary and recurring mishearings (see Advanced → Learned Corrections).
 - **Re-run with next prompt** (`Ctrl+Alt+R`): redo your last dictation with the next prompt. Select the text you pasted before to replace it.
@@ -32,4 +32,4 @@ This build (`0.9.7-hotkeys.1`) adds features on top of Handy. The full reference
 
 ## Command line
 
-`handy --swap-language`, `--next-prompt`, `--rerun`, `--paste-last`, `--learn`, `--prompt-picker`, `--reformat`, `--sync-lists FILE` (merge words, snippets and learned corrections with a JSON file, e.g. one kept in git), `--set-language no`, `--set-prompt email`. They work with a running Handy and can be combined with `--toggle-post-process`, for example from a window-manager key binding or Talon.
+`handy --swap-language`, `--rerun`, `--paste-last`, `--learn`, `--prompt-picker`, `--reformat`, `--sync-lists FILE` (merge words, snippets and learned corrections with a JSON file, e.g. one kept in git), `--set-language no`, `--set-prompt email`. They work with a running Handy and can be combined with `--toggle-post-process`, for example from a window-manager key binding or Talon.

@@ -185,10 +185,6 @@
             "name": "Swap Language Shortcut",
             "description": "Swap the selected language with the alternate language."
           },
-          "cycle_prompt": {
-            "name": "Cycle Prompt Shortcut",
-            "description": "Switch to the next post-processing prompt."
-          },
           "paste_last": {
             "name": "Paste Last Dictation Shortcut",
             "description": "Paste the most recent dictation again, for example when a paste went to the wrong window."

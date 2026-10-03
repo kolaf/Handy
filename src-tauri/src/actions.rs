@@ -996,11 +996,10 @@ impl ShortcutAction for TranscribeAction {
     }
 }
 
-// Switch Action: swaps the language with the alternate language, or steps the
-// post-processing prompt to the next one.
+// Switch Action: swaps the language with the alternate language. (Prompts are chosen with the
+// numbered prompt picker, `picker.rs`.)
 enum SwitchKind {
     SwapLanguage,
-    NextPrompt,
 }
 
 struct SwitchAction {
@@ -1092,24 +1091,6 @@ impl ShortcutAction for SwitchAction {
                 );
                 let lang = settings.selected_language.clone();
                 Some(("selected_language", lang.clone(), "language", lang))
-            }
-            SwitchKind::NextPrompt => {
-                let ids: Vec<String> = settings
-                    .post_process_prompts
-                    .iter()
-                    .map(|p| p.id.clone())
-                    .collect();
-                next_in_cycle(&ids, settings.post_process_selected_prompt_id.as_deref())
-                    .cloned()
-                    .map(|id| {
-                        let name = settings
-                            .post_process_prompts
-                            .iter()
-                            .find(|p| p.id == id)
-                            .map_or_else(|| id.clone(), |p| p.name.clone());
-                        settings.post_process_selected_prompt_id = Some(id.clone());
-                        ("post_process_selected_prompt_id", id, "prompt", name)
-                    })
             }
         };
         match changed {
@@ -1211,12 +1192,6 @@ pub static ACTION_MAP: Lazy<HashMap<String, Arc<dyn ShortcutAction>>> = Lazy::ne
     map.insert(
         "rerun_next_prompt".to_string(),
         Arc::new(crate::extras::RerunAction) as Arc<dyn ShortcutAction>,
-    );
-    map.insert(
-        "cycle_prompt".to_string(),
-        Arc::new(SwitchAction {
-            kind: SwitchKind::NextPrompt,
-        }) as Arc<dyn ShortcutAction>,
     );
     map.insert(
         "test".to_string(),

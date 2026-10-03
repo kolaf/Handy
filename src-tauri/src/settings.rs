@@ -943,16 +943,6 @@ pub fn get_default_settings() -> AppSettings {
         },
     );
     bindings.insert(
-        "cycle_prompt".to_string(),
-        ShortcutBinding {
-            id: "cycle_prompt".to_string(),
-            name: "Cycle Post-Processing Prompt".to_string(),
-            description: "Switches to the next post-processing prompt.".to_string(),
-            default_binding: "ctrl+alt+p".to_string(),
-            current_binding: "ctrl+alt+p".to_string(),
-        },
-    );
-    bindings.insert(
         "rerun_next_prompt".to_string(),
         ShortcutBinding {
             id: "rerun_next_prompt".to_string(),
@@ -991,8 +981,8 @@ pub fn get_default_settings() -> AppSettings {
             name: "Prompt Picker".to_string(),
             description: "Open a numbered list of the post-processing prompts; press a number or click to choose."
                 .to_string(),
-            default_binding: "ctrl+alt+o".to_string(),
-            current_binding: "ctrl+alt+o".to_string(),
+            default_binding: "ctrl+alt+p".to_string(),
+            current_binding: "ctrl+alt+p".to_string(),
         },
     );
     bindings.insert(
@@ -1218,6 +1208,11 @@ fn apply_settings_migrations(
 ) -> bool {
     let mut updated = false;
 
+    // The cycle-prompt shortcut was replaced by the prompt picker (which takes over its default key).
+    if settings.bindings.remove("cycle_prompt").is_some() {
+        updated = true;
+    }
+
     // One-time onboarding migration: users with an explicit selected model have
     // already made it through model selection. Users who merely have compatible
     // files on disk should still see onboarding.
@@ -1356,6 +1351,28 @@ pub fn get_recording_retention_period(app: &AppHandle) -> RecordingRetentionPeri
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn retired_cycle_prompt_binding_is_removed_and_the_picker_takes_its_key() {
+        let mut settings = get_default_settings();
+        settings.bindings.insert(
+            "cycle_prompt".to_string(),
+            ShortcutBinding {
+                id: "cycle_prompt".to_string(),
+                name: "old".to_string(),
+                description: String::new(),
+                default_binding: "ctrl+alt+p".to_string(),
+                current_binding: "ctrl+alt+p".to_string(),
+            },
+        );
+        let value = serde_json::to_value(&settings).unwrap();
+        assert!(apply_settings_migrations(&mut settings, &value));
+        assert!(!settings.bindings.contains_key("cycle_prompt"));
+        assert_eq!(
+            settings.bindings["prompt_picker"].current_binding,
+            "ctrl+alt+p"
+        );
+    }
 
     #[test]
     fn stored_binding_returns_the_requested_binding() {

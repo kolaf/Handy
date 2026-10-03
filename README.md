@@ -102,7 +102,7 @@ handy --toggle-transcription    # Toggle recording on/off
 handy --toggle-post-process     # Toggle recording with post-processing on/off
 handy --cancel                  # Cancel the current operation
 handy --swap-language           # Swap the selected language with the alternate language
-handy --next-prompt             # Switch to the next post-processing prompt
+handy --prompt-picker            # Open the numbered prompt picker
 handy --rerun                   # Re-run the last dictation with the next prompt
 handy --paste-last              # Paste the most recent dictation again
 handy --learn                   # Learn words and fixes from the selected, corrected text
