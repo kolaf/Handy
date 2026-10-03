@@ -95,6 +95,31 @@ pub fn matching_rule<'a>(rules: &'a [AppPrompt], ctx: &AppContext) -> Option<&'a
         })
 }
 
+/// Terminal emulators: a plain Ctrl+C there interrupts the running program, so copying uses Ctrl+Shift+C.
+const TERMINALS: &[&str] = &[
+    "windowsterminal",
+    "wt",
+    "conhost",
+    "openconsole",
+    "cmd",
+    "powershell",
+    "pwsh",
+    "mintty",
+    "alacritty",
+    "wezterm-gui",
+    "wezterm",
+    "kitty",
+    "putty",
+    "warp",
+    "tabby",
+    "hyper",
+    "terminus",
+];
+
+pub fn is_terminal_exe(exe: &str) -> bool {
+    TERMINALS.contains(&normalize_exe(exe).as_str())
+}
+
 pub fn set_one_shot(prompt_id: &str) {
     if let Ok(mut slot) = ONE_SHOT.lock() {
         *slot = Some((prompt_id.to_string(), Instant::now()));
@@ -295,6 +320,14 @@ mod tests {
                 .prompt_id,
             "simple"
         );
+    }
+
+    #[test]
+    fn terminals_are_recognised() {
+        assert!(is_terminal_exe("WindowsTerminal.exe"));
+        assert!(is_terminal_exe("pwsh.exe"));
+        assert!(!is_terminal_exe("code.exe"));
+        assert!(!is_terminal_exe("slack.exe"));
     }
 
     #[test]

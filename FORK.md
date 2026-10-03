@@ -68,6 +68,13 @@ was a recognition mistake (`fork/prompts/learn_prompt.md`). Names and terms go i
 rules applied to future transcripts. Proposals are validated locally (the word must really appear in your text, ordinary-word
 swaps and rewordings are refused). Benchmark: `python3 fork/prompts/learn_bench.py --from-handy`.
 
+How the selection is copied (learn, reformat, transform, "edit this"/"reply to this"): Handy first releases any Alt, Shift or
+Meta key that your hotkey may still be holding (otherwise the app would receive Ctrl+Alt+C), then sends Ctrl+C, or Ctrl+Shift+C
+when the active window is a terminal (a plain Ctrl+C there would interrupt the running program). If the clipboard does not change
+it tries once more. The Activity page entry says what was sent to which window and whether it worked. If nothing could be copied
+and the clipboard text does not look like your last dictation (less than 40 % shared words), learn stops instead of comparing
+unrelated texts.
+
 **Prompt picker.** `Ctrl+Alt+P` opens a small floating window listing the first nine prompts with a number each (the
 current one is highlighted). Press a number key or click a row to switch to that prompt; Escape, the shortcut again, or 12
 seconds of nothing closes it. The window never takes focus, so the app you are dictating into keeps its selection. While it is

@@ -202,6 +202,15 @@ pub fn send_paste_ctrl_v(enigo: &mut Enigo, hold_ms: u64) -> Result<(), String> 
     Ok(())
 }
 
+/// Releases Alt, Shift and Meta before a shortcut is typed. A hotkey like Ctrl+Alt+K triggers its action while the user's
+/// fingers may still be on the keys; with Alt still down the app would receive Ctrl+Alt+C instead of Ctrl+C.
+fn release_stray_modifiers(enigo: &mut Enigo) {
+    for key in [Key::Alt, Key::Shift, Key::Meta] {
+        let _ = enigo.key(key, enigo::Direction::Release);
+    }
+    std::thread::sleep(std::time::Duration::from_millis(15));
+}
+
 /// Sends the platform's copy shortcut (Ctrl+C, Cmd+C on macOS) so the current selection lands on the clipboard.
 /// The macOS key code is not covered by a test; Windows and Linux mirror the paste helper above.
 pub fn send_copy_ctrl_c(enigo: &mut Enigo, hold_ms: u64) -> Result<(), String> {
@@ -212,6 +221,7 @@ pub fn send_copy_ctrl_c(enigo: &mut Enigo, hold_ms: u64) -> Result<(), String> {
     #[cfg(target_os = "linux")]
     let (modifier_key, c_key) = (Key::Control, Key::Unicode('c'));
 
+    release_stray_modifiers(enigo);
     enigo
         .key(modifier_key, enigo::Direction::Press)
         .map_err(|e| format!("Failed to press modifier key: {}", e))?;
@@ -248,6 +258,36 @@ pub fn send_arrow_right(enigo: &mut Enigo) -> Result<(), String> {
     enigo
         .key(Key::RightArrow, enigo::Direction::Click)
         .map_err(|e| format!("Failed to press right arrow: {}", e))
+}
+
+/// Sends Ctrl+Shift+C, the copy shortcut of terminal emulators. In a terminal a plain Ctrl+C is "interrupt" unless the
+/// terminal itself has a selection, so copying a selection there must use this.
+pub fn send_copy_ctrl_shift_c(enigo: &mut Enigo, hold_ms: u64) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    let (modifier_key, c_key) = (Key::Meta, Key::Unicode('c'));
+    #[cfg(target_os = "windows")]
+    let (modifier_key, c_key) = (Key::Control, Key::Other(0x43)); // VK_C
+    #[cfg(target_os = "linux")]
+    let (modifier_key, c_key) = (Key::Control, Key::Unicode('c'));
+
+    release_stray_modifiers(enigo);
+    enigo
+        .key(modifier_key, enigo::Direction::Press)
+        .map_err(|e| format!("Failed to press modifier key: {}", e))?;
+    enigo
+        .key(Key::Shift, enigo::Direction::Press)
+        .map_err(|e| format!("Failed to press Shift key: {}", e))?;
+    enigo
+        .key(c_key, enigo::Direction::Click)
+        .map_err(|e| format!("Failed to click C key: {}", e))?;
+    std::thread::sleep(std::time::Duration::from_millis(hold_ms));
+    enigo
+        .key(Key::Shift, enigo::Direction::Release)
+        .map_err(|e| format!("Failed to release Shift key: {}", e))?;
+    enigo
+        .key(modifier_key, enigo::Direction::Release)
+        .map_err(|e| format!("Failed to release modifier key: {}", e))?;
+    Ok(())
 }
 
 /// Sends a Ctrl+Shift+V paste command.

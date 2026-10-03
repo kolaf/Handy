@@ -421,6 +421,17 @@ mod tests {
     }
 
     #[test]
+    fn unrelated_clipboard_text_is_not_the_corrected_text() {
+        let pasted = "This is me doing a full dictation run to see if it works. I really want to try the new correction thing.";
+        let raw = "This is me doing a full dictation run to see if it works. I really want to try the new correction thing";
+        let unrelated = "tory that I tested, the airsports tracking repository, but it only picked up some words, airport names and such.";
+        let corrected = "This is me doing a full dictation run to see if this works. I really want to try the new correction feature.";
+        assert!(!plausibly_same_passage(unrelated, pasted, raw));
+        assert!(plausibly_same_passage(corrected, pasted, raw));
+        assert!(!plausibly_same_passage("", pasted, raw));
+    }
+
+    #[test]
     fn hint_rules_may_be_ordinary_words_and_are_not_applied_literally() {
         let p = proposal(
             r#"{"corrections":[{"wrong":"det","right":"de"},{"wrong":"det","right":"de","literal":true}]}"#,
@@ -594,6 +605,16 @@ pub fn update_corrections(app: AppHandle, corrections: Vec<Correction>) -> Resul
 
 /// Copies the current selection (Ctrl+C), reads it, and puts the user's clipboard back. Returns the text and whether it
 /// came from a selection; when nothing was copied the clipboard's own text is used (the user may have copied by hand).
+/// What the last `capture_selection` did, for the activity log.
+static LAST_CAPTURE_NOTE: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+
+pub(crate) fn last_capture_note() -> String {
+    LAST_CAPTURE_NOTE
+        .lock()
+        .map(|n| n.clone())
+        .unwrap_or_default()
+}
+
 pub(crate) fn capture_selection(app: &AppHandle) -> Option<(String, bool)> {
     let clipboard = app.clipboard();
     let saved_text = clipboard.read_text().ok().filter(|t| !t.is_empty());
@@ -611,20 +632,62 @@ pub(crate) fn capture_selection(app: &AppHandle) -> Option<(String, bool)> {
     );
     clipboard.write_text(sentinel.clone()).ok()?;
 
-    let sent = crate::clipboard::with_enigo(app, |enigo| crate::input::send_copy_ctrl_c(enigo, 60));
+    // In a terminal Ctrl+C would interrupt the program that is running (for example an AI assistant's prompt).
+    let in_terminal =
+        crate::context::foreground().is_some_and(|c| crate::context::is_terminal_exe(&c.exe));
+    let shortcut = if in_terminal {
+        "Ctrl+Shift+C"
+    } else {
+        "Ctrl+C"
+    };
     let mut selection = None;
-    if sent.is_ok() {
-        for _ in 0..24 {
-            std::thread::sleep(Duration::from_millis(25));
-            if let Ok(t) = clipboard.read_text() {
-                if t != sentinel && !t.is_empty() {
-                    selection = Some(t);
-                    break;
+    let mut attempts = 0;
+    let mut send_error: Option<String> = None;
+    // A second try helps when the first one arrived while the user's hotkey was still being released.
+    while attempts < 2 && selection.is_none() {
+        attempts += 1;
+        let sent = crate::clipboard::with_enigo(app, |enigo| {
+            if in_terminal {
+                crate::input::send_copy_ctrl_shift_c(enigo, 60)
+            } else {
+                crate::input::send_copy_ctrl_c(enigo, 60)
+            }
+        });
+        match sent {
+            Ok(()) => {
+                for _ in 0..24 {
+                    std::thread::sleep(Duration::from_millis(25));
+                    if let Ok(t) = clipboard.read_text() {
+                        if t != sentinel && !t.is_empty() {
+                            selection = Some(t);
+                            break;
+                        }
+                    }
                 }
             }
+            Err(err) => {
+                warn!("Learn: could not send the copy shortcut: {}", err);
+                send_error = Some(err);
+                break;
+            }
         }
-    } else {
-        warn!("Learn: could not send the copy shortcut: {:?}", sent.err());
+        if selection.is_none() && attempts < 2 {
+            std::thread::sleep(Duration::from_millis(250));
+        }
+    }
+    let app_name = crate::context::foreground().map_or_else(
+        || "unknown app".to_string(),
+        |c| format!("{} \"{}\"", c.exe, c.title),
+    );
+    let note = match (&selection, &send_error) {
+        (Some(_), _) => format!("Sent {shortcut} to {app_name}: copied (attempt {attempts})."),
+        (None, Some(err)) => format!("Could not send {shortcut} to {app_name}: {err}"),
+        (None, None) => format!(
+            "Sent {shortcut} to {app_name} {attempts} time(s) but the clipboard did not change: nothing was selected there, or the window did not have the keyboard focus."
+        ),
+    };
+    if let Ok(mut slot) = LAST_CAPTURE_NOTE.lock() {
+        *slot = note;
     }
 
     match (&saved_text, saved_image) {
@@ -703,6 +766,29 @@ pub(crate) fn announce_with(app: &AppHandle, kind: &'static str, value: String, 
     });
 }
 
+/// Do the corrected text and the dictation share enough words to be the same passage? Used when no selection could be
+/// copied and an unrelated clipboard text might be mistaken for the corrected one.
+pub fn plausibly_same_passage(corrected: &str, pasted: &str, raw: &str) -> bool {
+    let words = |t: &str| -> std::collections::HashSet<String> {
+        t.split(|c: char| !c.is_alphanumeric())
+            .filter(|w| w.chars().count() >= 2)
+            .map(str::to_lowercase)
+            .collect()
+    };
+    let corrected_words = words(corrected);
+    let mut known = words(pasted);
+    known.extend(words(raw));
+    if corrected_words.is_empty() || known.is_empty() {
+        return false;
+    }
+    let shared = corrected_words
+        .iter()
+        .filter(|w| known.contains(*w))
+        .count();
+    let smaller = corrected_words.len().min(words(pasted).len().max(1));
+    shared as f64 / smaller as f64 >= 0.4
+}
+
 /// The start of a text for the activity log.
 fn excerpt(text: &str, max: usize) -> String {
     let flat = text.split_whitespace().collect::<Vec<_>>().join(" ");
@@ -719,8 +805,10 @@ async fn learn_from(app: &AppHandle, captured: Option<(String, bool)>) {
             app,
             "learned-none",
             String::new(),
-            "Nothing was selected, and no text could be copied. Select the corrected text first."
-                .into(),
+            format!(
+                "Nothing was selected, and no text could be copied. {}",
+                last_capture_note()
+            ),
         );
         return;
     };
@@ -751,8 +839,14 @@ async fn learn_from(app: &AppHandle, captured: Option<(String, bool)>) {
         format!("  Pasted:    {}", excerpt(&pasted, 300)),
         format!("  Corrected: {}", excerpt(&corrected, 300)),
     ];
+    details.push(last_capture_note());
     if !from_selection {
-        details.push("(No selection could be copied, so the clipboard text was used.)".into());
+        details.push("The clipboard text was used instead of a selection.".into());
+        if !plausibly_same_passage(&corrected, &pasted, &raw) {
+            details.push("The clipboard text does not look like your last dictation, so nothing was compared. Select the corrected text (in a terminal, with the mouse) and try again; it is copied for you.".into());
+            announce_with(app, "learned-none", String::new(), details.join("\n"));
+            return;
+        }
     }
     if corrected.trim() == pasted.trim() || corrected.trim() == raw.trim() {
         details.push("The selected text is the same as the last dictation, so there was nothing to learn from. If you corrected an older dictation, dictate again or correct the latest one: only the most recent dictation is compared.".into());
