@@ -40,6 +40,22 @@ pub struct CliArgs {
     #[arg(long)]
     pub reformat: bool,
 
+    /// Use this prompt for the next dictation only (sent to running instance)
+    #[arg(long, value_name = "ID")]
+    pub use_prompt_once: Option<String>,
+
+    /// Run the selection (or, with nothing selected, the last dictation) through this prompt and replace it
+    #[arg(long, value_name = "ID")]
+    pub transform: Option<String>,
+
+    /// Add project-specific words from a folder (a repository) to the custom words, with the help of the model
+    #[arg(long, value_name = "FOLDER")]
+    pub learn_repo: Option<String>,
+
+    /// Add the words in a text file (one per line) to the custom words
+    #[arg(long, value_name = "FILE")]
+    pub import_words: Option<String>,
+
     /// Learn from the selected, corrected text (sent to running instance)
     #[arg(long)]
     pub learn: bool,

@@ -21,6 +21,7 @@ import { ModelSelect } from "../PostProcessingSettingsApi/ModelSelect";
 import { usePostProcessProviderState } from "../PostProcessingSettingsApi/usePostProcessProviderState";
 import { ShortcutInput } from "../ShortcutInput";
 import { PostProcessMinWords } from "../PostProcessMinWords";
+import { AppPrompts } from "../AppPrompts";
 import { useSettings } from "../../../hooks/useSettings";
 
 const PostProcessingSettingsApiComponent: React.FC = () => {
@@ -505,6 +506,10 @@ export const PostProcessingSettings: React.FC = () => {
           grouped={true}
         />
         <PostProcessMinWords descriptionMode="tooltip" grouped={true} />
+      </SettingsGroup>
+
+      <SettingsGroup title={t("settings.postProcessing.appPrompts.title")}>
+        <AppPrompts descriptionMode="tooltip" grouped={true} />
       </SettingsGroup>
 
       <SettingsGroup title={t("settings.postProcessing.api.title")}>

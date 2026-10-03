@@ -8,6 +8,7 @@ mod catalog;
 pub mod cli;
 mod clipboard;
 mod commands;
+mod context;
 mod extras;
 mod helpers;
 mod input;
@@ -20,6 +21,7 @@ mod overlay;
 mod paste_tx;
 mod picker;
 pub mod portable;
+mod repo_words;
 mod secure_input;
 mod settings;
 mod shortcut;
@@ -694,6 +696,8 @@ pub fn run(cli_args: CliArgs) {
             shortcut::update_custom_words,
             extras::update_snippets,
             learn::update_corrections,
+            context::update_app_prompts,
+            context::change_app_prompts_enabled_setting,
             picker::picker_select,
             picker::picker_close,
             picker::picker_state,
@@ -876,6 +880,22 @@ pub fn run(cli_args: CliArgs) {
                 listsync::run(app, &path, &cwd);
                 handled_setting = true;
             }
+            if let Some(id) = signal_handle::flag_value(&args, "--use-prompt-once") {
+                context::set_one_shot(&id);
+                handled_setting = true;
+            }
+            if let Some(id) = signal_handle::flag_value(&args, "--transform") {
+                extras::run_transform(app, Some(id));
+                handled_setting = true;
+            }
+            if let Some(path) = signal_handle::flag_value(&args, "--learn-repo") {
+                repo_words::run(app, &path, &cwd);
+                handled_setting = true;
+            }
+            if let Some(path) = signal_handle::flag_value(&args, "--import-words") {
+                repo_words::run_import(app, &path, &cwd);
+                handled_setting = true;
+            }
             if args.iter().any(|a| a == "--toggle-transcription") {
                 signal_handle::send_transcription_input(app, "transcribe", "CLI");
             } else if args.iter().any(|a| a == "--toggle-post-process") {
@@ -1045,6 +1065,7 @@ pub fn run(cli_args: CliArgs) {
             WEBVIEW_LOG_STREAMING.store(settings.debug_mode, Ordering::Relaxed);
             let app_handle = app.handle().clone();
             app.manage(TranscriptionCoordinator::new(app_handle.clone()));
+            context::start_state_writer(&app_handle);
 
             initialize_core_logic(&app_handle);
 

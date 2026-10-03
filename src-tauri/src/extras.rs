@@ -340,6 +340,12 @@ impl ShortcutAction for PasteLastAction {
 /// result. Select the earlier pasted text first to have it replaced.
 pub(crate) struct RerunAction;
 
+/// Prompts whose id starts with `t_` are one-purpose text transformations ("make that formal") used through
+/// `handy --transform`; they are not offered in the prompt picker or by "re-run with next prompt".
+pub(crate) fn is_transform_prompt(id: &str) -> bool {
+    id.starts_with("t_")
+}
+
 impl ShortcutAction for RerunAction {
     fn start(&self, app: &AppHandle, _binding_id: &str, _shortcut_str: &str) {
         let app = app.clone();
@@ -370,6 +376,7 @@ async fn rerun_with_next_prompt(app: &AppHandle) {
     let ids: Vec<String> = settings
         .post_process_prompts
         .iter()
+        .filter(|p| !is_transform_prompt(&p.id))
         .map(|p| p.id.clone())
         .collect();
     let Some(next_id) =
@@ -409,23 +416,90 @@ async fn rerun_with_next_prompt(app: &AppHandle) {
 /// Replaces the selected text with the result of running it through the selected post-processing prompt.
 pub(crate) struct ReformatAction;
 
+/// Most characters of the last dictation that are selected backwards by key presses (each is a key event).
+const MAX_SELECT_BACK: usize = 1200;
+
+/// How many Shift+Left presses select the text that was just pasted (text plus the trailing space Handy may add).
+pub(crate) fn selection_length(pasted: &str, trailing_space: bool) -> usize {
+    pasted.chars().count() + usize::from(trailing_space)
+}
+
+/// Do two texts match once line endings and trailing whitespace are ignored?
+pub(crate) fn same_text(a: &str, b: &str) -> bool {
+    let norm = |s: &str| s.replace("\r\n", "\n").trim_end().to_string();
+    norm(a) == norm(b)
+}
+
+/// Selects the last dictation backwards from the caret and checks that the selection really is that text. Returns the
+/// selected text, or nothing (and leaves the caret where it was) when the text at the caret is something else, for
+/// example because the user clicked elsewhere since. Runs on the main thread.
+fn select_last_dictation(app: &AppHandle) -> Option<String> {
+    let history = app.state::<Arc<HistoryManager>>();
+    let entry = history.get_latest_completed_entry().ok().flatten()?;
+    let expected = entry
+        .post_processed_text
+        .filter(|t| !t.trim().is_empty())
+        .unwrap_or(entry.transcription_text);
+    let count = selection_length(&expected, get_settings(app).append_trailing_space);
+    if expected.trim().is_empty() || count > MAX_SELECT_BACK {
+        return None;
+    }
+    if crate::clipboard::with_enigo(app, |enigo| crate::input::send_select_left(enigo, count))
+        .is_err()
+    {
+        return None;
+    }
+    std::thread::sleep(std::time::Duration::from_millis(80));
+    match crate::learn::capture_selection(app) {
+        Some((text, true)) if same_text(&text, &expected) => Some(text),
+        _ => {
+            // Not what we expected: put the caret back instead of leaving a wrong selection.
+            let _ = crate::clipboard::with_enigo(app, crate::input::send_arrow_right);
+            None
+        }
+    }
+}
+
 impl ReformatAction {
     fn run(app: &AppHandle) {
-        let app = app.clone();
-        std::thread::spawn(move || {
-            // The copy shortcut must be sent from the main thread, like the paste shortcut.
-            let (tx, rx) = std::sync::mpsc::channel();
-            let handle = app.clone();
-            let _ = app.run_on_main_thread(move || {
-                let _ = tx.send(crate::learn::capture_selection(&handle));
-            });
-            let captured = rx
-                .recv_timeout(std::time::Duration::from_secs(5))
-                .ok()
-                .flatten();
-            tauri::async_runtime::block_on(reformat_selection(&app, captured));
-        });
+        run_reformat(app, None, false);
     }
+}
+
+/// `handy --transform ID`: runs the selection (or, with nothing selected, the last dictation) through the prompt `ID`
+/// without changing the selected prompt, and replaces it.
+pub(crate) fn run_transform(app: &AppHandle, prompt_id: Option<String>) {
+    run_reformat(app, prompt_id, true);
+}
+
+fn run_reformat(app: &AppHandle, prompt_id: Option<String>, fall_back_to_last_dictation: bool) {
+    let app = app.clone();
+    std::thread::spawn(move || {
+        // The copy shortcut must be sent from the main thread, like the paste shortcut.
+        let (tx, rx) = std::sync::mpsc::channel();
+        let handle = app.clone();
+        let _ = app.run_on_main_thread(move || {
+            let mut captured = crate::learn::capture_selection(&handle);
+            let real_selection = matches!(captured, Some((_, true)));
+            if !real_selection && fall_back_to_last_dictation {
+                captured = select_last_dictation(&handle).map(|t| (t, true));
+                if captured.is_none() {
+                    let _ = tx.send(Err(()));
+                    return;
+                }
+            }
+            let _ = tx.send(Ok(captured));
+        });
+        let captured = match rx.recv_timeout(std::time::Duration::from_secs(15)) {
+            Ok(Ok(captured)) => captured,
+            Ok(Err(())) => {
+                crate::learn::announce(&app, "transform-moved", String::new());
+                return;
+            }
+            Err(_) => None,
+        };
+        tauri::async_runtime::block_on(reformat_selection(&app, captured, prompt_id));
+    });
 }
 
 impl ShortcutAction for ReformatAction {
@@ -444,13 +518,25 @@ impl ShortcutAction for ReformatAction {
 
 const MAX_REFORMAT_CHARS: usize = 20_000;
 
-async fn reformat_selection(app: &AppHandle, captured: Option<(String, bool)>) {
+async fn reformat_selection(
+    app: &AppHandle,
+    captured: Option<(String, bool)>,
+    prompt_id: Option<String>,
+) {
     // Only a real selection counts: pasting over "whatever was on the clipboard" would insert text, not replace it.
     let Some((text, true)) = captured else {
         crate::learn::announce(app, "reformat-none", String::new());
         return;
     };
-    let settings = get_settings(app);
+    let mut settings = get_settings(app);
+    if let Some(id) = prompt_id {
+        if !settings.post_process_prompts.iter().any(|p| p.id == id) {
+            warn!("Reformat: there is no prompt '{}'", id);
+            crate::learn::announce(app, "reformat-setup", String::new());
+            return;
+        }
+        settings.post_process_selected_prompt_id = Some(id);
+    }
     let selected = settings.post_process_selected_prompt_id.clone();
     // The edit prompt takes a spoken instruction, not text to transform.
     if selected.as_deref() == Some("edit")
@@ -528,6 +614,15 @@ mod tests {
             hint: false,
         }];
         assert!(!expand_variables("${corrections}", &[], &evil, &[], "", "").contains("${output}"));
+    }
+
+    #[test]
+    fn last_dictation_selection_length_and_check() {
+        assert_eq!(selection_length("Hello wørld", true), 12);
+        assert_eq!(selection_length("Hello", false), 5);
+        assert!(same_text("Hello\r\nworld ", "Hello\nworld"));
+        assert!(!same_text("Hello world", "Hello there"));
+        assert!(is_transform_prompt("t_formal") && !is_transform_prompt("formal_text"));
     }
 
     #[test]

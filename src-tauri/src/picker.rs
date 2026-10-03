@@ -163,6 +163,7 @@ fn open(app: &AppHandle) {
     let prompts: Vec<(String, String)> = settings
         .post_process_prompts
         .iter()
+        .filter(|p| !crate::extras::is_transform_prompt(&p.id))
         .map(|p| (p.id.clone(), p.name.clone()))
         .collect();
     let items = pick_items(&prompts);

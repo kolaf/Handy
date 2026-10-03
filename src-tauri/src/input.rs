@@ -225,6 +225,31 @@ pub fn send_copy_ctrl_c(enigo: &mut Enigo, hold_ms: u64) -> Result<(), String> {
     Ok(())
 }
 
+/// Selects `count` characters to the left of the caret (Shift+Left, repeated). Used to select the last dictation.
+pub fn send_select_left(enigo: &mut Enigo, count: usize) -> Result<(), String> {
+    enigo
+        .key(Key::Shift, enigo::Direction::Press)
+        .map_err(|e| format!("Failed to press shift: {}", e))?;
+    let mut result = Ok(());
+    for _ in 0..count {
+        if let Err(e) = enigo.key(Key::LeftArrow, enigo::Direction::Click) {
+            result = Err(format!("Failed to press left arrow: {}", e));
+            break;
+        }
+    }
+    let released = enigo
+        .key(Key::Shift, enigo::Direction::Release)
+        .map_err(|e| format!("Failed to release shift: {}", e));
+    result.and(released)
+}
+
+/// Presses the right arrow: collapses a selection to its end, where the caret was before it was made.
+pub fn send_arrow_right(enigo: &mut Enigo) -> Result<(), String> {
+    enigo
+        .key(Key::RightArrow, enigo::Direction::Click)
+        .map_err(|e| format!("Failed to press right arrow: {}", e))
+}
+
 /// Sends a Ctrl+Shift+V paste command.
 /// This is commonly used in terminal applications on Linux to paste without formatting.
 /// Note: On Wayland, this may not work - callers should check for Wayland and use alternative methods.

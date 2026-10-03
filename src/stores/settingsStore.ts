@@ -9,6 +9,7 @@ import type {
   ShortcutActivation,
   Snippet,
   Correction,
+  AppPrompt,
   VadBackend,
 } from "@/bindings";
 import { commands } from "@/bindings";
@@ -142,6 +143,9 @@ const settingUpdaters: {
   custom_words: (value) => commands.updateCustomWords(value as string[]),
   snippets: (value) => commands.updateSnippets(value as Snippet[]),
   corrections: (value) => commands.updateCorrections(value as Correction[]),
+  app_prompts: (value) => commands.updateAppPrompts(value as AppPrompt[]),
+  app_prompts_enabled: (value) =>
+    commands.changeAppPromptsEnabledSetting(value as boolean),
   post_process_min_words: (value) =>
     commands.changePostProcessMinWordsSetting(value as number),
   word_correction_threshold: (value) =>

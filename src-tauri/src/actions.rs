@@ -494,7 +494,11 @@ pub(crate) async fn process_transcription_output(
     transcription: &str,
     post_process: bool,
 ) -> ProcessedTranscription {
-    let settings = get_settings(app);
+    let mut settings = get_settings(app);
+    if post_process {
+        // A one-shot prompt ("reply to this") or a per-app rule may replace the selected prompt for this dictation.
+        crate::context::apply_prompt_choice(&mut settings);
+    }
     // Learned corrections (see learn.rs) fix known mishearings before anything else sees the text.
     let heard = crate::learn::apply_corrections(transcription, &settings.corrections);
     let mut final_text = heard.clone();

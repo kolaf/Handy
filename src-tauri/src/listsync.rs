@@ -11,7 +11,7 @@ use crate::settings::{Correction, Snippet};
 use serde::{Deserialize, Serialize};
 
 const FORMAT_VERSION: u32 = 1;
-const MAX_WORDS: usize = 2000;
+pub(crate) const MAX_WORDS: usize = 2000;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
 pub struct Lists {
@@ -70,7 +70,7 @@ impl Report {
     }
 }
 
-fn word_ok(w: &str) -> bool {
+pub(crate) fn word_ok(w: &str) -> bool {
     is_clean_term(w) && w.chars().count() <= 64
 }
 

@@ -23,6 +23,10 @@ This is a fork of [cjpais/Handy](https://github.com/cjpais/Handy) that has delib
 | **Re-run with next prompt** | `ctrl+alt+r` or `handy --rerun` | Post-processing page |
 | **Prompt picker** (replaces cycling) | `ctrl+alt+p` or `handy --prompt-picker` | Post-processing page |
 | **Reformat selection** | `ctrl+alt+f` or `handy --reformat` | Post-processing page |
+| **Prompt per app** | Post-processing page | rules "program (+ title) → prompt", Windows only |
+| **Transform** | `handy --transform ID` (Talon: "make that formal" ...) | selection or last dictation → prompt `t_*` → replaces it |
+| **Reply with context** | `handy --use-prompt-once reply --toggle-post-process` (Talon: "reply to this") | |
+| **Learn a repo** | `handy --learn-repo FOLDER` (Talon: "learn this repo"), `handy --import-words FILE` | adds project words |
 | **Sync lists** | `handy --sync-lists FILE` | merges word list, snippets and learned corrections with a JSON file kept in git |
 | **Learn from correction** | `ctrl+alt+k` or `handy --learn` | Post-processing page; list under Advanced → Learned Corrections |
 | **Paste last dictation** | `ctrl+alt+v` or `handy --paste-last` | General page |
@@ -85,6 +89,33 @@ only when the model vouches that the heard text is not a real word ("Superwisper
 in Advanced → Learned Corrections. Prompts
 get the rules through the `${corrections}` variable (the built-in prompts already have it: "X is Y" for always rules, "X may be Y
 (only if it fits the sentence)" for hints). Hints need post-processing to be on and reachable; without it nothing happens.
+
+**Prompt per app.** Post-processing page → "Prompt per app": turn it on and add rules (program name such as `slack.exe`, an
+optional window-title part, and a prompt). When you dictate with post-processing, the first matching rule decides the prompt;
+a rule with a title part wins over a rule for the whole app; no match means the selected prompt. Windows only (it reads the
+foreground window). The log shows the decision ("Prompt for this dictation: ... (app rule for slack.exe ...)"), which is also
+the easiest way to find a program's name. A prompt set with `--use-prompt-once` (below) wins over a rule.
+
+**One-shot prompt.** `handy --use-prompt-once ID` makes the next dictation that uses post-processing use prompt `ID` and then
+forgets it (it expires after 3 minutes). Talon's "reply to this" copies the selected message, sets `reply` this way and starts
+a dictation, so the reply is written with the message as context.
+
+**Transform.** `handy --transform ID` runs the selected text through prompt `ID` (without changing the selected prompt) and
+replaces it. With nothing selected it takes the last dictation: Handy selects it backwards from the caret (Shift+Left, at most
+1200 characters), copies it and checks that it is exactly the last dictation; if not (you clicked elsewhere) it puts the caret
+back and does nothing. The built-in transform prompts have ids starting with `t_` (formal, informal, shorter, longer, clearer,
+fix, to_no, to_en, bullets, summary) and are left out of the prompt picker and "re-run with next prompt". Talon: "make that
+formal", "make that shorter", "fix that up", "translate that to norwegian", "bullet that", "summarize that" ...
+
+**Recording state.** While running, Handy keeps `%USERPROFILE%\.cache\hv\handy-state.txt` ("recording" or "idle", then a Unix
+time; refreshed every 3 s while recording). Talon uses it to switch its speech off while Handy records and on afterwards, so a
+dictation is not taken for voice commands (Talon setting `user.kolaf_mute_during_handy`).
+
+**Learn a repo.** `handy --learn-repo FOLDER` scans the folder (skipping `.git`, `node_modules`, `target` ... and capped at 4000
+files / 4 MB), takes the 250 best-scoring terms from file names and sources, asks the post-processing model which of them a
+speech recognizer would likely misspell (project and product names, people, unusual technical terms), keeps only answers that
+were really candidates, and adds the new ones to the custom words. `handy --import-words FILE` adds the words of a text file
+(one per line) with no model involved.
 
 **Sync lists.** `handy --sync-lists FILE` (Handy must be running) merges your custom words, snippets and learned corrections
 with a JSON file, both ways, and rewrites the file in a stable sorted order so it diffs well in git. Keep the file in a

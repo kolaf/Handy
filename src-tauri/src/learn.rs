@@ -608,6 +608,14 @@ pub(crate) fn capture_selection(app: &AppHandle) -> Option<(String, bool)> {
 }
 
 async fn ask_model(settings: &crate::settings::AppSettings, prompt: String) -> Option<Proposal> {
+    parse_proposal(&ask_text(settings, prompt).await?)
+}
+
+/// Sends one prompt to the configured post-processing model and returns its answer.
+pub(crate) async fn ask_text(
+    settings: &crate::settings::AppSettings,
+    prompt: String,
+) -> Option<String> {
     let provider = settings.active_post_process_provider().cloned()?;
     if provider.id == crate::settings::APPLE_INTELLIGENCE_PROVIDER_ID {
         return None;
@@ -635,8 +643,7 @@ async fn ask_model(settings: &crate::settings::AppSettings, prompt: String) -> O
     )
     .await
     {
-        Ok(Some(answer)) => parse_proposal(&answer),
-        Ok(None) => None,
+        Ok(answer) => answer,
         Err(err) => {
             warn!("Learn: the model request failed: {}", err);
             None

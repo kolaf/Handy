@@ -508,6 +508,17 @@
         "cancel": "Cancel",
         "selectToEdit": "Select a prompt above to view and edit its details.",
         "createFirst": "Click 'Create New Prompt' above to create your first post-processing prompt."
+      },
+      "appPrompts": {
+        "title": "Prompt per app",
+        "enabledLabel": "Choose the prompt by app",
+        "enabledDescription": "When you dictate with post-processing, use the prompt of the first matching rule below instead of the selected prompt (Windows only). The program name of the app you dictated into is written to the Handy log (line 'Prompt for this dictation'), e.g. slack.exe.",
+        "appPlaceholder": "Program, e.g. slack.exe",
+        "titlePlaceholder": "Window title contains (optional)",
+        "promptPlaceholder": "Prompt",
+        "add": "Add rule",
+        "remove": "Remove",
+        "rulesTitle": "Rules"
       }
     },
     "history": {
@@ -769,7 +780,8 @@
     "noticeSyncFailed": "Lists sync failed (see log)",
     "noticeNoSelection": "Select some text first",
     "noticeReformatSetup": "Pick a transforming prompt and set up post-processing first",
-    "noticeReformatFailed": "Reformat failed (see log)"
+    "noticeReformatFailed": "Reformat failed (see log)",
+    "noticeNotAtCursor": "The last dictation is not at the cursor"
   },
   "secureInput": {
     "blockedWithCulprit_one": "{{name}} may be blocking 1 shortcut",

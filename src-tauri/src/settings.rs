@@ -98,6 +98,16 @@ pub struct Correction {
     pub hint: bool,
 }
 
+/// A per-app prompt choice: when the foreground app is `app` (its program name, e.g. `slack.exe`) and its window title
+/// contains `title` (if given), dictation is post-processed with `prompt_id`. See `context.rs`.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Type)]
+pub struct AppPrompt {
+    pub app: String,
+    #[serde(default)]
+    pub title: String,
+    pub prompt_id: String,
+}
+
 /// A named block of text that the post-processing prompt can insert by name
 /// (`[[snippet: NAME]]`); see `extras.rs`.
 #[derive(Serialize, Deserialize, Debug, Clone, Type, PartialEq)]
@@ -484,6 +494,11 @@ pub struct AppSettings {
     /// Learned `wrong -> right` fixes applied to each new transcript.
     #[serde(default)]
     pub corrections: Vec<Correction>,
+    /// Use a different post-processing prompt depending on the foreground app (Windows only).
+    #[serde(default)]
+    pub app_prompts_enabled: bool,
+    #[serde(default)]
+    pub app_prompts: Vec<AppPrompt>,
     /// Dictations with fewer words than this skip the language model (0 = always use it).
     #[serde(default)]
     pub post_process_min_words: u32,
@@ -1050,6 +1065,8 @@ pub fn get_default_settings() -> AppSettings {
         post_process_models: default_post_process_models(),
         snippets: Vec::new(),
         corrections: Vec::new(),
+        app_prompts_enabled: false,
+        app_prompts: Vec::new(),
         post_process_min_words: 0,
         post_process_prompts: default_post_process_prompts(),
         post_process_selected_prompt_id: Some("super".to_string()),
