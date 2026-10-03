@@ -120,7 +120,10 @@ fn should_use_streaming_overlay(style: OverlayStyle, is_streaming: bool) -> bool
     style == OverlayStyle::Live && is_streaming
 }
 
-async fn post_process_transcription(settings: &AppSettings, transcription: &str) -> Option<String> {
+pub(crate) async fn post_process_transcription(
+    settings: &AppSettings,
+    transcription: &str,
+) -> Option<String> {
     if is_blank_transcription(transcription) {
         debug!("Post-processing skipped because the transcription is empty");
         return None;
@@ -432,7 +435,7 @@ const MAX_VOCAB_WORD_CHARS: usize = 64;
 /// the words are validated: one line, bounded length, no brackets or control characters,
 /// at most [`MAX_VOCAB_COMMANDS`] per dictation. Returns the text without the tags and
 /// the accepted words.
-fn extract_vocab_commands(text: &str) -> (String, Vec<String>) {
+pub(crate) fn extract_vocab_commands(text: &str) -> (String, Vec<String>) {
     static TAG: Lazy<Regex> = Lazy::new(|| Regex::new(r"\[\[\s*vocab\s*:([^\]\n]*)\]\]").unwrap());
     let mut words: Vec<String> = Vec::new();
     for capture in TAG.captures_iter(text) {
@@ -1178,6 +1181,24 @@ pub static ACTION_MAP: Lazy<HashMap<String, Arc<dyn ShortcutAction>>> = Lazy::ne
         Arc::new(SwitchAction {
             kind: SwitchKind::SwapLanguage,
         }) as Arc<dyn ShortcutAction>,
+    );
+    map.insert(
+        "prompt_picker".to_string(),
+        Arc::new(crate::picker::PickerToggleAction) as Arc<dyn ShortcutAction>,
+    );
+    map.insert(
+        "reformat_selection".to_string(),
+        Arc::new(crate::extras::ReformatAction) as Arc<dyn ShortcutAction>,
+    );
+    for n in 1..=crate::picker::MAX_ITEMS {
+        map.insert(
+            format!("picker_{n}"),
+            Arc::new(crate::picker::PickerChoiceAction { number: n }) as Arc<dyn ShortcutAction>,
+        );
+    }
+    map.insert(
+        "picker_close".to_string(),
+        Arc::new(crate::picker::PickerCloseAction) as Arc<dyn ShortcutAction>,
     );
     map.insert(
         "learn_correction".to_string(),

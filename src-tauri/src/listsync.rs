@@ -42,6 +42,7 @@ pub struct Report {
 }
 
 impl Report {
+    #[cfg(test)]
     pub fn added(&self) -> usize {
         self.words_added + self.snippets_added + self.corrections_added
     }

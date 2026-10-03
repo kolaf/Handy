@@ -36,6 +36,14 @@ pub struct CliArgs {
     #[arg(long)]
     pub rerun: bool,
 
+    /// Open the numbered prompt picker (sent to running instance)
+    #[arg(long)]
+    pub prompt_picker: bool,
+
+    /// Replace the selected text with its reformatted version, using the selected prompt (sent to running instance)
+    #[arg(long)]
+    pub reformat: bool,
+
     /// Learn from the selected, corrected text (sent to running instance)
     #[arg(long)]
     pub learn: bool,

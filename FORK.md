@@ -22,6 +22,8 @@ This is a fork of [cjpais/Handy](https://github.com/cjpais/Handy) that has delib
 | **Prompt variables** | `${vocabulary}` `${snippets}` `${clipboard}` `${examples}` in any prompt | Prompt editor |
 | **Prompt examples** | Optional examples box per prompt | Prompt editor |
 | **Re-run with next prompt** | `ctrl+alt+r` or `handy --rerun` | Post-processing page |
+| **Prompt picker** | `ctrl+alt+o` or `handy --prompt-picker` | Post-processing page |
+| **Reformat selection** | `ctrl+alt+f` or `handy --reformat` | Post-processing page |
 | **Sync lists** | `handy --sync-lists FILE` | merges word list, snippets and learned corrections with a JSON file kept in git |
 | **Learn from correction** | `ctrl+alt+k` or `handy --learn` | Post-processing page; list under Advanced → Learned Corrections |
 | **Paste last dictation** | `ctrl+alt+v` or `handy --paste-last` | General page |
@@ -62,6 +64,19 @@ the selection (your clipboard is restored), finds the matching dictation in the 
 was a recognition mistake (`fork/prompts/learn_prompt.md`). Names and terms go into the custom words; recurring mishearings become
 rules applied to future transcripts. Proposals are validated locally (the word must really appear in your text, ordinary-word
 swaps and rewordings are refused). Benchmark: `python3 fork/prompts/learn_bench.py --from-handy`.
+
+**Prompt picker.** `Ctrl+Alt+O` opens a small floating window listing the first nine prompts with a number each (the
+current one is highlighted). Press a number key or click a row to switch to that prompt; Escape, the shortcut again, or 12
+seconds of nothing closes it. The window never takes focus, so the app you are dictating into keeps its selection. While it is
+open the digits 1-9 and Escape are temporary global shortcuts, swallowed so no digit is typed into the document (if the
+keyboard hook cannot block keys on your system, the digit would also reach the document). More than nine prompts: only the
+first nine are listed; use cycle or `--set-prompt` for the rest.
+
+**Reformat selection.** `Ctrl+Alt+F` (or `handy --reformat`) copies the selected text (your clipboard is restored), runs it
+through the currently selected prompt exactly like a dictation would be, and pastes the result over the selection. Needs real
+selected text and a working post-processing setup; the `edit` prompt is refused because it expects a spoken instruction.
+Spoken-punctuation and filler rules of the prompt apply to the selected text too, so choose a prompt that fits (formal,
+informal, email, ...). Undo in the target app (Ctrl+Z) reverts it.
 
 **Corrections: always or hint.** A learned correction is either *always* (replaced literally in every transcript, before
 the formatter sees it) or a *hint* (only listed to the formatter, which applies it when it fits the sentence). Learn marks rules

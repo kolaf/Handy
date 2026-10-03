@@ -406,6 +406,86 @@ async fn rerun_with_next_prompt(app: &AppHandle) {
     });
 }
 
+/// Replaces the selected text with the result of running it through the selected post-processing prompt.
+pub(crate) struct ReformatAction;
+
+impl ReformatAction {
+    fn run(app: &AppHandle) {
+        let app = app.clone();
+        std::thread::spawn(move || {
+            // The copy shortcut must be sent from the main thread, like the paste shortcut.
+            let (tx, rx) = std::sync::mpsc::channel();
+            let handle = app.clone();
+            let _ = app.run_on_main_thread(move || {
+                let _ = tx.send(crate::learn::capture_selection(&handle));
+            });
+            let captured = rx
+                .recv_timeout(std::time::Duration::from_secs(5))
+                .ok()
+                .flatten();
+            tauri::async_runtime::block_on(reformat_selection(&app, captured));
+        });
+    }
+}
+
+impl ShortcutAction for ReformatAction {
+    // Hotkey: act on release, when the modifier keys are up (a held Alt would turn Ctrl+C into Ctrl+Alt+C).
+    // CLI: there is no key release, so act immediately.
+    fn start(&self, app: &AppHandle, _binding_id: &str, shortcut_str: &str) {
+        if shortcut_str == "CLI" {
+            Self::run(app);
+        }
+    }
+
+    fn stop(&self, app: &AppHandle, _binding_id: &str, _shortcut_str: &str) {
+        Self::run(app);
+    }
+}
+
+const MAX_REFORMAT_CHARS: usize = 20_000;
+
+async fn reformat_selection(app: &AppHandle, captured: Option<(String, bool)>) {
+    // Only a real selection counts: pasting over "whatever was on the clipboard" would insert text, not replace it.
+    let Some((text, true)) = captured else {
+        crate::learn::announce(app, "reformat-none", String::new());
+        return;
+    };
+    let settings = get_settings(app);
+    let selected = settings.post_process_selected_prompt_id.clone();
+    // The edit prompt takes a spoken instruction, not text to transform.
+    if selected.as_deref() == Some("edit")
+        || text.chars().count() > MAX_REFORMAT_CHARS
+        || !post_processing_configured(&settings, &text)
+    {
+        crate::learn::announce(app, "reformat-setup", String::new());
+        return;
+    }
+
+    crate::utils::show_processing_overlay(app);
+    let prompt_settings = expand_prompt_variables(app, settings.clone());
+    let result = crate::actions::post_process_transcription(&prompt_settings, &text).await;
+    let handle = app.clone();
+    match result {
+        Some(out) => {
+            let (out, _) = crate::actions::extract_vocab_commands(&out);
+            let out = expand_snippets(&out, &settings.snippets);
+            let _ = app.run_on_main_thread(move || {
+                if !out.trim().is_empty() {
+                    if let Err(err) = crate::utils::paste(out, handle.clone()) {
+                        warn!("Reformat: failed to paste: {}", err);
+                    }
+                }
+                crate::utils::hide_recording_overlay(&handle);
+            });
+        }
+        None => {
+            warn!("Reformat: the post-processing request failed");
+            crate::utils::hide_recording_overlay(app);
+            crate::learn::announce(app, "reformat-failed", String::new());
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

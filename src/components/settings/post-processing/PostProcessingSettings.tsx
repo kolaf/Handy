@@ -495,6 +495,16 @@ export const PostProcessingSettings: React.FC = () => {
           grouped={true}
         />
         <ShortcutInput
+          shortcutId="prompt_picker"
+          descriptionMode="tooltip"
+          grouped={true}
+        />
+        <ShortcutInput
+          shortcutId="reformat_selection"
+          descriptionMode="tooltip"
+          grouped={true}
+        />
+        <ShortcutInput
           shortcutId="learn_correction"
           descriptionMode="tooltip"
           grouped={true}

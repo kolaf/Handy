@@ -18,6 +18,7 @@ mod managers;
 mod memory;
 mod overlay;
 mod paste_tx;
+mod picker;
 pub mod portable;
 mod secure_input;
 mod settings;
@@ -693,6 +694,8 @@ pub fn run(cli_args: CliArgs) {
             shortcut::update_custom_words,
             extras::update_snippets,
             learn::update_corrections,
+            picker::picker_select,
+            picker::picker_close,
             shortcut::change_post_process_min_words_setting,
             shortcut::suspend_all_bindings,
             shortcut::resume_all_bindings,
@@ -886,6 +889,10 @@ pub fn run(cli_args: CliArgs) {
                 signal_handle::run_action(app, "rerun_next_prompt", "CLI");
             } else if args.iter().any(|a| a == "--paste-last") {
                 signal_handle::run_action(app, "paste_last", "CLI");
+            } else if args.iter().any(|a| a == "--prompt-picker") {
+                signal_handle::run_action(app, "prompt_picker", "CLI");
+            } else if args.iter().any(|a| a == "--reformat") {
+                signal_handle::run_action(app, "reformat_selection", "CLI");
             } else if args.iter().any(|a| a == "--learn") {
                 signal_handle::run_action(app, "learn_correction", "CLI");
             } else if !handled_setting {

@@ -530,7 +530,7 @@ pub fn update_corrections(app: AppHandle, corrections: Vec<Correction>) -> Resul
 
 /// Copies the current selection (Ctrl+C), reads it, and puts the user's clipboard back. Returns the text and whether it
 /// came from a selection; when nothing was copied the clipboard's own text is used (the user may have copied by hand).
-fn capture_selection(app: &AppHandle) -> Option<(String, bool)> {
+pub(crate) fn capture_selection(app: &AppHandle) -> Option<(String, bool)> {
     let clipboard = app.clipboard();
     let saved_text = clipboard.read_text().ok().filter(|t| !t.is_empty());
     let saved_image = if saved_text.is_none() {
@@ -618,7 +618,7 @@ async fn ask_model(settings: &crate::settings::AppSettings, prompt: String) -> O
 }
 
 /// Shows a short result in the overlay once the "processing" overlay has finished fading.
-fn announce(app: &AppHandle, kind: &'static str, value: String) {
+pub(crate) fn announce(app: &AppHandle, kind: &'static str, value: String) {
     let handle = app.clone();
     std::thread::spawn(move || {
         std::thread::sleep(Duration::from_millis(700));

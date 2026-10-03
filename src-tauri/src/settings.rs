@@ -985,6 +985,29 @@ pub fn get_default_settings() -> AppSettings {
         },
     );
     bindings.insert(
+        "prompt_picker".to_string(),
+        ShortcutBinding {
+            id: "prompt_picker".to_string(),
+            name: "Prompt Picker".to_string(),
+            description: "Open a numbered list of the post-processing prompts; press a number or click to choose."
+                .to_string(),
+            default_binding: "ctrl+alt+o".to_string(),
+            current_binding: "ctrl+alt+o".to_string(),
+        },
+    );
+    bindings.insert(
+        "reformat_selection".to_string(),
+        ShortcutBinding {
+            id: "reformat_selection".to_string(),
+            name: "Reformat Selection".to_string(),
+            description:
+                "Run the selected text through the selected post-processing prompt and replace it."
+                    .to_string(),
+            default_binding: "ctrl+alt+f".to_string(),
+            current_binding: "ctrl+alt+f".to_string(),
+        },
+    );
+    bindings.insert(
         "cancel".to_string(),
         ShortcutBinding {
             id: "cancel".to_string(),

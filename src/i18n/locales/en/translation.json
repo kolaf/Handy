@@ -197,6 +197,14 @@
             "name": "Learn From Correction Shortcut",
             "description": "Select text you have corrected after a dictation and press this shortcut. Handy compares it with what was heard and learns new vocabulary and recurring mistakes."
           },
+          "prompt_picker": {
+            "name": "Prompt Picker Shortcut",
+            "description": "Open a numbered list of the post-processing prompts. Press a number key or click to choose, Escape to close."
+          },
+          "reformat_selection": {
+            "name": "Reformat Selection Shortcut",
+            "description": "Run the selected text through the selected post-processing prompt and replace it with the result."
+          },
           "rerun_next_prompt": {
             "name": "Re-run With Next Prompt Shortcut",
             "description": "Re-process the last dictation with the next prompt and paste the result. Select the previously pasted text first to replace it."
@@ -762,7 +770,10 @@
     "noticeLearned": "Learned: {{value}}",
     "noticeLearnedNone": "Nothing new to learn",
     "noticeSynced": "Lists synced: {{value}}",
-    "noticeSyncFailed": "Lists sync failed (see log)"
+    "noticeSyncFailed": "Lists sync failed (see log)",
+    "noticeNoSelection": "Select some text first",
+    "noticeReformatSetup": "Pick a transforming prompt and set up post-processing first",
+    "noticeReformatFailed": "Reformat failed (see log)"
   },
   "secureInput": {
     "blockedWithCulprit_one": "{{name}} may be blocking 1 shortcut",
@@ -774,5 +785,10 @@
     "learnMore": "How to fix",
     "recorderBlocked": "Can't record shortcuts right now — macOS Secure Input is blocking key events. Resolve the Secure Input warning first.",
     "dismiss": "Dismiss"
+  },
+  "picker": {
+    "title": "Prompt",
+    "close": "Close",
+    "escape": "Esc"
   }
 }
