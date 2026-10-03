@@ -143,6 +143,8 @@ const settingUpdaters: {
   custom_words: (value) => commands.updateCustomWords(value as string[]),
   snippets: (value) => commands.updateSnippets(value as Snippet[]),
   corrections: (value) => commands.updateCorrections(value as Correction[]),
+  paste_focus_guard: (value) =>
+    commands.changePasteFocusGuardSetting(value as boolean),
   app_prompts: (value) => commands.updateAppPrompts(value as AppPrompt[]),
   app_prompts_enabled: (value) =>
     commands.changeAppPromptsEnabledSetting(value as boolean),

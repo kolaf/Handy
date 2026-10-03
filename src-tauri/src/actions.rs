@@ -494,10 +494,21 @@ pub(crate) async fn process_transcription_output(
     transcription: &str,
     post_process: bool,
 ) -> ProcessedTranscription {
+    process_transcription_output_in(app, transcription, post_process, None).await
+}
+
+/// `started_in`: the app and window the dictation was started in (the prompt rules and the `${app}` and `${title}`
+/// variables use it); without it the app that has focus now is used.
+pub(crate) async fn process_transcription_output_in(
+    app: &AppHandle,
+    transcription: &str,
+    post_process: bool,
+    started_in: Option<&crate::context::AppContext>,
+) -> ProcessedTranscription {
     let mut settings = get_settings(app);
     if post_process {
         // A one-shot prompt ("reply to this") or a per-app rule may replace the selected prompt for this dictation.
-        crate::context::apply_prompt_choice(&mut settings);
+        crate::context::apply_prompt_choice(&mut settings, started_in);
     }
     // Learned corrections (see learn.rs) fix known mishearings before anything else sees the text.
     let heard = crate::learn::apply_corrections(transcription, &settings.corrections);
@@ -522,7 +533,8 @@ pub(crate) async fn process_transcription_output(
     } else if post_process {
         // Prompt variables (${clipboard} etc.) are filled in on a copy so the stored prompt
         // text, which goes into the history, never contains clipboard contents.
-        let prompt_settings = crate::extras::expand_prompt_variables(app, settings.clone());
+        let prompt_settings =
+            crate::extras::expand_prompt_variables(app, settings.clone(), started_in);
         if let Some(processed_text) =
             post_process_transcription(&prompt_settings, &final_text).await
         {
@@ -566,6 +578,8 @@ impl ShortcutAction for TranscribeAction {
     fn start(&self, app: &AppHandle, binding_id: &str, _shortcut_str: &str) {
         let start_time = Instant::now();
         debug!("TranscribeAction::start called for binding: {}", binding_id);
+        // Where the user is when they start speaking; see `context::begin_recording_context`.
+        crate::context::begin_recording_context();
 
         // Load model in the background
         let tm = app.state::<Arc<TranscriptionManager>>();
@@ -781,6 +795,7 @@ impl ShortcutAction for TranscribeAction {
         let binding_id = binding_id.to_string(); // Clone binding_id for the async task
         let post_process = self.post_process;
         let cancel_generation = rm.cancel_generation();
+        let started_in = crate::context::take_recording_context();
 
         tauri::async_runtime::spawn(async move {
             let _guard = FinishGuard(ah.clone(), Arc::clone(&tm));
@@ -886,7 +901,12 @@ impl ShortcutAction for TranscribeAction {
                                 }
                             }
                             let Some(processed) = complete_unless_cancelled(
-                                process_transcription_output(&ah, &transcription, post_process),
+                                process_transcription_output_in(
+                                    &ah,
+                                    &transcription,
+                                    post_process,
+                                    started_in.as_ref(),
+                                ),
                                 || rm.was_cancelled_since(cancel_generation),
                             )
                             .await
@@ -925,12 +945,39 @@ impl ShortcutAction for TranscribeAction {
                                 let paste_time = Instant::now();
                                 let final_text = processed.final_text;
                                 let rm_for_paste = Arc::clone(&rm);
+                                let started_in_for_paste = started_in.clone();
                                 ah.run_on_main_thread(move || {
                                     if rm_for_paste.was_cancelled_since(cancel_generation) {
                                         debug!("Transcription operation cancelled before paste");
                                         utils::hide_recording_overlay(&ah_clone);
                                         set_tray_state(&ah_clone, TrayIconState::Idle);
                                         return;
+                                    }
+
+                                    // The user may have moved to another window while the text was being prepared.
+                                    if get_settings(&ah_clone).paste_focus_guard {
+                                        let now = crate::context::foreground();
+                                        if crate::context::focus_moved(
+                                            started_in_for_paste.as_ref(),
+                                            now.as_ref(),
+                                        ) {
+                                            use tauri_plugin_clipboard_manager::ClipboardExt;
+                                            let _ = ah_clone.clipboard().write_text(final_text.clone());
+                                            utils::hide_recording_overlay(&ah_clone);
+                                            set_tray_state(&ah_clone, TrayIconState::Idle);
+                                            crate::learn::announce_with(
+                                                &ah_clone,
+                                                "paste-moved",
+                                                "The window changed, so the dictation is on the clipboard".to_string(),
+                                                format!(
+                                                    "You started speaking in {}; when the text was ready the active window was {}. It was not pasted, to keep it out of the wrong window. It is on the clipboard (and in History):\n\n{}",
+                                                    crate::context::describe(started_in_for_paste.as_ref()),
+                                                    crate::context::describe(now.as_ref()),
+                                                    final_text
+                                                ),
+                                            );
+                                            return;
+                                        }
                                     }
 
                                     match utils::paste(final_text, ah_clone.clone()) {

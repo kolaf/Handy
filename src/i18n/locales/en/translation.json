@@ -447,6 +447,10 @@
       "fillerWordRemoval": {
         "title": "Remove Filler Words",
         "description": "Removes common hesitation words from transcriptions. Turn off to keep them."
+      },
+      "pasteFocusGuard": {
+        "label": "Keep dictation out of the wrong window",
+        "description": "Windows only. If you switch to another window or app while a dictation is being prepared, it is not pasted there: it is put on the clipboard and a notice says so (also in History and Activity). The window you were in when you started speaking is what counts."
       }
     },
     "postProcessing": {
@@ -722,7 +726,9 @@
         "reformat-setup": "Reformat: not possible",
         "reformat-failed": "Reformat failed",
         "transform-moved": "Transform: last dictation not at the cursor",
-        "fallback": "Offline: basic cleanup only"
+        "fallback": "Offline: basic cleanup only",
+        "paste-moved": "Not pasted: window changed",
+        "scratched": "Dictation removed"
       }
     }
   },
@@ -802,7 +808,9 @@
     "noticeNoSelection": "Select some text first",
     "noticeReformatSetup": "Pick a transforming prompt and set up post-processing first",
     "noticeReformatFailed": "Reformat failed (see log)",
-    "noticeNotAtCursor": "The last dictation is not at the cursor"
+    "noticeNotAtCursor": "The last dictation is not at the cursor",
+    "noticePasteMoved": "Window changed: dictation is on the clipboard",
+    "noticeScratched": "Last dictation removed"
   },
   "secureInput": {
     "blockedWithCulprit_one": "{{name}} may be blocking 1 shortcut",

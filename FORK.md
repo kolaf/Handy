@@ -105,6 +105,24 @@ proposed, what was added and every item that was left out with the reason ("does
 your custom words", "a common word" ...). For `--learn-repo` it lists the folder, how many files and terms were read, the
 terms the model chose and which of them were new.
 
+**Where you started.** When recording starts Handy remembers the foreground program and window (`context.rs`,
+`begin_recording_context`). That is what the prompt rules and the `${app}` / `${title}` variables use, and what the paste guard
+compares with: if the program or window is a different one when the text is ready (Windows; the title is ignored because it
+changes as you type), the text is put on the clipboard instead of pasted, with a notice and an Activity entry ("Not pasted:
+window changed"). Setting: Advanced → "Keep dictation out of the wrong window" (on by default). Actions that do not record
+(re-run, redo) use the window that has focus when they run.
+
+**More prompt variables.** `${app}`, `${title}` (program and window title where you started speaking; the title is bounded and
+defused because it is untrusted text), `${language}` (the dictation language setting), `${date}` (2026-10-03), `${time}`
+(21:48) and `${weekday}`. Unknown values read "(unknown)". `${selection}` was left out on purpose: capturing a selection at
+the start of every dictation would send Ctrl+C while you hold your dictation hotkey and delay the recording; "reply to this" and
+"edit this" copy the selection explicitly instead.
+
+**Scratch and redo.** `handy --scratch-last` deletes the last dictation and `handy --redo-with ID` replaces it by the same
+recording (the raw transcript from the history) processed with prompt `ID`. Both first select the last dictation backwards from
+the caret and verify it, exactly like `--transform` with nothing selected. Talon: "scratch dictation", "redo as email|message|
+note|meeting|document|formal|informal|simple".
+
 **Prompt per app.** Post-processing page → "Prompt per app": turn it on and add rules (program name such as `slack.exe`, an
 optional window-title part, and a prompt). When you dictate with post-processing, the first matching rule decides the prompt;
 a rule with a title part wins over a rule for the whole app; no match means the selected prompt. Windows only (it reads the

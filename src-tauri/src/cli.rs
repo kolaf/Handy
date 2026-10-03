@@ -40,6 +40,14 @@ pub struct CliArgs {
     #[arg(long)]
     pub reformat: bool,
 
+    /// Delete the last dictation if it is the text just before the cursor (sent to running instance)
+    #[arg(long)]
+    pub scratch_last: bool,
+
+    /// Replace the last dictation by the same recording processed again with this prompt (sent to running instance)
+    #[arg(long, value_name = "ID")]
+    pub redo_with: Option<String>,
+
     /// Use this prompt for the next dictation only (sent to running instance)
     #[arg(long, value_name = "ID")]
     pub use_prompt_once: Option<String>,

@@ -13,12 +13,53 @@ const MAX_RULES: usize = 50;
 const MAX_FIELD_CHARS: usize = 80;
 
 static ONE_SHOT: Mutex<Option<(String, Instant)>> = Mutex::new(None);
+static RECORDING_CONTEXT: Mutex<Option<(AppContext, Instant)>> = Mutex::new(None);
+/// A dictation can be long (push-to-talk held, or a toggled recording); a context older than this is not trusted.
+const RECORDING_CONTEXT_TTL: Duration = Duration::from_secs(30 * 60);
+
+/// Remembers which app and window a dictation starts in. Called when recording starts: the user may switch windows while
+/// the text is being transcribed and formatted, and the text belongs to where they were when they started speaking.
+pub fn begin_recording_context() {
+    let ctx = foreground();
+    if let Ok(mut slot) = RECORDING_CONTEXT.lock() {
+        *slot = ctx.map(|c| (c, Instant::now()));
+    }
+}
+
+/// Takes the context remembered by `begin_recording_context` (once).
+pub fn take_recording_context() -> Option<AppContext> {
+    let mut slot = RECORDING_CONTEXT.lock().ok()?;
+    let (ctx, at) = slot.take()?;
+    (at.elapsed() <= RECORDING_CONTEXT_TTL).then_some(ctx)
+}
+
+/// Has the user moved to another window since `target`? Only the program and the window are compared, not the title (a
+/// title changes as you type, for example "file.txt" becomes "*file.txt"). Unknown on either side counts as "not moved".
+pub fn focus_moved(target: Option<&AppContext>, now: Option<&AppContext>) -> bool {
+    match (target, now) {
+        (Some(t), Some(n)) => {
+            normalize_exe(&t.exe) != normalize_exe(&n.exe)
+                || (t.window != 0 && n.window != 0 && t.window != n.window)
+        }
+        _ => false,
+    }
+}
+
+/// `slack.exe "Channel - Slack"` for messages and logs.
+pub fn describe(ctx: Option<&AppContext>) -> String {
+    ctx.map_or_else(
+        || "unknown window".to_string(),
+        |c| format!("{} \"{}\"", c.exe, c.title),
+    )
+}
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct AppContext {
     /// Program file name, e.g. `slack.exe`.
     pub exe: String,
     pub title: String,
+    /// The window (a window handle on Windows, 0 when unknown); tells two windows of the same program apart.
+    pub window: isize,
 }
 
 #[cfg(windows)]
@@ -60,7 +101,11 @@ pub fn foreground() -> Option<AppContext> {
         queried.ok()?;
         let path = String::from_utf16_lossy(&path_buf[..size as usize]);
         let exe = path.rsplit(['\\', '/']).next().unwrap_or("").to_string();
-        Some(AppContext { exe, title })
+        Some(AppContext {
+            exe,
+            title,
+            window: hwnd.0 as isize,
+        })
     }
 }
 
@@ -139,7 +184,7 @@ fn prompt_exists(settings: &AppSettings, id: &str) -> bool {
 
 /// Picks the prompt for the dictation that is being post-processed now: a one-shot prompt first, then a per-app rule,
 /// else whatever is selected. Changes only the given copy of the settings.
-pub fn apply_prompt_choice(settings: &mut AppSettings) {
+pub fn apply_prompt_choice(settings: &mut AppSettings, started_in: Option<&AppContext>) {
     if let Some(id) = take_one_shot() {
         if prompt_exists(settings, &id) {
             info!("Prompt for this dictation: '{id}' (one-shot)");
@@ -151,7 +196,8 @@ pub fn apply_prompt_choice(settings: &mut AppSettings) {
     if !settings.app_prompts_enabled || settings.app_prompts.is_empty() {
         return;
     }
-    let Some(ctx) = foreground() else {
+    // The app where the dictation started; for actions that do not record (re-run) the app that has focus now.
+    let Some(ctx) = started_in.cloned().or_else(foreground) else {
         return;
     };
     match matching_rule(&settings.app_prompts, &ctx) {
@@ -198,6 +244,18 @@ pub fn update_app_prompts(app: tauri::AppHandle, rules: Vec<AppPrompt>) -> Resul
     let mut settings = get_settings(&app);
     validate_rules(&rules, &settings)?;
     settings.app_prompts = rules;
+    crate::settings::write_settings(&app, settings);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn change_paste_focus_guard_setting(
+    app: tauri::AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    let mut settings = get_settings(&app);
+    settings.paste_focus_guard = enabled;
     crate::settings::write_settings(&app, settings);
     Ok(())
 }
@@ -291,6 +349,7 @@ mod tests {
         AppContext {
             exe: exe.into(),
             title: title.into(),
+            window: 0,
         }
     }
 
@@ -320,6 +379,27 @@ mod tests {
                 .prompt_id,
             "simple"
         );
+    }
+
+    #[test]
+    fn moving_to_another_window_is_detected_but_typing_in_the_same_one_is_not() {
+        let editor = |title: &str, window: isize| AppContext {
+            exe: "code.exe".into(),
+            title: title.into(),
+            window,
+        };
+        let start = editor("notes.md", 100);
+        assert!(!focus_moved(Some(&start), Some(&editor("*notes.md", 100))));
+        assert!(focus_moved(Some(&start), Some(&editor("notes.md", 200))));
+        let other = AppContext {
+            exe: "slack.exe".into(),
+            title: "x".into(),
+            window: 300,
+        };
+        assert!(focus_moved(Some(&start), Some(&other)));
+        assert!(!focus_moved(None, Some(&other)));
+        assert!(!focus_moved(Some(&start), None));
+        assert!(!focus_moved(Some(&editor("a", 0)), Some(&editor("b", 5))));
     }
 
     #[test]

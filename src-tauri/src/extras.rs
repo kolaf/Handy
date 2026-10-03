@@ -21,7 +21,7 @@ const MAX_SNIPPET_NAME_CHARS: usize = 50;
 pub(crate) const MAX_SNIPPET_TEXT_CHARS: usize = 5000;
 
 static VARIABLE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"\$\{(vocabulary|corrections|snippets|clipboard|examples)\}").unwrap()
+    Regex::new(r"\$\{(vocabulary|corrections|snippets|clipboard|examples|app|title|date|time|weekday|language)\}").unwrap()
 });
 static SNIPPET_TAG: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"\[\[\s*snippet\s*:([^\]\n]*)\]\]").unwrap());
@@ -45,7 +45,36 @@ fn clipboard_for_prompt(text: &str) -> String {
     bounded.replace("${output}", "$ {output}")
 }
 
-/// Replaces `${vocabulary}`, `${snippets}` and `${clipboard}` in a prompt template.
+/// Facts about the situation of a dictation, for `${app}`, `${title}` and `${language}`.
+#[derive(Debug, Default, Clone)]
+pub(crate) struct PromptContext {
+    /// Program the dictation was started in, e.g. `slack.exe` (empty if unknown).
+    pub app: String,
+    /// Title of that window (empty if unknown). Window titles can contain anything, so it is treated as data.
+    pub title: String,
+    /// The dictation language setting, e.g. `en`.
+    pub language: String,
+}
+
+/// A window title as it goes into a prompt: bounded, no control characters, transcript placeholder defused.
+fn title_for_prompt(title: &str) -> String {
+    title
+        .chars()
+        .filter(|c| !c.is_control())
+        .take(200)
+        .collect::<String>()
+        .replace("${output}", "$ {output}")
+}
+
+fn or_unknown(text: &str) -> String {
+    if text.trim().is_empty() {
+        "(unknown)".to_string()
+    } else {
+        text.to_string()
+    }
+}
+
+/// Replaces `${vocabulary}`, `${snippets}`, `${clipboard}` and the other variables in a prompt template.
 /// Substituted text is never scanned again, so values cannot introduce new variables.
 pub(crate) fn expand_variables(
     template: &str,
@@ -55,12 +84,39 @@ pub(crate) fn expand_variables(
     clipboard: &str,
     examples: &str,
 ) -> String {
+    expand_variables_with(
+        template,
+        vocabulary,
+        corrections,
+        snippet_names,
+        clipboard,
+        examples,
+        &PromptContext::default(),
+    )
+}
+
+pub(crate) fn expand_variables_with(
+    template: &str,
+    vocabulary: &[String],
+    corrections: &[Correction],
+    snippet_names: &[String],
+    clipboard: &str,
+    examples: &str,
+    ctx: &PromptContext,
+) -> String {
+    let now = chrono::Local::now();
     VARIABLE
         .replace_all(template, |caps: &regex::Captures| match &caps[1] {
             "vocabulary" => join_or(vocabulary, "(none yet)"),
             "corrections" => corrections_block(corrections),
             "snippets" => join_or(snippet_names, "(none)"),
             "examples" => examples_block(examples),
+            "app" => or_unknown(&ctx.app),
+            "title" => or_unknown(&title_for_prompt(&ctx.title)),
+            "date" => now.format("%Y-%m-%d").to_string(),
+            "time" => now.format("%H:%M").to_string(),
+            "weekday" => now.format("%A").to_string(),
+            "language" => or_unknown(&ctx.language),
             _ => clipboard_for_prompt(clipboard),
         })
         .into_owned()
@@ -106,7 +162,11 @@ fn examples_block(examples: &str) -> String {
 
 /// Returns settings whose selected prompt has its variables filled in. The clipboard is
 /// only read when the prompt actually uses `${clipboard}`.
-pub(crate) fn expand_prompt_variables(app: &AppHandle, mut settings: AppSettings) -> AppSettings {
+pub(crate) fn expand_prompt_variables(
+    app: &AppHandle,
+    mut settings: AppSettings,
+    started_in: Option<&crate::context::AppContext>,
+) -> AppSettings {
     let Some(selected) = settings.post_process_selected_prompt_id.clone() else {
         return settings;
     };
@@ -130,13 +190,31 @@ pub(crate) fn expand_prompt_variables(app: &AppHandle, mut settings: AppSettings
         String::new()
     };
     let names: Vec<String> = settings.snippets.iter().map(|s| s.name.clone()).collect();
-    let mut expanded = expand_variables(
+    // Where the dictation started; for actions that do not record (re-run) the app that has focus now.
+    let situation = if template.contains("${app}") || template.contains("${title}") {
+        started_in.cloned().or_else(crate::context::foreground)
+    } else {
+        None
+    };
+    let ctx = PromptContext {
+        app: situation
+            .as_ref()
+            .map(|c| c.exe.clone())
+            .unwrap_or_default(),
+        title: situation
+            .as_ref()
+            .map(|c| c.title.clone())
+            .unwrap_or_default(),
+        language: settings.selected_language.clone(),
+    };
+    let mut expanded = expand_variables_with(
         &template,
         &settings.custom_words,
         &settings.corrections,
         &names,
         &clipboard,
         &examples,
+        &ctx,
     );
     if has_examples && !places_examples {
         expanded.push_str(
@@ -472,6 +550,90 @@ pub(crate) fn run_transform(app: &AppHandle, prompt_id: Option<String>) {
     run_reformat(app, prompt_id, true);
 }
 
+/// `handy --scratch-last`: deletes the last dictation, if it is really the text just before the cursor.
+pub(crate) fn run_scratch(app: &AppHandle) {
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let handle = app.clone();
+        let _ = app.run_on_main_thread(move || {
+            let removed = select_last_dictation(&handle).is_some()
+                && crate::clipboard::with_enigo(&handle, crate::input::send_backspace).is_ok();
+            let _ = tx.send(removed);
+        });
+        let removed = rx
+            .recv_timeout(std::time::Duration::from_secs(15))
+            .unwrap_or(false);
+        if removed {
+            crate::learn::announce_with(
+                &app,
+                "scratched",
+                "Last dictation removed".to_string(),
+                String::new(),
+            );
+        } else {
+            crate::learn::announce(&app, "transform-moved", String::new());
+        }
+    });
+}
+
+/// `handy --redo-with ID`: replaces the last dictation (if it is really the text just before the cursor) by the same
+/// recording processed again with prompt `ID`. The raw transcript is processed, not the already formatted text.
+pub(crate) fn run_redo(app: &AppHandle, prompt_id: String) {
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let settings = get_settings(&app);
+        if prompt_id == "edit"
+            || !settings
+                .post_process_prompts
+                .iter()
+                .any(|p| p.id == prompt_id)
+        {
+            warn!("Redo: there is no usable prompt '{}'", prompt_id);
+            crate::learn::announce(&app, "reformat-setup", String::new());
+            return;
+        }
+        let raw = match app
+            .state::<Arc<HistoryManager>>()
+            .get_latest_completed_entry()
+        {
+            Ok(Some(entry)) if !entry.transcription_text.trim().is_empty() => {
+                entry.transcription_text
+            }
+            _ => {
+                crate::learn::announce(&app, "transform-moved", String::new());
+                return;
+            }
+        };
+        let (tx, rx) = std::sync::mpsc::channel();
+        let handle = app.clone();
+        let _ = app.run_on_main_thread(move || {
+            let _ = tx.send(select_last_dictation(&handle).is_some());
+        });
+        if !rx
+            .recv_timeout(std::time::Duration::from_secs(15))
+            .unwrap_or(false)
+        {
+            crate::learn::announce(&app, "transform-moved", String::new());
+            return;
+        }
+        crate::utils::show_processing_overlay(&app);
+        crate::context::set_one_shot(&prompt_id);
+        let processed =
+            tauri::async_runtime::block_on(process_transcription_output(&app, &raw, true));
+        let handle = app.clone();
+        let text = processed.final_text;
+        let _ = app.run_on_main_thread(move || {
+            if !text.trim().is_empty() {
+                if let Err(err) = crate::utils::paste(text, handle.clone()) {
+                    warn!("Redo: failed to paste: {}", err);
+                }
+            }
+            crate::utils::hide_recording_overlay(&handle);
+        });
+    });
+}
+
 fn run_reformat(app: &AppHandle, prompt_id: Option<String>, fall_back_to_last_dictation: bool) {
     let app = app.clone();
     std::thread::spawn(move || {
@@ -548,7 +710,7 @@ async fn reformat_selection(
     }
 
     crate::utils::show_processing_overlay(app);
-    let prompt_settings = expand_prompt_variables(app, settings.clone());
+    let prompt_settings = expand_prompt_variables(app, settings.clone(), None);
     let result = crate::actions::post_process_transcription(&prompt_settings, &text).await;
     let handle = app.clone();
     match result {
@@ -623,6 +785,33 @@ mod tests {
         assert!(same_text("Hello\r\nworld ", "Hello\nworld"));
         assert!(!same_text("Hello world", "Hello there"));
         assert!(is_transform_prompt("t_formal") && !is_transform_prompt("formal_text"));
+    }
+
+    #[test]
+    fn situation_variables_are_filled_and_defused() {
+        let ctx = PromptContext {
+            app: "slack.exe".into(),
+            title: "chan\u{7}nel ${output} - Slack".into(),
+            language: "no".into(),
+        };
+        let out = expand_variables_with(
+            "A:${app}|T:${title}|L:${language}|D:${date}|C:${time}|W:${weekday}",
+            &[],
+            &[],
+            &[],
+            "",
+            "",
+            &ctx,
+        );
+        assert!(
+            out.starts_with("A:slack.exe|T:channel $ {output} - Slack|L:no|D:"),
+            "{out}"
+        );
+        assert!(out.contains("D:20"), "{out}");
+        let unknown = expand_variables("${app}/${title}/${language}", &[], &[], &[], "", "");
+        assert_eq!(unknown, "(unknown)/(unknown)/(unknown)");
+        let re = regex::Regex::new(r"C:\d\d:\d\d\|W:[A-Z][a-z]+day").unwrap();
+        assert!(re.is_match(&out), "{out}");
     }
 
     #[test]

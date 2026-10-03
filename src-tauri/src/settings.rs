@@ -98,6 +98,10 @@ pub struct Correction {
     pub hint: bool,
 }
 
+fn default_true() -> bool {
+    true
+}
+
 /// A per-app prompt choice: when the foreground app is `app` (its program name, e.g. `slack.exe`) and its window title
 /// contains `title` (if given), dictation is post-processed with `prompt_id`. See `context.rs`.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Type)]
@@ -494,6 +498,10 @@ pub struct AppSettings {
     /// Learned `wrong -> right` fixes applied to each new transcript.
     #[serde(default)]
     pub corrections: Vec<Correction>,
+    /// Do not paste a dictation into another window than the one it was started in (Windows only): keep it on the
+    /// clipboard and say so instead.
+    #[serde(default = "default_true")]
+    pub paste_focus_guard: bool,
     /// Use a different post-processing prompt depending on the foreground app (Windows only).
     #[serde(default)]
     pub app_prompts_enabled: bool,
@@ -1065,6 +1073,7 @@ pub fn get_default_settings() -> AppSettings {
         post_process_models: default_post_process_models(),
         snippets: Vec::new(),
         corrections: Vec::new(),
+        paste_focus_guard: true,
         app_prompts_enabled: false,
         app_prompts: Vec::new(),
         post_process_min_words: 0,

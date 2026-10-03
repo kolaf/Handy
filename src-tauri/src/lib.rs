@@ -701,6 +701,7 @@ pub fn run(cli_args: CliArgs) {
             activity::clear_activity,
             context::update_app_prompts,
             context::change_app_prompts_enabled_setting,
+            context::change_paste_focus_guard_setting,
             picker::picker_select,
             picker::picker_close,
             picker::picker_state,
@@ -885,6 +886,14 @@ pub fn run(cli_args: CliArgs) {
             }
             if let Some(id) = signal_handle::flag_value(&args, "--use-prompt-once") {
                 context::set_one_shot(&id);
+                handled_setting = true;
+            }
+            if let Some(id) = signal_handle::flag_value(&args, "--redo-with") {
+                extras::run_redo(app, id);
+                handled_setting = true;
+            }
+            if args.iter().any(|a| a == "--scratch-last") {
+                extras::run_scratch(app);
                 handled_setting = true;
             }
             if let Some(id) = signal_handle::flag_value(&args, "--transform") {

@@ -253,6 +253,13 @@ pub fn send_select_left(enigo: &mut Enigo, count: usize) -> Result<(), String> {
     result.and(released)
 }
 
+/// Presses Backspace: deletes the current selection.
+pub fn send_backspace(enigo: &mut Enigo) -> Result<(), String> {
+    enigo
+        .key(Key::Backspace, enigo::Direction::Click)
+        .map_err(|e| format!("Failed to press backspace: {}", e))
+}
+
 /// Presses the right arrow: collapses a selection to its end, where the caret was before it was made.
 pub fn send_arrow_right(enigo: &mut Enigo) -> Result<(), String> {
     enigo

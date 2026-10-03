@@ -6,7 +6,8 @@ This build (`0.9.7-hotkeys.1`) adds features on top of Handy. The full reference
 
 - **Swap language** (`Ctrl+Alt+L`): swaps the language with the _Alternate Language_ you set on the General page.
 - **Prompt picker** (`Ctrl+Alt+P`): a numbered list of your prompts in a small window. Press a number key or click a row to choose, `Esc` (or `Ctrl+Alt+P` again) to close. The first nine prompts are listed; the one in use is highlighted. The window never takes focus, so your selection stays where it is.
-- **Prompt per app** (Post-Processing page): choose the prompt by the app you dictate into, for example Slack → _Informal message_. Rules are "program (+ optional part of the window title) → prompt"; the first matching rule wins, otherwise the selected prompt is used. Windows only. The Handy log shows the program name it saw.
+- **Prompt per app** (Post-Processing page): choose the prompt by the app you dictate into, for example Slack → _Informal message_. Rules are "program (+ optional part of the window title) → prompt"; the first matching rule wins, otherwise the selected prompt is used. Windows only. The app is the one you were in when you **started** speaking, not where you are when the text is ready. The Handy log shows the program name it saw.
+- **Keeps dictation out of the wrong window** (Advanced, on by default, Windows): if you switch to another window or app while a dictation is being prepared, it is not pasted there. It is put on the clipboard and a notice says so.
 - **Paste last dictation** (`Ctrl+Alt+V`): paste your most recent dictation again.
 - A short notice and a caption under the recording controls show the current language and prompt.
 
@@ -14,6 +15,7 @@ This build (`0.9.7-hotkeys.1`) adds features on top of Handy. The full reference
 
 - **Reformat selection** (`Ctrl+Alt+F`): run the selected text through the selected prompt and replace it with the result.
 - **Transform** (`handy --transform ID`, or Talon: "make that formal"): run the selection, or with nothing selected the last dictation, through a one-purpose prompt and replace it. Built in: formal, informal, shorter, fuller, clearer, fix spelling and grammar, translate to Norwegian or English, bullet list, summary (the prompts whose id starts with `t_`; they are not in the picker). For the last dictation Handy first checks that the text before the cursor really is that dictation, and does nothing otherwise.
+- **Undo and redo by voice** (Talon): "scratch dictation" deletes the last dictation and "redo as email" (message, note, meeting, formal, ...) processes the same recording again with that prompt and replaces the text. Handy first checks that the text before the cursor really is the last dictation (`--scratch-last`, `--redo-with ID`).
 - **Re-run with next prompt** (`Ctrl+Alt+R`): redo your last dictation with the next prompt in the list. Select the text you pasted before to replace it.
 - **Edit by instruction**: Talon's "edit this" copies the selected text, then you speak the change you want ("shorter and friendlier, mention Thursday"), stop with your Handy key, and the result replaces the selection (it uses `handy --use-prompt-once edit --toggle-post-process`). The fixed "make that ..." commands are faster for common changes.
 - **Reply with context**: `handy --use-prompt-once reply --toggle-post-process` (Talon: "reply to this") makes the next dictation use the _Reply_ prompt, with the clipboard (the message you are answering) as context; the prompt is then forgotten.
@@ -33,7 +35,7 @@ Next to History. Every on-screen notice (learned, nothing learned, lists synced,
 
 ## Writing prompts
 
-- Variables: `${output}` the transcript, `${vocabulary}` your Custom Words, `${corrections}` the learned mishearings ("X is Y" for _Always_ rules, "X may be Y" for hints), `${snippets}` the snippet names, `${clipboard}` the clipboard text (read only if the prompt uses it), `${examples}` the prompt's examples.
+- Variables: `${output}` the transcript, `${vocabulary}` your Custom Words, `${corrections}` the learned mishearings ("X is Y" for _Always_ rules, "X may be Y" for hints), `${snippets}` the snippet names, `${clipboard}` the clipboard text (read only if the prompt uses it), `${examples}` the prompt's examples, `${app}` and `${title}` the program and window title where you started speaking (Windows), `${language}` the dictation language, `${date}`, `${time}` and `${weekday}`. Window titles are untrusted text, so treat them as data in your prompt.
 - The **Examples** box is for fixed structures: put the structure with `[placeholders]` in the prompt, then add one or two `Dictation: ... / Result: ...` pairs separated by `---`.
 - The _Document template_ and _Reply_ prompts are working samples. _Reply_ uses the clipboard as the message you are answering.
 - Say a format at the end of a dictation ("...format as email", "...som punktliste") with the _Super_ prompt to choose the style.
@@ -51,4 +53,4 @@ Next to History. Every on-screen notice (learned, nothing learned, lists synced,
 
 ## Command line
 
-`handy --swap-language`, `--prompt-picker`, `--reformat`, `--transform ID`, `--use-prompt-once ID`, `--rerun`, `--paste-last`, `--learn`, `--learn-repo FOLDER`, `--import-words FILE`, `--sync-lists FILE`, `--set-language no`, `--set-prompt email`. They work with a running Handy and can be combined with `--toggle-post-process`, for example from a window-manager key binding, a Logitech button or Talon.
+`handy --swap-language`, `--prompt-picker`, `--reformat`, `--transform ID`, `--redo-with ID`, `--scratch-last`, `--use-prompt-once ID`, `--rerun`, `--paste-last`, `--learn`, `--learn-repo FOLDER`, `--import-words FILE`, `--sync-lists FILE`, `--set-language no`, `--set-prompt email`. They work with a running Handy and can be combined with `--toggle-post-process`, for example from a window-manager key binding, a Logitech button or Talon.
