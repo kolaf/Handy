@@ -6,8 +6,8 @@ This build (`0.9.7-hotkeys.1`) adds features on top of Handy. The full reference
 
 - **Swap language** (`Ctrl+Alt+L`): swaps the language with the _Alternate Language_ you set on the General page.
 - **Prompt picker** (`Ctrl+Alt+P`): a numbered list of your prompts in a small window. Press a number key or click a row to choose, `Esc` (or `Ctrl+Alt+P` again) to close. The first nine prompts are listed; the one in use is highlighted. The window never takes focus, so your selection stays where it is.
-- **Prompt per app** (Post-Processing page): choose the prompt by the app you dictate into, for example Slack → _Informal message_. Rules are "program (+ optional part of the window title) → prompt"; the first matching rule wins, otherwise the selected prompt is used. Windows only. The app is the one you were in when you **started** speaking, not where you are when the text is ready. The Handy log shows the program name it saw.
-- **Keeps dictation out of the wrong window** (Advanced, on by default, Windows): if you switch to another window or app while a dictation is being prepared, it is not pasted there. It is put on the clipboard and a notice says so.
+- **Prompt per app** (Post-Processing page): choose the prompt by the app you dictate into, for example Slack → _Informal message_. Rules are "program (+ optional part of the window title) → prompt"; the first matching rule wins, otherwise the selected prompt is used. Windows, and Linux with X11 (Wayland does not let apps see the active window). On Linux the program name is the process name, for example `slack` or `firefox`. The app is the one you were in when you **started** speaking, not where you are when the text is ready. The Handy log shows the program name it saw.
+- **Keeps dictation out of the wrong window** (Advanced, on by default; Windows and Linux/X11): if you switch to another window or app while a dictation is being prepared, it is not pasted there. It is put on the clipboard and a notice says so.
 - **Paste last dictation** (`Ctrl+Alt+V`): paste your most recent dictation again.
 - A short notice and a caption under the recording controls show the current language and prompt.
 

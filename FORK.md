@@ -23,7 +23,7 @@ This is a fork of [cjpais/Handy](https://github.com/cjpais/Handy) that has delib
 | **Re-run with next prompt** | `ctrl+alt+r` or `handy --rerun` | Post-processing page |
 | **Prompt picker** (replaces cycling) | `ctrl+alt+p` or `handy --prompt-picker` | Post-processing page |
 | **Reformat selection** | `ctrl+alt+f` or `handy --reformat` | Post-processing page |
-| **Prompt per app** | Post-processing page | rules "program (+ title) → prompt", Windows only |
+| **Prompt per app** | Post-processing page | rules "program (+ title) → prompt", Windows and Linux/X11 |
 | **Transform** | `handy --transform ID` (Talon: "make that formal" ...) | selection or last dictation → prompt `t_*` → replaces it |
 | **Reply with context** | `handy --use-prompt-once reply --toggle-post-process` (Talon: "reply to this") | |
 | **Learn a repo** | `handy --learn-repo FOLDER` (Talon: "learn this repo"), `handy --import-words FILE` | adds project words |
@@ -112,6 +112,14 @@ changes as you type), the text is put on the clipboard instead of pasted, with a
 window changed"). Setting: Advanced → "Keep dictation out of the wrong window" (on by default). Actions that do not record
 (re-run, redo) use the window that has focus when they run.
 
+**Linux (X11).** The active window is read through the standard window-manager property `_NET_ACTIVE_WINDOW` (title from
+`_NET_WM_NAME`, program from the window's process `/proc/<pid>/exe`, falling back to the window class for sandboxed apps), using
+the `x11rb` crate (no extra system libraries). Everything that depends on the active window works the same: prompt rules (rule
+program names are the process names, e.g. `slack`, `firefox`, `gnome-terminal-server`), `${app}` / `${title}`, the paste
+guard, and terminal-aware copying (Ctrl+Shift+C in terminals). Under Wayland applications cannot ask which window is active, so
+there the app is unknown: rules do not match, and the paste guard and the terminal check do nothing. The Talon files in
+`kolaf/` are written for Windows Terminal; Linux Talon needs the terminal contexts adjusted.
+
 **More prompt variables.** `${app}`, `${title}` (program and window title where you started speaking; the title is bounded and
 defused because it is untrusted text), `${language}` (the dictation language setting), `${date}` (2026-10-03), `${time}`
 (21:48) and `${weekday}`. Unknown values read "(unknown)". `${selection}` was left out on purpose: capturing a selection at
@@ -125,7 +133,7 @@ note|meeting|document|formal|informal|simple".
 
 **Prompt per app.** Post-processing page → "Prompt per app": turn it on and add rules (program name such as `slack.exe`, an
 optional window-title part, and a prompt). When you dictate with post-processing, the first matching rule decides the prompt;
-a rule with a title part wins over a rule for the whole app; no match means the selected prompt. Windows only (it reads the
+a rule with a title part wins over a rule for the whole app; no match means the selected prompt. Windows and Linux with X11 (it reads the
 foreground window). The log shows the decision ("Prompt for this dictation: ... (app rule for slack.exe ...)"), which is also
 the easiest way to find a program's name. A prompt set with `--use-prompt-once` (below) wins over a rule.
 

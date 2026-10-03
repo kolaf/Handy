@@ -1,7 +1,8 @@
 //! What the user is doing right now, used to pick the post-processing prompt:
 //! - the foreground app (Windows): per-app prompt rules, e.g. Slack -> the informal message prompt;
 //! - a one-shot prompt for the next dictation (`handy --use-prompt-once ID`), e.g. "reply to this" from Talon;
-//! and a small state file that tells other tools (Talon) whether Handy is recording.
+//!
+//! It also keeps a small state file that tells other tools (Talon) whether Handy is recording.
 
 use crate::settings::{get_settings, AppPrompt, AppSettings};
 use log::{info, warn};
@@ -109,7 +110,99 @@ pub fn foreground() -> Option<AppContext> {
     }
 }
 
-#[cfg(not(windows))]
+/// The active window under X11 (EWMH `_NET_ACTIVE_WINDOW`): program name from the window's process, title, window id.
+/// Wayland does not let applications ask which window is active, so there it is unknown (like on macOS).
+#[cfg(target_os = "linux")]
+pub fn foreground() -> Option<AppContext> {
+    use x11rb::connection::Connection;
+    use x11rb::protocol::xproto::{AtomEnum, ConnectionExt};
+
+    if std::env::var("XDG_SESSION_TYPE").is_ok_and(|v| v.eq_ignore_ascii_case("wayland")) {
+        return None;
+    }
+    let (conn, screen) = x11rb::connect(None).ok()?;
+    let root = conn.setup().roots.get(screen)?.root;
+    let atom = |name: &str| -> Option<u32> {
+        conn.intern_atom(false, name.as_bytes())
+            .ok()?
+            .reply()
+            .ok()
+            .map(|r| r.atom)
+    };
+
+    let active = conn
+        .get_property(
+            false,
+            root,
+            atom("_NET_ACTIVE_WINDOW")?,
+            AtomEnum::WINDOW,
+            0,
+            1,
+        )
+        .ok()?
+        .reply()
+        .ok()?
+        .value32()?
+        .next()?;
+    if active == 0 {
+        return None;
+    }
+
+    let title = conn
+        .get_property(
+            false,
+            active,
+            atom("_NET_WM_NAME")?,
+            atom("UTF8_STRING")?,
+            0,
+            256,
+        )
+        .ok()
+        .and_then(|c| c.reply().ok())
+        .map(|r| String::from_utf8_lossy(&r.value).to_string())
+        .unwrap_or_default();
+
+    let pid = conn
+        .get_property(
+            false,
+            active,
+            atom("_NET_WM_PID")?,
+            AtomEnum::CARDINAL,
+            0,
+            1,
+        )
+        .ok()
+        .and_then(|c| c.reply().ok())
+        .and_then(|r| r.value32()?.next());
+    let from_process = pid
+        .and_then(|pid| std::fs::read_link(format!("/proc/{pid}/exe")).ok())
+        .and_then(|path| path.file_name().map(|n| n.to_string_lossy().to_string()));
+    // Sandboxed apps hide their process; the window class ("Slack", "firefox") then names the program.
+    let exe = from_process.or_else(|| {
+        let class = conn
+            .get_property(false, active, AtomEnum::WM_CLASS, AtomEnum::STRING, 0, 128)
+            .ok()?
+            .reply()
+            .ok()?;
+        class_from_wm_class(&class.value)
+    })?;
+    Some(AppContext {
+        exe,
+        title,
+        window: active as isize,
+    })
+}
+
+/// `WM_CLASS` holds "instance\0Class\0"; the class (second part) is the better program name.
+#[cfg(target_os = "linux")]
+fn class_from_wm_class(value: &[u8]) -> Option<String> {
+    let mut parts = value.split(|b| *b == 0).filter(|p| !p.is_empty());
+    let instance = parts.next()?;
+    let class = parts.next().unwrap_or(instance);
+    Some(String::from_utf8_lossy(class).to_lowercase())
+}
+
+#[cfg(not(any(windows, target_os = "linux")))]
 pub fn foreground() -> Option<AppContext> {
     None
 }
@@ -141,24 +234,16 @@ pub fn matching_rule<'a>(rules: &'a [AppPrompt], ctx: &AppContext) -> Option<&'a
 }
 
 /// Terminal emulators: a plain Ctrl+C there interrupts the running program, so copying uses Ctrl+Shift+C.
+#[rustfmt::skip]
 const TERMINALS: &[&str] = &[
-    "windowsterminal",
-    "wt",
-    "conhost",
-    "openconsole",
-    "cmd",
-    "powershell",
-    "pwsh",
-    "mintty",
-    "alacritty",
-    "wezterm-gui",
-    "wezterm",
-    "kitty",
-    "putty",
-    "warp",
-    "tabby",
-    "hyper",
-    "terminus",
+    // Windows
+    "windowsterminal", "wt", "conhost", "openconsole", "cmd", "powershell", "pwsh", "mintty", "putty",
+    // cross-platform
+    "alacritty", "wezterm-gui", "wezterm", "kitty", "warp", "tabby", "hyper", "terminus", "ghostty",
+    // Linux (the program name is the process, e.g. gnome-terminal-server)
+    "gnome-terminal-server", "gnome-terminal", "konsole", "xterm", "urxvt", "rxvt", "terminator", "tilix",
+    "xfce4-terminal", "lxterminal", "qterminal", "mate-terminal", "sakura", "guake", "yakuake", "foot",
+    "st", "ptyxis", "blackbox", "kgx", "terminology", "cool-retro-term",
 ];
 
 pub fn is_terminal_exe(exe: &str) -> bool {
@@ -402,8 +487,132 @@ mod tests {
         assert!(!focus_moved(Some(&editor("a", 0)), Some(&editor("b", 5))));
     }
 
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn wm_class_gives_the_class_name() {
+        assert_eq!(
+            class_from_wm_class(b"slack\0Slack\0").as_deref(),
+            Some("slack")
+        );
+        assert_eq!(
+            class_from_wm_class(b"Navigator\0firefox\0").as_deref(),
+            Some("firefox")
+        );
+        assert_eq!(class_from_wm_class(b"solo\0").as_deref(), Some("solo"));
+        assert_eq!(class_from_wm_class(b""), None);
+    }
+
+    /// Needs an X display; skipped without one. Makes a window, marks it as the active one the way a window manager
+    /// does, and checks that `foreground` reads its title, process and id.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn reads_the_active_window_from_x11() {
+        use x11rb::connection::Connection;
+        use x11rb::protocol::xproto::{
+            AtomEnum, ConnectionExt, CreateWindowAux, PropMode, WindowClass,
+        };
+        use x11rb::wrapper::ConnectionExt as _;
+        let Ok((conn, screen_num)) = x11rb::connect(None) else {
+            return;
+        };
+        if std::env::var("XDG_SESSION_TYPE").is_ok_and(|v| v.eq_ignore_ascii_case("wayland")) {
+            return;
+        }
+        let screen = &conn.setup().roots[screen_num];
+        let root = screen.root;
+        let atom = |name: &str| {
+            conn.intern_atom(false, name.as_bytes())
+                .unwrap()
+                .reply()
+                .unwrap()
+                .atom
+        };
+        let (active_atom, name_atom, utf8, pid_atom) = (
+            atom("_NET_ACTIVE_WINDOW"),
+            atom("_NET_WM_NAME"),
+            atom("UTF8_STRING"),
+            atom("_NET_WM_PID"),
+        );
+        let previous = conn
+            .get_property(false, root, active_atom, AtomEnum::WINDOW, 0, 1)
+            .unwrap()
+            .reply()
+            .unwrap()
+            .value32()
+            .and_then(|mut v| v.next())
+            .unwrap_or(0);
+
+        let window = conn.generate_id().unwrap();
+        conn.create_window(
+            0,
+            window,
+            root,
+            0,
+            0,
+            10,
+            10,
+            0,
+            WindowClass::INPUT_OUTPUT,
+            0,
+            &CreateWindowAux::new(),
+        )
+        .unwrap();
+        conn.change_property8(
+            PropMode::REPLACE,
+            window,
+            name_atom,
+            utf8,
+            "Inbox - Slack".as_bytes(),
+        )
+        .unwrap();
+        conn.change_property32(
+            PropMode::REPLACE,
+            window,
+            pid_atom,
+            AtomEnum::CARDINAL,
+            &[std::process::id()],
+        )
+        .unwrap();
+        conn.change_property32(
+            PropMode::REPLACE,
+            root,
+            active_atom,
+            AtomEnum::WINDOW,
+            &[window],
+        )
+        .unwrap();
+        conn.flush().unwrap();
+
+        let seen = foreground();
+
+        conn.change_property32(
+            PropMode::REPLACE,
+            root,
+            active_atom,
+            AtomEnum::WINDOW,
+            &[previous],
+        )
+        .unwrap();
+        conn.destroy_window(window).unwrap();
+        conn.flush().unwrap();
+
+        let seen = seen.expect("the active window should be found");
+        assert_eq!(seen.title, "Inbox - Slack");
+        assert_eq!(seen.window, window as isize);
+        let own = std::env::current_exe()
+            .unwrap()
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .to_string();
+        assert_eq!(seen.exe, own);
+    }
+
     #[test]
     fn terminals_are_recognised() {
+        assert!(is_terminal_exe("gnome-terminal-server"));
+        assert!(is_terminal_exe("konsole"));
+        assert!(!is_terminal_exe("firefox"));
         assert!(is_terminal_exe("WindowsTerminal.exe"));
         assert!(is_terminal_exe("pwsh.exe"));
         assert!(!is_terminal_exe("code.exe"));

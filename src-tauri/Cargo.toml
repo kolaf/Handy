@@ -161,6 +161,8 @@ objc2-app-kit = "0.3"
 objc2-service-management = "0.3.2"
 
 [target.'cfg(target_os = "linux")'.dependencies]
+# Active window (program, title, window id) under X11, for per-app prompts and the paste guard; see context.rs.
+x11rb = "0.13"
 gtk-layer-shell = { version = "0.8", features = ["v0_6"] }
 gtk = "0.18"
 libc = "0.2"

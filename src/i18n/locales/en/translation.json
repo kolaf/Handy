@@ -450,7 +450,7 @@
       },
       "pasteFocusGuard": {
         "label": "Keep dictation out of the wrong window",
-        "description": "Windows only. If you switch to another window or app while a dictation is being prepared, it is not pasted there: it is put on the clipboard and a notice says so (also in History and Activity). The window you were in when you started speaking is what counts."
+        "description": "Windows, and Linux with X11 (not Wayland). If you switch to another window or app while a dictation is being prepared, it is not pasted there: it is put on the clipboard and a notice says so (also in History and Activity). The window you were in when you started speaking is what counts."
       }
     },
     "postProcessing": {
@@ -517,7 +517,7 @@
       "appPrompts": {
         "title": "Prompt per app",
         "enabledLabel": "Choose the prompt by app",
-        "enabledDescription": "When you dictate with post-processing, use the prompt of the first matching rule below instead of the selected prompt (Windows only). The program name of the app you dictated into is written to the Handy log (line 'Prompt for this dictation'), e.g. slack.exe.",
+        "enabledDescription": "When you dictate with post-processing, use the prompt of the first matching rule below instead of the selected prompt (Windows, and Linux with X11; not Wayland). The program name of the app you dictated into is written to the Handy log (line 'Prompt for this dictation'), e.g. slack.exe on Windows or slack on Linux.",
         "appPlaceholder": "Program, e.g. slack.exe",
         "titlePlaceholder": "Window title contains (optional)",
         "promptPlaceholder": "Prompt",
