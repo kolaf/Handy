@@ -5,6 +5,7 @@ import {
   Cog,
   FlaskConical,
   History,
+  ScrollText,
   Info,
   Sparkles,
   Cpu,
@@ -16,6 +17,7 @@ import {
   GeneralSettings,
   AdvancedSettings,
   HistorySettings,
+  ActivitySettings,
   DebugSettings,
   AboutSettings,
   GuideSettings,
@@ -51,6 +53,12 @@ export const SECTIONS_CONFIG = {
     labelKey: "sidebar.history",
     icon: History,
     component: HistorySettings,
+    enabled: () => true,
+  },
+  activity: {
+    labelKey: "sidebar.activity",
+    icon: ScrollText,
+    component: ActivitySettings,
     enabled: () => true,
   },
   models: {

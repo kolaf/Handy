@@ -24,8 +24,12 @@ This build (`0.9.7-hotkeys.1`) adds features on top of Handy. The full reference
 - **Learn from correction** (`Ctrl+Alt+K`): fix a dictation by hand, select the fixed text and press the shortcut. Handy compares it with what was heard and learns new words and recurring mishearings.
 - **Learned Corrections** (Advanced): the list of mishearings it learned. A rule is either _Always_ (replaced automatically; only for heard text that is not a real word, like "Superwisper") or _Hint_ (only shown to the model, which applies it when the sentence fits; used for real words like "carry" for "Kari"). Click the button to switch a rule, or remove it.
 - **Snippets** (Advanced): store text such as a signature or link, then say "insert my signature". The text is inserted locally; only the snippet _names_ reach the language model.
-- **Learn a project's words**: `handy --learn-repo FOLDER` (Talon: "learn this repo" in the terminal) scans a folder and adds its names and terms to Custom Words; `handy --import-words FILE` adds the words in a text file.
+- **Learn a project's words**: `handy --learn-repo FOLDER` (Talon: "learn this repo" in the terminal) scans a folder and asks the model for the names (people, places, products, codes) and the domain vocabulary of the project, and adds them to Custom Words; `handy --import-words FILE` adds the words in a text file.
 - **Sync between computers**: `handy --sync-lists FILE` merges Custom Words, Snippets and Learned Corrections with a JSON file you keep in git. It only adds entries, so deletions are not carried over.
+
+## The Activity page
+
+Next to History. Every on-screen notice (learned, nothing learned, lists synced, reformat problems ...) is kept here with the details behind it: which dictation was compared, what the model said, what was added and what was left out and why. Click an entry to see it. Only your most recent dictation is compared when you learn from a correction.
 
 ## Writing prompts
 

@@ -344,6 +344,12 @@ async changeAppPromptsEnabledSetting(enabled: boolean) : Promise<Result<null, st
     else return { status: "error", error: e  as any };
 }
 },
+async getActivity() : Promise<ActivityEntry[]> {
+    return await TAURI_INVOKE("get_activity");
+},
+async clearActivity() : Promise<null> {
+    return await TAURI_INVOKE("clear_activity");
+},
 async updateSnippets(snippets: Snippet[]) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("update_snippets", { snippets }) };
@@ -1084,6 +1090,7 @@ export type KeyboardDiagnosticReport = { secure_input_enabled: boolean; culprit_
 key_down: number; key_up: number; flags_changed: number; mouse: number; duration_ms: number }
 export type KeyboardImplementation = "tauri" | "handy_keys"
 export type LLMPrompt = { id: string; name: string; prompt: string; examples: string }
+export type ActivityEntry = { timestamp: number; kind: string; title: string; details: string }
 export type AppPrompt = { app: string; title?: string; prompt_id: string }
 export type Correction = { wrong: string; right: string; hint?: boolean }
 export type Snippet = { name: string; text: string }

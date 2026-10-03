@@ -165,35 +165,62 @@ pub fn validate(
     known_vocab: &[String],
     known: &[Correction],
 ) -> Learned {
+    validate_noted(p, raw, corrected, known_vocab, known, &mut Vec::new())
+}
+
+/// `validate`, and `notes` gets one line for every proposed item that was dropped, with the reason.
+pub fn validate_noted(
+    p: &Proposal,
+    raw: &str,
+    corrected: &str,
+    known_vocab: &[String],
+    known: &[Correction],
+    notes: &mut Vec<String>,
+) -> Learned {
     let mut out = Learned::default();
     for word in &p.vocabulary {
         let w = word.trim();
-        if out.vocabulary.len() >= MAX_ITEMS
-            || !is_clean_term(w)
-            || w.split_whitespace().count() > MAX_PHRASE_WORDS
-        {
+        if out.vocabulary.len() >= MAX_ITEMS {
+            notes.push(format!("word '{w}': more than {MAX_ITEMS} words proposed"));
+            continue;
+        }
+        if !is_clean_term(w) || w.split_whitespace().count() > MAX_PHRASE_WORDS {
+            notes.push(format!(
+                "word '{w}': not a clean term (empty, too long, or contains brackets)"
+            ));
             continue;
         }
         let lower = w.to_lowercase();
         let single_stop = w.split_whitespace().count() == 1 && STOPWORDS.contains(&lower.as_str());
         let dup = known_vocab.iter().any(|k| k.eq_ignore_ascii_case(w))
             || out.vocabulary.iter().any(|k| k.eq_ignore_ascii_case(w));
-        if !single_stop && !dup && contains_word_ci(corrected, w) {
+        if single_stop {
+            notes.push(format!("word '{w}': a common word"));
+        } else if dup {
+            notes.push(format!("word '{w}': already in your custom words"));
+        } else if !contains_word_ci(corrected, w) {
+            notes.push(format!("word '{w}': does not occur in the corrected text"));
+        } else {
             out.vocabulary.push(w.to_string());
         }
     }
     for c in &p.corrections {
         let (wrong, right) = (c.wrong.trim(), c.right.trim());
-        if out.corrections.len() >= MAX_ITEMS
-            || !is_clean_term(wrong)
-            || !is_clean_term(right)
-            || wrong == right
-        {
+        let label = format!("correction '{wrong}' -> '{right}'");
+        if out.corrections.len() >= MAX_ITEMS {
+            notes.push(format!(
+                "{label}: more than {MAX_ITEMS} corrections proposed"
+            ));
+            continue;
+        }
+        if !is_clean_term(wrong) || !is_clean_term(right) || wrong == right {
+            notes.push(format!("{label}: not a clean term, or no change"));
             continue;
         }
         if wrong.split_whitespace().count() > MAX_PHRASE_WORDS
             || right.split_whitespace().count() > MAX_PHRASE_WORDS
         {
+            notes.push(format!("{label}: longer than {MAX_PHRASE_WORDS} words"));
             continue;
         }
         // Unless the model vouches that "wrong" is not a real word, the rule is only a hint to the formatter,
@@ -206,11 +233,21 @@ pub fn validate(
             .iter()
             .chain(out.corrections.iter())
             .any(|k| k.wrong.eq_ignore_ascii_case(wrong));
-        if !single_stop
-            && !dup
-            && contains_word_ci(raw, wrong)
-            && contains_word_ci(corrected, right)
-        {
+        if single_stop {
+            notes.push(format!(
+                "{label}: a common word cannot be replaced automatically"
+            ));
+        } else if dup {
+            notes.push(format!("{label}: already known"));
+        } else if !contains_word_ci(raw, wrong) {
+            notes.push(format!(
+                "{label}: the heard text does not contain '{wrong}'"
+            ));
+        } else if !contains_word_ci(corrected, right) {
+            notes.push(format!(
+                "{label}: the corrected text does not contain '{right}'"
+            ));
+        } else {
             out.corrections.push(Correction {
                 wrong: wrong.to_string(),
                 right: right.to_string(),
@@ -653,16 +690,38 @@ pub(crate) async fn ask_text(
 
 /// Shows a short result in the overlay once the "processing" overlay has finished fading.
 pub(crate) fn announce(app: &AppHandle, kind: &'static str, value: String) {
+    announce_with(app, kind, value, String::new());
+}
+
+/// Like `announce`, and the activity log gets `details` (what was compared, what the model said, what was dropped).
+pub(crate) fn announce_with(app: &AppHandle, kind: &'static str, value: String, details: String) {
+    crate::activity::log(app, kind, &value, &details);
     let handle = app.clone();
     std::thread::spawn(move || {
         std::thread::sleep(Duration::from_millis(700));
-        crate::overlay::show_notice_overlay(&handle, kind, &value);
+        crate::overlay::show_notice_overlay_unlogged(&handle, kind, &value);
     });
 }
 
+/// The start of a text for the activity log.
+fn excerpt(text: &str, max: usize) -> String {
+    let flat = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if flat.chars().count() <= max {
+        flat
+    } else {
+        format!("{}…", flat.chars().take(max).collect::<String>())
+    }
+}
+
 async fn learn_from(app: &AppHandle, captured: Option<(String, bool)>) {
-    let Some((selected, _from_selection)) = captured else {
-        announce(app, "learned-none", String::new());
+    let Some((selected, from_selection)) = captured else {
+        announce_with(
+            app,
+            "learned-none",
+            String::new(),
+            "Nothing was selected, and no text could be copied. Select the corrected text first."
+                .into(),
+        );
         return;
     };
     let history = app.state::<Arc<HistoryManager>>();
@@ -670,7 +729,12 @@ async fn learn_from(app: &AppHandle, captured: Option<(String, bool)>) {
         Ok(Some(entry)) => entry,
         _ => {
             warn!("Learn: there is no dictation in the history yet");
-            announce(app, "learned-none", String::new());
+            announce_with(
+                app,
+                "learned-none",
+                String::new(),
+                "There is no dictation in the history yet.".into(),
+            );
             return;
         }
     };
@@ -681,8 +745,18 @@ async fn learn_from(app: &AppHandle, captured: Option<(String, bool)>) {
         .unwrap_or_else(|| raw.clone());
     let bounded: String = selected.chars().take(MAX_CORRECTED_CHARS).collect();
     let corrected = best_window(&bounded, &pasted);
+    let mut details = vec![
+        "Compared with your most recent dictation:".to_string(),
+        format!("  Heard:     {}", excerpt(&raw, 300)),
+        format!("  Pasted:    {}", excerpt(&pasted, 300)),
+        format!("  Corrected: {}", excerpt(&corrected, 300)),
+    ];
+    if !from_selection {
+        details.push("(No selection could be copied, so the clipboard text was used.)".into());
+    }
     if corrected.trim() == pasted.trim() || corrected.trim() == raw.trim() {
-        announce(app, "learned-none", String::new());
+        details.push("The selected text is the same as the last dictation, so there was nothing to learn from. If you corrected an older dictation, dictate again or correct the latest one: only the most recent dictation is compared.".into());
+        announce_with(app, "learned-none", String::new(), details.join("\n"));
         return;
     }
 
@@ -697,31 +771,58 @@ async fn learn_from(app: &AppHandle, captured: Option<(String, bool)>) {
     );
     let proposal = ask_model(&settings, prompt).await;
     let used_model = proposal.is_some();
+    let mut notes: Vec<String> = Vec::new();
     let learned = match &proposal {
-        Some(p) => validate(
-            p,
-            &raw,
-            &corrected,
-            &settings.custom_words,
-            &settings.corrections,
-        ),
-        None => Learned {
-            vocabulary: local_candidates(&raw, &pasted, &corrected)
-                .into_iter()
-                .filter(|w| {
-                    !settings
-                        .custom_words
-                        .iter()
-                        .any(|k| k.eq_ignore_ascii_case(w))
-                })
-                .collect(),
-            corrections: Vec::new(),
-        },
+        Some(p) => {
+            details.push(format!(
+                "Model: {}",
+                if p.summary.trim().is_empty() {
+                    "(no comment)"
+                } else {
+                    p.summary.trim()
+                }
+            ));
+            details.push(format!(
+                "Proposed {} word(s) and {} correction(s).",
+                p.vocabulary.len(),
+                p.corrections.len()
+            ));
+            validate_noted(
+                p,
+                &raw,
+                &corrected,
+                &settings.custom_words,
+                &settings.corrections,
+                &mut notes,
+            )
+        }
+        None => {
+            details.push("The model could not be reached (or post-processing is not set up), so only a simple local word check was used.".into());
+            Learned {
+                vocabulary: local_candidates(&raw, &pasted, &corrected)
+                    .into_iter()
+                    .filter(|w| {
+                        !settings
+                            .custom_words
+                            .iter()
+                            .any(|k| k.eq_ignore_ascii_case(w))
+                    })
+                    .collect(),
+                corrections: Vec::new(),
+            }
+        }
     };
+    if !notes.is_empty() {
+        details.push("Not used:".into());
+        details.extend(notes.iter().map(|n| format!("  - {n}")));
+    }
     crate::utils::hide_recording_overlay(app);
 
     if learned.is_empty() {
-        announce(app, "learned-none", String::new());
+        if used_model && notes.is_empty() {
+            details.push("Edits that only reword, restyle or change facts are not recognition mistakes, so they are not learned.".into());
+        }
+        announce_with(app, "learned-none", String::new(), details.join("\n"));
         return;
     }
     let mut settings = get_settings(app);
@@ -758,7 +859,21 @@ async fn learn_from(app: &AppHandle, captured: Option<(String, bool)>) {
         },
         learned.describe()
     );
-    announce(app, "learned", learned.describe());
+    if !learned.vocabulary.is_empty() {
+        details.push(format!(
+            "Added to custom words: {}",
+            learned.vocabulary.join(", ")
+        ));
+    }
+    for c in &learned.corrections {
+        details.push(format!(
+            "Added correction ({}): {} -> {}",
+            if c.hint { "hint" } else { "always" },
+            c.wrong,
+            c.right
+        ));
+    }
+    announce_with(app, "learned", learned.describe(), details.join("\n"));
 }
 
 /// "Learn from correction": select the text you fixed, then press the shortcut (or run `handy --learn`).

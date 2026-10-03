@@ -17,7 +17,8 @@
     "history": "History",
     "debug": "Debug",
     "guide": "Guide",
-    "about": "About"
+    "about": "About",
+    "activity": "Activity"
   },
   "onboarding": {
     "subtitle": "To get started, choose a transcription model",
@@ -702,6 +703,26 @@
           "description": "High-performance tensor library for on-device machine learning inference",
           "details": "Handy's local speech-to-text is built on transcribe.cpp and ggml. Thanks to the amazing work by Georgi Gerganov and contributors."
         }
+      }
+    },
+    "activity": {
+      "title": "Activity",
+      "description": "A log of the short notices Handy shows on screen, with what is behind them: what was compared, what the model said, what was added and what was left out and why. Click an entry for details.",
+      "loading": "Loading activity...",
+      "empty": "Nothing yet. Notices from learning, syncing and reformatting will appear here.",
+      "clear": "Clear",
+      "showDetails": "Show details",
+      "kinds": {
+        "learned": "Learned",
+        "learned-none": "Nothing learned",
+        "vocab": "Added to vocabulary",
+        "synced": "Lists synced",
+        "synced-failed": "Lists sync failed",
+        "reformat-none": "Reformat: nothing selected",
+        "reformat-setup": "Reformat: not possible",
+        "reformat-failed": "Reformat failed",
+        "transform-moved": "Transform: last dictation not at the cursor",
+        "fallback": "Offline: basic cleanup only"
       }
     }
   },

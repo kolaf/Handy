@@ -238,11 +238,19 @@ pub fn run(app: &AppHandle, path: &str, cwd: &str) {
                 report.skipped,
                 report.conflicts
             );
-            crate::overlay::show_notice_overlay(app, "synced", &report.describe());
+            let details = format!(
+                "File: {}\nSkipped invalid entries: {}\nConflicts (this machine's version was kept): {}",
+                p.display(),
+                report.skipped,
+                if report.conflicts.is_empty() { "none".to_string() } else { report.conflicts.join(", ") }
+            );
+            crate::activity::log(app, "synced", &report.describe(), &details);
+            crate::overlay::show_notice_overlay_unlogged(app, "synced", &report.describe());
         }
         Err(e) => {
             warn!("Lists sync failed: {e}");
-            crate::overlay::show_notice_overlay(app, "synced-failed", "");
+            crate::activity::log(app, "synced-failed", "", &e);
+            crate::overlay::show_notice_overlay_unlogged(app, "synced-failed", "");
         }
     }
 }

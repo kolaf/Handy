@@ -718,6 +718,15 @@ static NOTICE_SEQ: AtomicU64 = AtomicU64::new(0);
 /// the overlay is in use for recording or transcribing, and a newer notice replaces
 /// an older one that is still showing.
 pub fn show_notice_overlay(app_handle: &AppHandle, kind: &str, value: &str) {
+    // Language and prompt switches are frequent and say everything themselves; everything else is kept in the activity log.
+    if !matches!(kind, "language" | "prompt") {
+        crate::activity::log(app_handle, kind, value, "");
+    }
+    show_notice_overlay_unlogged(app_handle, kind, value);
+}
+
+/// Shows the toast without adding it to the activity log (for callers that logged it with more detail).
+pub fn show_notice_overlay_unlogged(app_handle: &AppHandle, kind: &str, value: &str) {
     if settings::get_settings(app_handle).overlay_style == OverlayStyle::None {
         return;
     }

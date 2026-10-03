@@ -90,6 +90,14 @@ in Advanced → Learned Corrections. Prompts
 get the rules through the `${corrections}` variable (the built-in prompts already have it: "X is Y" for always rules, "X may be Y
 (only if it fits the sentence)" for hints). Hints need post-processing to be on and reachable; without it nothing happens.
 
+**Activity log.** Every on-screen notice except language and prompt switches ("Learned: ...", "Nothing new to learn", "Lists
+synced", reformat and transform problems, "Offline: basic cleanup only") is also written to `activity.jsonl` in Handy's data
+folder (the last 500 entries) and shown on the **Activity** page next to History. An entry has the full notice text and, for
+learning, the details: which dictation was compared (heard / pasted / corrected), what the model said about it, what it
+proposed, what was added and every item that was left out with the reason ("does not occur in the corrected text", "already in
+your custom words", "a common word" ...). For `--learn-repo` it lists the folder, how many files and terms were read, the
+terms the model chose and which of them were new.
+
 **Prompt per app.** Post-processing page → "Prompt per app": turn it on and add rules (program name such as `slack.exe`, an
 optional window-title part, and a prompt). When you dictate with post-processing, the first matching rule decides the prompt;
 a rule with a title part wins over a rule for the whole app; no match means the selected prompt. Windows only (it reads the
@@ -114,8 +122,10 @@ time; refreshed every 3 s while recording). Talon uses it to switch its speech o
 dictation is not taken for voice commands (Talon setting `user.kolaf_mute_during_handy`).
 
 **Learn a repo.** `handy --learn-repo FOLDER` scans the folder (skipping `.git`, `node_modules`, `target` ... and capped at 4000
-files / 4 MB), takes the 250 best-scoring terms from file names and sources, asks the post-processing model which of them a
-speech recognizer would likely misspell (project and product names, people, unusual technical terms), keeps only answers that
+files / 4 MB), takes the 400 best-scoring terms from file names and sources, asks the post-processing model to choose (a) names a speech
+recognizer would likely get wrong (people, places, airport and product names, codes, tool names with unusual spelling) and (b) the
+project's own domain vocabulary, including everyday words that are central to it (an air sports app: scorecard, contestant,
+waypoint, gate), but not generic programming or interface words; keeps only answers that
 were really candidates, and adds the new ones to the custom words. `handy --import-words FILE` adds the words of a text file
 (one per line) with no model involved.
 

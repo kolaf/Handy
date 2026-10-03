@@ -1,4 +1,5 @@
 mod actions;
+mod activity;
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
 mod apple_intelligence;
 mod audio_feedback;
@@ -696,6 +697,8 @@ pub fn run(cli_args: CliArgs) {
             shortcut::update_custom_words,
             extras::update_snippets,
             learn::update_corrections,
+            activity::get_activity,
+            activity::clear_activity,
             context::update_app_prompts,
             context::change_app_prompts_enabled_setting,
             picker::picker_select,

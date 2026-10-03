@@ -4,6 +4,7 @@ export { AdvancedSettings } from "./advanced/AdvancedSettings";
 export { DebugSettings } from "./debug/DebugSettings";
 export type { OnboardingPreviewStep } from "./debug/OnboardingPreview";
 export { HistorySettings } from "./history/HistorySettings";
+export { ActivitySettings } from "./activity/ActivitySettings";
 export { AboutSettings } from "./about/AboutSettings";
 export { GuideSettings } from "./guide/GuideSettings";
 export { PostProcessingSettings } from "./post-processing/PostProcessingSettings";

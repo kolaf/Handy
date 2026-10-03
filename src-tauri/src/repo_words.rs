@@ -18,8 +18,8 @@ const MAX_FILES: usize = 4000;
 const MAX_DEPTH: usize = 8;
 const MAX_FILE_BYTES: usize = 64 * 1024;
 const MAX_TOTAL_BYTES: usize = 4 * 1024 * 1024;
-const MAX_CANDIDATES: usize = 250;
-const MAX_NEW_WORDS: usize = 40;
+const MAX_CANDIDATES: usize = 400;
+const MAX_NEW_WORDS: usize = 60;
 const SKIP_DIRS: &[&str] = &[
     ".git",
     "node_modules",
@@ -64,6 +64,9 @@ static TOKEN: Lazy<Regex> = Lazy::new(|| Regex::new(r"[A-Za-z][A-Za-z0-9]{3,40}"
 pub struct Candidates {
     /// Spelling -> number of files that contain it (plus a bonus when it occurs in a file or folder name).
     pub scores: HashMap<String, usize>,
+    /// How many files were read and how many bytes of them.
+    pub files: usize,
+    pub bytes: usize,
 }
 
 impl Candidates {
@@ -153,6 +156,8 @@ pub fn collect(root: &Path) -> Candidates {
             }
         }
     }
+    candidates.files = files;
+    candidates.bytes = bytes;
     candidates
 }
 
@@ -228,9 +233,10 @@ fn resolve(path: &str, cwd: &str) -> PathBuf {
     }
 }
 
-fn store_words(app: &AppHandle, words: &[String], label: &str) {
+fn store_words(app: &AppHandle, words: &[String], label: &str, mut details: Vec<String>) {
     let mut settings = get_settings(app);
     let added = merge_words(&mut settings.custom_words, words);
+    let already: Vec<&String> = words.iter().filter(|w| !added.contains(w)).collect();
     if !added.is_empty() {
         write_settings(app, settings);
         let _ = app.emit(
@@ -239,10 +245,31 @@ fn store_words(app: &AppHandle, words: &[String], label: &str) {
         );
     }
     info!("{label}: added {} words: {:?}", added.len(), added);
+    details.push(format!(
+        "Added to custom words ({}): {}",
+        added.len(),
+        added.join(", ")
+    ));
+    if !already.is_empty() {
+        details.push(format!(
+            "Already known or not valid ({}): {}",
+            already.len(),
+            already
+                .iter()
+                .map(|w| w.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+    }
     if added.is_empty() {
-        crate::learn::announce(app, "learned-none", String::new());
+        crate::learn::announce_with(app, "learned-none", String::new(), details.join("\n"));
     } else {
-        crate::learn::announce(app, "learned", format!("{} words ({})", added.len(), label));
+        crate::learn::announce_with(
+            app,
+            "learned",
+            format!("{} words ({}): {}", added.len(), label, added.join(", ")),
+            details.join("\n"),
+        );
     }
 }
 
@@ -253,12 +280,30 @@ pub fn run(app: &AppHandle, path: &str, cwd: &str) {
     std::thread::spawn(move || {
         if !root.is_dir() {
             warn!("Learn repo: '{}' is not a folder", root.display());
-            crate::learn::announce(&app, "learned-none", String::new());
+            crate::learn::announce_with(
+                &app,
+                "learned-none",
+                String::new(),
+                format!("'{}' is not a folder.", root.display()),
+            );
             return;
         }
-        let candidates = collect(&root).top(MAX_CANDIDATES, 2);
+        let found = collect(&root);
+        let candidates = found.top(MAX_CANDIDATES, 2);
+        let mut details = vec![
+            format!("Folder: {}", root.display()),
+            format!(
+                "Read {} files ({} KB); {} distinct terms, {} used in at least two places; the best {} were shown to the model.",
+                found.files,
+                found.bytes / 1024,
+                found.scores.len(),
+                found.scores.values().filter(|s| **s >= 2).count(),
+                candidates.len()
+            ),
+        ];
         if candidates.is_empty() {
-            crate::learn::announce(&app, "learned-none", String::new());
+            details.push("Nothing to choose from: the folder has no readable text files.".into());
+            crate::learn::announce_with(&app, "learned-none", String::new(), details.join("\n"));
             return;
         }
         let project = root.file_name().map_or_else(
@@ -268,10 +313,22 @@ pub fn run(app: &AppHandle, path: &str, cwd: &str) {
         let settings = get_settings(&app);
         let prompt = build_prompt(&project, &candidates);
         let answer = tauri::async_runtime::block_on(crate::learn::ask_text(&settings, prompt));
-        let words = answer
-            .map(|a| parse_answer(&a, &candidates))
-            .unwrap_or_default();
-        store_words(&app, &words, &project);
+        let words = match &answer {
+            Some(a) => parse_answer(a, &candidates),
+            None => {
+                details.push("The model could not be reached (or post-processing is not set up), so nothing was chosen.".into());
+                Vec::new()
+            }
+        };
+        if answer.is_some() {
+            details.push(format!(
+                "The model chose {} term(s): {}",
+                words.len(),
+                words.join(", ")
+            ));
+            details.push("It was asked for names (people, places, products, codes) and for the project's own domain vocabulary, not for generic programming or interface words.".into());
+        }
+        store_words(&app, &words, &project, details);
     });
 }
 
@@ -287,11 +344,21 @@ pub fn run_import(app: &AppHandle, path: &str, cwd: &str) {
             .collect(),
         Err(err) => {
             warn!("Import words: cannot read {}: {}", file.display(), err);
-            crate::learn::announce(app, "learned-none", String::new());
+            crate::learn::announce_with(
+                app,
+                "learned-none",
+                String::new(),
+                format!("Cannot read {}: {}", file.display(), err),
+            );
             return;
         }
     };
-    store_words(app, &words, "word list");
+    store_words(
+        app,
+        &words,
+        "word list",
+        vec![format!("File: {}", file.display())],
+    );
 }
 
 #[cfg(test)]
