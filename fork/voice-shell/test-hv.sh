@@ -13,21 +13,41 @@ check(){ if eval "$2"; then ok "$1"; else bad "$1"; fi; }
 cat > "$T/hermes-stub" <<'STUB'
 #!/usr/bin/env bash
 printf '%s\n' "$@" > "$HV_STUB_ARGS"
+printf '%s' "${HERMES_HOME:-}" > "$HV_STUB_HOME"
 while [[ $# -gt 0 ]]; do [[ "$1" == "-q" ]] && printf '%s' "$2" > "$HV_STUB_PROMPT"; shift; done
 echo "stub answer"
 echo "session_id: ${HV_STUB_SID:-STUB1}" >&2
 exit "${HV_STUB_RC:-0}"
 STUB
 chmod +x "$T/hermes-stub"
-export HV_STUB_ARGS="$T/args" HV_STUB_PROMPT="$T/prompt"
+export HV_STUB_ARGS="$T/args" HV_STUB_PROMPT="$T/prompt" HV_STUB_HOME="$T/home"
+mkdir -p "$T/real"; printf 'agent:\n  reasoning_effort: medium\n' > "$T/real/config.yaml"; echo key > "$T/real/auth.json"
+export HERMES_HOME="$T/real"
 HV="$HERE/hv"
+
+echo "fast voice home"
+out="$("$HV" "list the files" 2>&1)"
+check "runs in the private voice home"      '[[ "$(cat "$T/home")" == "$T/config/hermes-home" ]]'
+check "reasoning effort lowered in the copy" 'grep -q "reasoning_effort: low" "$T/config/hermes-home/config.yaml"'
+check "approval timeout shortened"          'grep -q "timeout: 5" "$T/config/hermes-home/config.yaml"'
+check "the real config is untouched"        'grep -q "reasoning_effort: medium" "$T/real/config.yaml"'
+check "sign-in is shared by symlink"        '[[ -L "$T/config/hermes-home/auth.json" ]]'
+printf 'agent:\n  reasoning_effort: high\n' > "$T/real/config.yaml"; touch -d "+1 minute" "$T/real/config.yaml"
+"$HV" "list the files" >/dev/null 2>&1
+check "copy refreshed when the real config changes" 'grep -q "reasoning_effort: low" "$T/config/hermes-home/config.yaml" && ! grep -q "high" "$T/config/hermes-home/config.yaml"'
+HV_FAST=0 "$HV" "list the files" >/dev/null 2>&1
+check "HV_FAST=0 uses the normal home"       '[[ "$(cat "$T/home")" == "$T/real" ]]'
+mkdir -p "$T/work"; : > "$T/work/a file.txt"; mkdir "$T/work/sub"
+(cd "$T/work" && "$HV" "what is here" >/dev/null 2>&1)
+check "prompt lists the working directory"  'grep -q "a file.txt" "$T/prompt" && grep -q "    sub/" "$T/prompt"'
+check "read-only requests are answered directly" 'grep -q "no plan" "$T/prompt"'
 
 echo "new request"
 out="$("$HV" "copy this file to the reports folder" 2>&1)"
 check "prints the model answer"            '[[ "$out" == *"stub answer"* ]]'
 check "session id saved"                   '[[ "$(cat "$T/state/last_session")" == "STUB1" ]]'
 check "uses -Q and a fresh session"        'grep -qx -- "-Q" "$T/args" && ! grep -qx -- "--resume" "$T/args"'
-check "narrow toolsets (no clarify: it blocks)" 'grep -qx "terminal,file,memory,skills" "$T/args"'
+check "narrow toolsets (no clarify: it blocks)" 'grep -qx "terminal,file,memory" "$T/args"'
 check "checkpoints on"                     'grep -qx -- "--checkpoints" "$T/args"'
 check "step limit set"                     'grep -A1 -x -- "--max-turns" "$T/args" | grep -qx 12'
 check "source tag voice"                   'grep -A1 -x -- "--source" "$T/args" | grep -qx voice'

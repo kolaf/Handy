@@ -34,9 +34,25 @@ ambiguous, show exact full paths).
 - Talon's recognizer is English-focused. For Norwegian requests, dictate with Handy into the terminal instead and
   press Enter after typing `hv ` first.
 
+## Speed
+
+A request costs about 5-10 s, almost all of it model time (two model calls of ~10k tokens each, and the wait grows with the
+number of tokens the model writes). What `hv` does about it:
+
+- **Private voice home** (`~/.config/hv/hermes-home`): a copy of your Hermes config with `reasoning_effort: low` and a 5 s
+  approval timeout, refreshed whenever your real `config.yaml` changes. A command that needs approval cannot be approved by
+  voice, so waiting the default 60 s only delayed the refusal (this was the cause of 60-90 s runs). Sign-in, memories, skills
+  and the Hindsight setup are shared with the normal home through symlinks; your own config is never changed.
+  `HV_FAST=0` turns it off; `HV_REASONING` and `HV_APPROVAL_TIMEOUT` tune it.
+- **The folder listing is in the context** ("Files here"), so "list the files" needs no tool call (one model call, ~6 s).
+- Toolsets are `terminal,file,memory` (no `skills`: that leaves out the skills index and tools, ~10 % of the prompt).
+- Read-only requests (list, show, find, count) are answered directly; only requests that change something get a plan
+  ending in "Go ahead?".
+- `hermes -z` is not used: it auto-approves every command, which would remove the plan-first safety.
+
 ## Settings (environment variables)
 
-`HV_TOOLSETS` (default `terminal,file,memory,skills`; `clarify` is deliberately off, see below), `HV_MAX_TURNS`
+`HV_TOOLSETS` (default `terminal,file,memory`; `clarify` is deliberately off, see below), `HV_MAX_TURNS`
 (12), `HV_SOURCE` (`voice`, a session tag), `HV_SELECTION_FILE`, `HV_SELECTION_TTL`, `HV_HERMES`, `HV_PREAMBLE`,
 `HV_STATE_DIR`, `HV_CONFIG_DIR`, `HV_EXTRA_ARGS` (extra flags for Hermes, e.g. `--ignore-rules` for tests).
 State: the last session id, and a tab-separated journal of every request, in `~/.local/state/hv/`.

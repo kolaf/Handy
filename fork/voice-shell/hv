@@ -9,7 +9,8 @@
 #
 # Each request adds a small context (working directory, selected paths, recent folders, your places file)
 # and a terminal-safety preamble (preamble.md). Environment overrides: HV_HERMES, HV_TOOLSETS, HV_MAX_TURNS,
-# HV_SOURCE, HV_PREAMBLE, HV_SELECTION_FILE, HV_SELECTION_TTL, HV_STATE_DIR, HV_CONFIG_DIR, HV_EXTRA_ARGS.
+# HV_SOURCE, HV_PREAMBLE, HV_SELECTION_FILE, HV_SELECTION_TTL, HV_STATE_DIR, HV_CONFIG_DIR, HV_EXTRA_ARGS,
+# HV_FAST (0 = use the normal Hermes home instead of the fast voice home), HV_REASONING, HV_APPROVAL_TIMEOUT, HV_LS_LIMIT.
 set -uo pipefail
 
 SELF="$(readlink -f "${BASH_SOURCE[0]}")"
@@ -17,12 +18,16 @@ HERE="$(dirname "$SELF")"
 STATE_DIR="${HV_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/hv}"
 CONFIG_DIR="${HV_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/hv}"
 HERMES="${HV_HERMES:-hermes}"
-TOOLSETS="${HV_TOOLSETS:-terminal,file,memory,skills}"
+TOOLSETS="${HV_TOOLSETS:-terminal,file,memory}"
 MAX_TURNS="${HV_MAX_TURNS:-12}"
 SOURCE_TAG="${HV_SOURCE:-voice}"
 PREAMBLE="${HV_PREAMBLE:-$HERE/preamble.md}"
 SELECTION_TTL="${HV_SELECTION_TTL:-180}"
 PLACES_FILE="$CONFIG_DIR/places.md"
+FAST="${HV_FAST:-1}"
+REASONING="${HV_REASONING:-low}"
+APPROVAL_TIMEOUT="${HV_APPROVAL_TIMEOUT:-5}"
+LS_LIMIT="${HV_LS_LIMIT:-40}"
 
 die() { printf 'hv: %s\n' "$*" >&2; exit 2; }
 usage() { sed -n '2,10p' "$SELF" | sed 's/^# \{0,1\}//'; }
@@ -58,6 +63,31 @@ places() {  # the user's own aliases and habits, comments stripped
   grep -v -E '^\s*(#|$)' "$PLACES_FILE" || true
 }
 
+# A private Hermes home for voice requests: a copy of the normal config with a lower reasoning effort (the model's
+# thinking tokens are most of the wait) and a short approval timeout (a command that needs approval cannot be approved
+# by voice, so waiting the default 60 s only delays the refusal). Sign-in, memories, skills and the Hindsight setup are
+# shared with the normal home through symlinks. The config copy is refreshed whenever the normal one changes.
+voice_home() {
+  local real="${HERMES_HOME:-$HOME/.hermes}" home="$CONFIG_DIR/hermes-home"
+  [[ -f "$real/config.yaml" ]] || return 1
+  mkdir -p "$home"
+  if [[ ! -f "$home/config.yaml" || "$real/config.yaml" -nt "$home/config.yaml" ]]; then
+    python3 - "$real/config.yaml" "$home/config.yaml" "$REASONING" "$APPROVAL_TIMEOUT" <<'PY' || return 1
+import sys, yaml
+src, dst, effort, timeout = sys.argv[1:5]
+cfg = yaml.safe_load(open(src)) or {}
+cfg.setdefault("agent", {})["reasoning_effort"] = effort
+cfg.setdefault("approvals", {})["timeout"] = int(timeout)
+yaml.safe_dump(cfg, open(dst, "w"), allow_unicode=True, sort_keys=False)
+PY
+  fi
+  local name
+  for name in .env auth.json SOUL.md skills memories hindsight; do
+    [[ -e "$real/$name" && ! -e "$home/$name" ]] && ln -s "$real/$name" "$home/$name"
+  done
+  printf '%s' "$home"
+}
+
 ensure_config() {
   mkdir -p "$CONFIG_DIR" "$STATE_DIR"
   [[ -f "$PLACES_FILE" ]] || cat > "$PLACES_FILE" <<'EOT'
@@ -69,10 +99,22 @@ ensure_config() {
 EOT
 }
 
+listing() {  # the working directory, so simple "what is here" requests need no tool call
+  local n=0 total entry
+  total="$(ls -1A -- "$PWD" 2>/dev/null | wc -l)"
+  while IFS= read -r entry; do
+    if [[ -d "$PWD/$entry" ]]; then printf '    %s/\n' "$entry"; else printf '    %s\n' "$entry"; fi
+    n=$((n + 1)); (( n >= LS_LIMIT )) && break
+  done < <(ls -1A -- "$PWD" 2>/dev/null)
+  (( total > LS_LIMIT )) && printf '    ... and %d more\n' $((total - LS_LIMIT))
+  return 0
+}
+
 build_context() {
-  local sel recent pl
-  sel="$(selected_paths)"; recent="$(recent_dirs)"; pl="$(places)"
+  local sel recent pl ls_out
+  sel="$(selected_paths)"; recent="$(recent_dirs)"; pl="$(places)"; ls_out="$(listing)"
   printf 'Context\n- Working directory: %s\n' "$PWD"
+  if [[ -n "$ls_out" ]]; then printf -- '- Files here (a directory is shown with a trailing /):\n%s\n' "$ls_out"; else printf -- '- Files here: (empty or unreadable)\n'; fi
   if [[ -n "$sel" ]]; then printf -- '- Selected paths:\n'; while IFS= read -r l; do printf '    %s\n' "$l"; done <<< "$sel"; else printf -- '- Selected paths: (none)\n'; fi
   if [[ -n "$recent" ]]; then printf -- '- Recent folders:\n'; while IFS= read -r l; do printf '    %s\n' "$l"; done <<< "$recent"; else printf -- '- Recent folders: (unknown)\n'; fi
   if [[ -n "$pl" ]]; then printf -- '- Places and habits:\n'; while IFS= read -r l; do printf '    %s\n' "$l"; done <<< "$pl"; else printf -- '- Places and habits: (none)\n'; fi
@@ -107,8 +149,8 @@ if (( resume )); then
 fi
 
 case "$phase" in
-  plan)     phase_text="PHASE: PLAN. Change nothing yet. Inspect read-only if needed, then give the numbered plan and end with: Go ahead?" ;;
-  followup) phase_text="PHASE: PLAN (follow-up). This corrects the previous request. Change nothing yet; give the updated numbered plan and end with: Go ahead?" ;;
+  plan)     phase_text="PHASE: PLAN. Change nothing yet. If the request only looks something up (list, show, find, count, read), just answer it directly: no plan, no numbering, no \"Go ahead?\". Otherwise inspect read-only if needed, then give the numbered plan and end with: Go ahead?" ;;
+  followup) phase_text="PHASE: PLAN (follow-up). This corrects the previous request. Change nothing yet. If it only looks something up, just answer directly (no plan, no \"Go ahead?\"); otherwise give the updated numbered plan and end with: Go ahead?" ;;
   ask)      phase_text="PHASE: ASK. Read-only. Answer briefly. Change nothing." ;;
   execute)  phase_text="PHASE: EXECUTE." ;;
 esac
@@ -129,7 +171,10 @@ if (( dry )); then
 fi
 
 err="$(mktemp)"; trap 'rm -f "$err"' EXIT
-out="$("$HERMES" "${args[@]}" 2>"$err")"; rc=$?
+home=""
+if [[ "$FAST" != 0 ]]; then home="$(voice_home)" || { printf 'hv: the fast voice home could not be prepared; using the normal Hermes home\n' >&2; home=""; }; fi
+if [[ -n "$home" ]]; then out="$(HERMES_HOME="$home" "$HERMES" "${args[@]}" 2>"$err")"; else out="$("$HERMES" "${args[@]}" 2>"$err")"; fi
+rc=$?
 new_sid="$(sed -n 's/^session_id: *//p' "$err" | tail -1)"
 [[ -n "$new_sid" ]] && printf '%s' "$new_sid" > "$LAST_FILE"
 printf '%s\n' "$out"
