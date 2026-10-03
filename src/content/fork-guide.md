@@ -15,6 +15,7 @@ This build (`0.9.7-hotkeys.1`) adds features on top of Handy. The full reference
 - **Reformat selection** (`Ctrl+Alt+F`): run the selected text through the selected prompt and replace it with the result.
 - **Transform** (`handy --transform ID`, or Talon: "make that formal"): run the selection, or with nothing selected the last dictation, through a one-purpose prompt and replace it. Built in: formal, informal, shorter, fuller, clearer, fix spelling and grammar, translate to Norwegian or English, bullet list, summary (the prompts whose id starts with `t_`; they are not in the picker). For the last dictation Handy first checks that the text before the cursor really is that dictation, and does nothing otherwise.
 - **Re-run with next prompt** (`Ctrl+Alt+R`): redo your last dictation with the next prompt in the list. Select the text you pasted before to replace it.
+- **Edit by instruction**: Talon's "edit this" copies the selected text, then you speak the change you want ("shorter and friendlier, mention Thursday"), stop with your Handy key, and the result replaces the selection (it uses `handy --use-prompt-once edit --toggle-post-process`). The fixed "make that ..." commands are faster for common changes.
 - **Reply with context**: `handy --use-prompt-once reply --toggle-post-process` (Talon: "reply to this") makes the next dictation use the _Reply_ prompt, with the clipboard (the message you are answering) as context; the prompt is then forgotten.
 
 ## Teaching Handy your words

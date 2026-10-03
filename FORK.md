@@ -96,6 +96,8 @@ a rule with a title part wins over a rule for the whole app; no match means the 
 foreground window). The log shows the decision ("Prompt for this dictation: ... (app rule for slack.exe ...)"), which is also
 the easiest way to find a program's name. A prompt set with `--use-prompt-once` (below) wins over a rule.
 
+**Edit by instruction.** Talon's "edit this" copies the selected text and runs `handy --use-prompt-once edit --toggle-post-process`: you then speak the change you want, stop with your Handy key, and the `edit` prompt (selected text from the clipboard, your words as the instruction) pastes the result over the still-selected text.
+
 **One-shot prompt.** `handy --use-prompt-once ID` makes the next dictation that uses post-processing use prompt `ID` and then
 forgets it (it expires after 3 minutes). Talon's "reply to this" copies the selected message, sets `reply` this way and starts
 a dictation, so the reply is written with the message as context.
