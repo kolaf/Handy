@@ -575,5 +575,51 @@
    }
   ],
   "mock": "I talked to Kari about the budget yesterday."
+ },
+ {
+  "id": "hint_keeps_deliberate_word",
+  "prompt": "super",
+  "note": "a hint must not rewrite a word the speaker means (fart vs prompt)",
+  "corrections": [
+   {
+    "wrong": "fart",
+    "right": "prompt",
+    "hint": true
+   },
+   {
+    "wrong": "farts",
+    "right": "prompts",
+    "hint": true
+   }
+  ],
+  "input": "For some reason the transcription model translated this into Norwegian promp, which means fart in English. I was talking about the word prompt.",
+  "checks": [
+   {
+    "icontains": "means fart"
+   }
+  ],
+  "mock": "For some reason, the transcription model translated this into Norwegian \"promp\", which means fart in English. I was talking about the word prompt."
+ },
+ {
+  "id": "hint_applies_when_it_fits",
+  "prompt": "super",
+  "note": "the same hint is used when the sentence needs it",
+  "corrections": [
+   {
+    "wrong": "fart",
+    "right": "prompt",
+    "hint": true
+   }
+  ],
+  "input": "i changed the system fart so the model answers shorter",
+  "checks": [
+   {
+    "icontains": "system prompt"
+   },
+   {
+    "not_icontains": "fart"
+   }
+  ],
+  "mock": "I changed the system prompt so the model answers shorter."
  }
 ]

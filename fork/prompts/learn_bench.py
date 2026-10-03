@@ -44,11 +44,17 @@ def main():
         except Exception:
             print(f"FAIL {c['id']}: not JSON: {out[:120]!r}"); bad += 1; continue
         vocab = [v for v in p.get("vocabulary", []) if has(c["corrected"], v)]
-        corr = [(x["wrong"], x["right"], bool(x.get("hint"))) for x in p.get("corrections", [])
+        corr = [(x["wrong"], x["right"], not x.get("literal")) for x in p.get("corrections", [])
                 if has(c["raw"], x["wrong"]) and has(c["corrected"], x["right"])]
         errs = []
         for v in c["expect_vocab"]:
             if not any(v.lower() == w.lower() for w in vocab): errs.append(f"missing vocab {v}")
+        if c.get("expect_literal"):
+            for w, r in c["expect_corr"]:
+                if not any(w.lower() == a.lower() and not h for a, b, h in corr): errs.append(f"{w}->{r} should be literal")
+        if c.get("expect_hint"):
+            for w, r in c["expect_corr"]:
+                if not any(w.lower() == a.lower() and h for a, b, h in corr): errs.append(f"{w}->{r} must be a hint")
         for w, r in c["expect_corr"]:
             if not any(w.lower() == a.lower() and r.lower() == b.lower() for a, b, _ in corr): errs.append(f"missing correction {w}->{r}")
         if not c["expect_vocab"] and vocab: errs.append(f"unexpected vocab {vocab}")

@@ -107,5 +107,36 @@
     "Ola"
    ]
   ]
+ },
+ {
+  "id": "real_word_is_hint",
+  "raw": "i changed the system fart so the model answers shorter",
+  "pasted": "I changed the system fart so the model answers shorter.",
+  "corrected": "I changed the system prompt so the model answers shorter.",
+  "expect_vocab": [],
+  "expect_corr": [
+   [
+    "fart",
+    "prompt"
+   ]
+  ],
+  "expect_hint": true
+ },
+ {
+  "id": "nonword_is_literal",
+  "raw": "ask Hermia about the Superwisper settings",
+  "pasted": "Ask Hermia about the Superwisper settings.",
+  "corrected": "Ask Hermes about the Superwhisper settings.",
+  "expect_vocab": [
+   "Hermes",
+   "Superwhisper"
+  ],
+  "expect_corr": [
+   [
+    "Superwisper",
+    "Superwhisper"
+   ]
+  ],
+  "expect_literal": true
  }
 ]

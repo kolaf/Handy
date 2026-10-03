@@ -44,8 +44,10 @@ pub struct Proposal {
 pub struct RawCorrection {
     pub wrong: String,
     pub right: String,
+    /// The model's claim that "wrong" is not a real word or phrase in any language, so replacing it blindly is safe.
+    /// Anything else is stored as a hint for the formatter (a real word like "fart" can be meant).
     #[serde(default)]
-    pub hint: bool,
+    pub literal: bool,
 }
 
 /// What survived validation and may be stored.
@@ -194,8 +196,10 @@ pub fn validate(
         {
             continue;
         }
-        // A hint is only a suggestion to the formatter, so it may be an ordinary word; a literal rule may not.
-        let single_stop = !c.hint
+        // Unless the model vouches that "wrong" is not a real word, the rule is only a hint to the formatter,
+        // which may be an ordinary word; a literal rule may not.
+        let hint = !c.literal;
+        let single_stop = !hint
             && wrong.split_whitespace().count() == 1
             && STOPWORDS.contains(&wrong.to_lowercase().as_str());
         let dup = known
@@ -210,7 +214,7 @@ pub fn validate(
             out.corrections.push(Correction {
                 wrong: wrong.to_string(),
                 right: right.to_string(),
-                hint: c.hint,
+                hint,
             });
         }
     }
@@ -334,8 +338,9 @@ mod tests {
 
     #[test]
     fn validation_keeps_real_corrections() {
-        let p =
-            proposal(r#"{"vocabulary":["DYST"],"corrections":[{"wrong":"dist","right":"DYST"}]}"#);
+        let p = proposal(
+            r#"{"vocabulary":["DYST"],"corrections":[{"wrong":"dist","right":"DYST","literal":true}]}"#,
+        );
         let l = validate(
             &p,
             "we use a system called dist for tracking",
@@ -357,12 +362,34 @@ mod tests {
     }
 
     #[test]
+    fn only_a_literal_claim_makes_an_automatic_rule() {
+        let p = proposal(
+            r#"{"corrections":[{"wrong":"fart","right":"prompt"},{"wrong":"Superwisper","right":"Superwhisper","literal":true}]}"#,
+        );
+        let l = validate(
+            &p,
+            "a fart and Superwisper",
+            "a prompt and Superwhisper",
+            &[],
+            &[],
+        );
+        assert!(
+            l.corrections[0].hint,
+            "a real word is only a hint by default"
+        );
+        assert!(
+            !l.corrections[1].hint,
+            "a vouched non-word is applied automatically"
+        );
+    }
+
+    #[test]
     fn hint_rules_may_be_ordinary_words_and_are_not_applied_literally() {
         let p = proposal(
-            r#"{"corrections":[{"wrong":"det","right":"de","hint":true},{"wrong":"det","right":"de"}]}"#,
+            r#"{"corrections":[{"wrong":"det","right":"de"},{"wrong":"det","right":"de","literal":true}]}"#,
         );
         let l = validate(&p, "ta det med", "ta de med", &[], &[]);
-        // the literal stop-word rule is refused, the hint (listed first) is kept
+        // the hint (listed first, no "literal") is kept; the literal stop-word rule is a duplicate and refused
         assert_eq!(l.corrections.len(), 1);
         assert!(l.corrections[0].hint);
         let rules = vec![
@@ -379,7 +406,7 @@ mod tests {
     #[test]
     fn validation_drops_stopwords_noops_duplicates_and_junk() {
         let p = proposal(
-            r#"{"vocabulary":["the","Kari","kari","[x]","a b c d e f"],"corrections":[{"wrong":"see","right":"sea"},{"wrong":"same","right":"same"},{"wrong":"carry","right":"Kari"},{"wrong":"Carry","right":"Kari"}]}"#,
+            r#"{"vocabulary":["the","Kari","kari","[x]","a b c d e f"],"corrections":[{"wrong":"see","right":"sea","literal":true},{"wrong":"same","right":"same","literal":true},{"wrong":"carry","right":"Kari","literal":true},{"wrong":"Carry","right":"Kari","literal":true}]}"#,
         );
         let l = validate(
             &p,

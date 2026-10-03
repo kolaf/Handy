@@ -79,8 +79,10 @@ Spoken-punctuation and filler rules of the prompt apply to the selected text too
 informal, email, ...). Undo in the target app (Ctrl+Z) reverts it.
 
 **Corrections: always or hint.** A learned correction is either *always* (replaced literally in every transcript, before
-the formatter sees it) or a *hint* (only listed to the formatter, which applies it when it fits the sentence). Learn marks rules
-whose "wrong" is an ordinary word (see/sea) as hints; switch any rule with the button in Advanced → Learned Corrections. Prompts
+the formatter sees it) or a *hint* (only listed to the formatter, which applies it when it fits the sentence). Learn stores a rule as *always*
+only when the model vouches that the heard text is not a real word ("Superwisper", "Hermia"); everything else ("fart" for
+"prompt", "carry" for "Kari") is a hint, because the speaker may really mean that word. Switch any rule with the button
+in Advanced → Learned Corrections. Prompts
 get the rules through the `${corrections}` variable (the built-in prompts already have it: "X is Y" for always rules, "X may be Y
 (only if it fits the sentence)" for hints). Hints need post-processing to be on and reachable; without it nothing happens.
 
