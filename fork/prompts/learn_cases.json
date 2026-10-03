@@ -52,7 +52,13 @@
   "corrected": "We went to the sea on Friday.",
   "expect_vocab": [],
   "expect_corr": [],
-  "note": "ordinary word, must not be learned"
+  "note": "ordinary word: may only be proposed as a hint",
+  "allow_hint_corr": [
+   [
+    "see",
+    "sea"
+   ]
+  ]
  },
  {
   "id": "injection",

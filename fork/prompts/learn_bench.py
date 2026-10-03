@@ -44,15 +44,18 @@ def main():
         except Exception:
             print(f"FAIL {c['id']}: not JSON: {out[:120]!r}"); bad += 1; continue
         vocab = [v for v in p.get("vocabulary", []) if has(c["corrected"], v)]
-        corr = [(x["wrong"], x["right"]) for x in p.get("corrections", [])
+        corr = [(x["wrong"], x["right"], bool(x.get("hint"))) for x in p.get("corrections", [])
                 if has(c["raw"], x["wrong"]) and has(c["corrected"], x["right"])]
         errs = []
         for v in c["expect_vocab"]:
             if not any(v.lower() == w.lower() for w in vocab): errs.append(f"missing vocab {v}")
         for w, r in c["expect_corr"]:
-            if not any(w.lower() == a.lower() and r.lower() == b.lower() for a, b in corr): errs.append(f"missing correction {w}->{r}")
+            if not any(w.lower() == a.lower() and r.lower() == b.lower() for a, b, _ in corr): errs.append(f"missing correction {w}->{r}")
         if not c["expect_vocab"] and vocab: errs.append(f"unexpected vocab {vocab}")
-        if not c["expect_corr"] and corr: errs.append(f"unexpected corrections {corr}")
+        allowed = {(w.lower(), r.lower()) for w, r in c.get("allow_hint_corr", [])}
+        for a, b, hint in corr:
+            if not c["expect_corr"] and not (hint and (a.lower(), b.lower()) in allowed):
+                errs.append(f"unexpected correction {a}->{b} hint={hint}")
         for f in c.get("forbid", []):
             if any(f.lower() in str(x).lower() for x in vocab + corr): errs.append(f"forbidden {f}")
         print(("FAIL " if errs else "ok   ") + c["id"] + (": " + "; ".join(errs) if errs else ""))

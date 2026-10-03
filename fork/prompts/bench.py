@@ -40,7 +40,7 @@ def default_settings_path() -> str:
 
 DEFAULT_HANDY_SETTINGS = default_settings_path()
 MAX_CLIPBOARD = 6000
-VAR = re.compile(r"\$\{(vocabulary|snippets|clipboard|examples)\}")
+VAR = re.compile(r"\$\{(vocabulary|corrections|snippets|clipboard|examples)\}")
 VOCAB_TAG = re.compile(r"\[\[\s*vocab\s*:([^\]\n]*)\]\]")
 SNIPPET_TAG = re.compile(r"\[\[\s*snippet\s*:([^\]\n]*)\]\]")
 THINK = re.compile(r"^\s*<think>.*?</think>\s*", re.S)
@@ -49,6 +49,14 @@ THINK = re.compile(r"^\s*<think>.*?</think>\s*", re.S)
 def examples_block(examples: str) -> str:
     ex = examples.strip()
     return "(no examples)" if not ex else "<examples>\n" + ex.replace("${output}", "$ {output}") + "\n</examples>"
+
+
+def corrections_block(rules: list) -> str:
+    if not rules:
+        return "(none yet)"
+    lines = [f'- "{r["wrong"]}" may be "{r["right"]}" (only if it fits the sentence)' if r.get("hint")
+             else f'- "{r["wrong"]}" is "{r["right"]}"' for r in rules[:60]]
+    return "\n" + "\n".join(lines).replace("${output}", "$ {output}")
 
 
 def clipboard_for_prompt(text: str) -> str:
@@ -69,6 +77,8 @@ def assemble(prompt: dict, case: dict) -> str:
         name = m.group(1)
         if name == "vocabulary":
             return ", ".join(vocab) or "(none yet)"
+        if name == "corrections":
+            return corrections_block(case.get("corrections", []))
         if name == "snippets":
             return ", ".join(snippet_names) or "(none)"
         if name == "examples":

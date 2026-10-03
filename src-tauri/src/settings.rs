@@ -88,11 +88,14 @@ pub struct ShortcutBinding {
 }
 
 /// A learned fix for a recurring mishearing: `wrong` (as the recognizer spells it) becomes `right` in every new
-/// transcript, as a whole word and ignoring case. See `learn.rs`.
+/// transcript, as a whole word and ignoring case. A `hint` rule is not applied literally: it is only listed to the
+/// post-processing model (`${corrections}`), which applies it when it fits the sentence. See `learn.rs`.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Type)]
 pub struct Correction {
     pub wrong: String,
     pub right: String,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub hint: bool,
 }
 
 /// A named block of text that the post-processing prompt can insert by name

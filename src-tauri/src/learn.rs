@@ -44,6 +44,8 @@ pub struct Proposal {
 pub struct RawCorrection {
     pub wrong: String,
     pub right: String,
+    #[serde(default)]
+    pub hint: bool,
 }
 
 /// What survived validation and may be stored.
@@ -61,11 +63,14 @@ impl Learned {
     /// Short text for the overlay, e.g. "DYST, dist -> DYST".
     pub fn describe(&self) -> String {
         let mut parts: Vec<String> = self.vocabulary.clone();
-        parts.extend(
-            self.corrections
-                .iter()
-                .map(|c| format!("{} -> {}", c.wrong, c.right)),
-        );
+        parts.extend(self.corrections.iter().map(|c| {
+            format!(
+                "{} -> {}{}",
+                c.wrong,
+                c.right,
+                if c.hint { " (hint)" } else { "" }
+            )
+        }));
         parts.join(", ")
     }
 }
@@ -189,7 +194,9 @@ pub fn validate(
         {
             continue;
         }
-        let single_stop = wrong.split_whitespace().count() == 1
+        // A hint is only a suggestion to the formatter, so it may be an ordinary word; a literal rule may not.
+        let single_stop = !c.hint
+            && wrong.split_whitespace().count() == 1
             && STOPWORDS.contains(&wrong.to_lowercase().as_str());
         let dup = known
             .iter()
@@ -203,6 +210,7 @@ pub fn validate(
             out.corrections.push(Correction {
                 wrong: wrong.to_string(),
                 right: right.to_string(),
+                hint: c.hint,
             });
         }
     }
@@ -212,7 +220,7 @@ pub fn validate(
 /// Applies learned corrections to a transcript: whole words, case-insensitive, literal replacement.
 pub fn apply_corrections(text: &str, rules: &[Correction]) -> String {
     let mut out = text.to_string();
-    for rule in rules {
+    for rule in rules.iter().filter(|r| !r.hint) {
         let Some(re) = word_regex(&rule.wrong) else {
             continue;
         };
@@ -307,6 +315,7 @@ mod tests {
         Correction {
             wrong: w.to_string(),
             right: r.to_string(),
+            hint: false,
         }
     }
     fn proposal(json: &str) -> Proposal {
@@ -345,6 +354,26 @@ mod tests {
         );
         let l = validate(&p, "a system called dist", "a system called DYST", &[], &[]);
         assert!(l.is_empty(), "{l:?}");
+    }
+
+    #[test]
+    fn hint_rules_may_be_ordinary_words_and_are_not_applied_literally() {
+        let p = proposal(
+            r#"{"corrections":[{"wrong":"det","right":"de","hint":true},{"wrong":"det","right":"de"}]}"#,
+        );
+        let l = validate(&p, "ta det med", "ta de med", &[], &[]);
+        // the literal stop-word rule is refused, the hint (listed first) is kept
+        assert_eq!(l.corrections.len(), 1);
+        assert!(l.corrections[0].hint);
+        let rules = vec![
+            Correction {
+                wrong: "see".into(),
+                right: "sea".into(),
+                hint: true,
+            },
+            corr("dist", "DYST"),
+        ];
+        assert_eq!(apply_corrections("see dist", &rules), "see DYST");
     }
 
     #[test]

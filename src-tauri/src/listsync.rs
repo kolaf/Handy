@@ -260,6 +260,7 @@ mod tests {
         Correction {
             wrong: w.into(),
             right: r.into(),
+            hint: false,
         }
     }
 

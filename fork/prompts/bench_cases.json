@@ -510,5 +510,70 @@
    }
   ],
   "mock": ""
+ },
+ {
+  "id": "hint_applies",
+  "prompt": "simple",
+  "note": "hint rule applied when the sentence fits",
+  "corrections": [
+   {
+    "wrong": "see",
+    "right": "sea",
+    "hint": true
+   }
+  ],
+  "input": "we spent the whole summer by the see sailing and swimming",
+  "checks": [
+   {
+    "icontains": "by the sea"
+   },
+   {
+    "not_icontains": "by the see"
+   }
+  ],
+  "mock": "We spent the whole summer by the sea sailing and swimming."
+ },
+ {
+  "id": "hint_ignored",
+  "prompt": "simple",
+  "note": "hint rule left alone when the word is right as it is",
+  "corrections": [
+   {
+    "wrong": "see",
+    "right": "sea",
+    "hint": true
+   }
+  ],
+  "input": "i can see the mountains from here",
+  "checks": [
+   {
+    "icontains": "can see the mountains"
+   },
+   {
+    "not_icontains": "can sea"
+   }
+  ],
+  "mock": "I can see the mountains from here."
+ },
+ {
+  "id": "literal_rule_context",
+  "prompt": "simple",
+  "note": "literal rule shows the pattern; a similar mishearing is generalised",
+  "corrections": [
+   {
+    "wrong": "carry",
+    "right": "Kari"
+   }
+  ],
+  "input": "i talked to carry about the budget yesterday",
+  "checks": [
+   {
+    "contains": "Kari"
+   },
+   {
+    "not_icontains": "carry"
+   }
+  ],
+  "mock": "I talked to Kari about the budget yesterday."
  }
 ]

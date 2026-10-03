@@ -410,7 +410,10 @@
       },
       "corrections": {
         "title": "Learned Corrections",
-        "description": "Mistakes Handy has learned to fix automatically (heard → correct). Added by the Learn From Correction shortcut; remove any that are wrong.",
+        "description": "Mistakes Handy has learned (heard → correct). Added by the Learn From Correction shortcut. \"Always\" rules replace the text automatically; \"Hint\" rules are only shown to the post-processing model, which applies them when they fit the sentence (needs the ${corrections} variable in the prompt).",
+        "modeAlways": "Always",
+        "modeHint": "Hint",
+        "modeHelp": "Click to switch between replacing automatically and only hinting the post-processing model",
         "remove": "Remove {{wrong}}",
         "removeShort": "Remove"
       },

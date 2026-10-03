@@ -15,6 +15,15 @@ export const Corrections: React.FC<CorrectionsProps> = React.memo(
     const { getSetting, updateSetting, isUpdating } = useSettings();
     const corrections = getSetting("corrections") || [];
 
+    const handleToggleHint = (wrong: string, right: string) => {
+      updateSetting(
+        "corrections",
+        corrections.map((c) =>
+          c.wrong === wrong && c.right === right ? { ...c, hint: !c.hint } : c,
+        ),
+      );
+    };
+
     const handleRemove = (wrong: string, right: string) => {
       updateSetting(
         "corrections",
@@ -45,17 +54,30 @@ export const Corrections: React.FC<CorrectionsProps> = React.memo(
                     {" → "}
                     <span className="font-semibold">{c.right}</span>
                   </div>
-                  <Button
-                    onClick={() => handleRemove(c.wrong, c.right)}
-                    disabled={isUpdating("corrections")}
-                    variant="secondary"
-                    size="sm"
-                    aria-label={t("settings.advanced.corrections.remove", {
-                      wrong: c.wrong,
-                    })}
-                  >
-                    {t("settings.advanced.corrections.removeShort")}
-                  </Button>
+                  <div className="flex gap-2 shrink-0">
+                    <Button
+                      onClick={() => handleToggleHint(c.wrong, c.right)}
+                      disabled={isUpdating("corrections")}
+                      variant="secondary"
+                      size="sm"
+                      title={t("settings.advanced.corrections.modeHelp")}
+                    >
+                      {c.hint
+                        ? t("settings.advanced.corrections.modeHint")
+                        : t("settings.advanced.corrections.modeAlways")}
+                    </Button>
+                    <Button
+                      onClick={() => handleRemove(c.wrong, c.right)}
+                      disabled={isUpdating("corrections")}
+                      variant="secondary"
+                      size="sm"
+                      aria-label={t("settings.advanced.corrections.remove", {
+                        wrong: c.wrong,
+                      })}
+                    >
+                      {t("settings.advanced.corrections.removeShort")}
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>

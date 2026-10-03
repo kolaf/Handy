@@ -6,7 +6,7 @@ use crate::actions::{
     announce_setting_change, next_in_cycle, process_transcription_output, ShortcutAction,
 };
 use crate::managers::history::HistoryManager;
-use crate::settings::{get_settings, AppSettings, Snippet};
+use crate::settings::{get_settings, AppSettings, Correction, Snippet};
 use log::warn;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -20,8 +20,9 @@ pub(crate) const MAX_SNIPPETS: usize = 100;
 const MAX_SNIPPET_NAME_CHARS: usize = 50;
 pub(crate) const MAX_SNIPPET_TEXT_CHARS: usize = 5000;
 
-static VARIABLE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\$\{(vocabulary|snippets|clipboard|examples)\}").unwrap());
+static VARIABLE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"\$\{(vocabulary|corrections|snippets|clipboard|examples)\}").unwrap()
+});
 static SNIPPET_TAG: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"\[\[\s*snippet\s*:([^\]\n]*)\]\]").unwrap());
 
@@ -49,6 +50,7 @@ fn clipboard_for_prompt(text: &str) -> String {
 pub(crate) fn expand_variables(
     template: &str,
     vocabulary: &[String],
+    corrections: &[Correction],
     snippet_names: &[String],
     clipboard: &str,
     examples: &str,
@@ -56,11 +58,38 @@ pub(crate) fn expand_variables(
     VARIABLE
         .replace_all(template, |caps: &regex::Captures| match &caps[1] {
             "vocabulary" => join_or(vocabulary, "(none yet)"),
+            "corrections" => corrections_block(corrections),
             "snippets" => join_or(snippet_names, "(none)"),
             "examples" => examples_block(examples),
             _ => clipboard_for_prompt(clipboard),
         })
         .into_owned()
+}
+
+const MAX_PROMPT_CORRECTIONS: usize = 60;
+
+/// The learned mishearings as the model sees them, one per line. Literal rules were already applied to the transcript, so
+/// they show the pattern; hint rules are marked as depending on context. Defuses the transcript placeholder.
+fn corrections_block(corrections: &[Correction]) -> String {
+    if corrections.is_empty() {
+        return "(none yet)".to_string();
+    }
+    let lines: Vec<String> = corrections
+        .iter()
+        .take(MAX_PROMPT_CORRECTIONS)
+        .map(|c| {
+            let line = if c.hint {
+                format!(
+                    "- \"{}\" may be \"{}\" (only if it fits the sentence)",
+                    c.wrong, c.right
+                )
+            } else {
+                format!("- \"{}\" is \"{}\"", c.wrong, c.right)
+            };
+            line.replace("${output}", "$ {output}")
+        })
+        .collect();
+    format!("\n{}", lines.join("\n"))
 }
 
 /// The examples as the model sees them. Defuses the transcript placeholder like the clipboard.
@@ -104,6 +133,7 @@ pub(crate) fn expand_prompt_variables(app: &AppHandle, mut settings: AppSettings
     let mut expanded = expand_variables(
         &template,
         &settings.custom_words,
+        &settings.corrections,
         &names,
         &clipboard,
         &examples,
@@ -392,10 +422,40 @@ mod tests {
     }
 
     #[test]
+    fn corrections_variable_lists_rules_and_marks_hints() {
+        let rules = vec![
+            Correction {
+                wrong: "cube control".into(),
+                right: "kubectl".into(),
+                hint: false,
+            },
+            Correction {
+                wrong: "see".into(),
+                right: "sea".into(),
+                hint: true,
+            },
+        ];
+        let out = expand_variables("M: ${corrections}", &[], &rules, &[], "", "");
+        assert!(out.contains("\"cube control\" is \"kubectl\""));
+        assert!(out.contains("\"see\" may be \"sea\" (only if it fits the sentence)"));
+        assert_eq!(
+            expand_variables("${corrections}", &[], &[], &[], "", ""),
+            "(none yet)"
+        );
+        let evil = vec![Correction {
+            wrong: "${output}".into(),
+            right: "x".into(),
+            hint: false,
+        }];
+        assert!(!expand_variables("${corrections}", &[], &evil, &[], "", "").contains("${output}"));
+    }
+
+    #[test]
     fn variables_are_expanded() {
         let out = expand_variables(
             "V: ${vocabulary}\nS: ${snippets}\nC: ${clipboard}",
             &names(&["DYST", "Kubernetes"]),
+            &[],
             &names(&["calendar"]),
             "  hello  ",
             "",
@@ -409,6 +469,7 @@ mod tests {
             "${vocabulary}|${snippets}|${clipboard}|${examples}",
             &[],
             &[],
+            &[],
             "  ",
             "",
         );
@@ -420,13 +481,20 @@ mod tests {
 
     #[test]
     fn substituted_text_is_not_expanded_again() {
-        let out = expand_variables("${clipboard}", &[], &[], "${vocabulary} and ${output}", "");
+        let out = expand_variables(
+            "${clipboard}",
+            &[],
+            &[],
+            &[],
+            "${vocabulary} and ${output}",
+            "",
+        );
         assert_eq!(out, "${vocabulary} and $ {output}");
     }
 
     #[test]
     fn examples_are_wrapped_and_defused() {
-        let out = expand_variables("A ${examples} B", &[], &[], "", "in -> ${output}");
+        let out = expand_variables("A ${examples} B", &[], &[], &[], "", "in -> ${output}");
         assert_eq!(out, "A <examples>\nin -> $ {output}\n</examples> B");
     }
 

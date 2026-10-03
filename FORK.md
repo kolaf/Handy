@@ -63,6 +63,12 @@ was a recognition mistake (`fork/prompts/learn_prompt.md`). Names and terms go i
 rules applied to future transcripts. Proposals are validated locally (the word must really appear in your text, ordinary-word
 swaps and rewordings are refused). Benchmark: `python3 fork/prompts/learn_bench.py --from-handy`.
 
+**Corrections: always or hint.** A learned correction is either *always* (replaced literally in every transcript, before
+the formatter sees it) or a *hint* (only listed to the formatter, which applies it when it fits the sentence). Learn marks rules
+whose "wrong" is an ordinary word (see/sea) as hints; switch any rule with the button in Advanced → Learned Corrections. Prompts
+get the rules through the `${corrections}` variable (the built-in prompts already have it: "X is Y" for always rules, "X may be Y
+(only if it fits the sentence)" for hints). Hints need post-processing to be on and reachable; without it nothing happens.
+
 **Sync lists.** `handy --sync-lists FILE` (Handy must be running) merges your custom words, snippets and learned corrections
 with a JSON file, both ways, and rewrites the file in a stable sorted order so it diffs well in git. Keep the file in a
 private repo (it holds your snippet texts) and run the command on each machine after pulling, then commit the result. It only
