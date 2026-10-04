@@ -918,6 +918,10 @@ pub fn run(cli_args: CliArgs) {
                 );
                 handled_setting = true;
             }
+            if let Some(name) = signal_handle::flag_value(&args, "--set-llm") {
+                model_switch::run_set_llm(app, name);
+                handled_setting = true;
+            }
             if let Some(name) = signal_handle::flag_value(&args, "--set-model") {
                 model_switch::run_set(app, name);
                 handled_setting = true;

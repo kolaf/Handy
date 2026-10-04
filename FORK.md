@@ -188,6 +188,25 @@ speaker are joined) and the minutes prompts attribute views, decisions and actio
 minutes by editing. If the endpoint (LiteLLM, for instance) drops the segments, the transcript is plain text and the Activity entry says so.
 Privacy: unlike plain transcription, the recording leaves the computer.
 
+**Speaker names.** With the sub-option "Use names that are said in the conversation" (on by default when speakers are on) the
+language model reads the labelled transcript once and returns a name only for a speaker whose name the conversation makes certain
+(an introduction, or being addressed by name and answering). Anything else stays "Speaker N". The reply is checked in code: only
+known labels, plain letters (no markup or line breaks), at most 40 characters, no name used for two speakers, no placeholders such
+as "unknown". The transcript file and the minutes then use the names; the Activity entry lists which names were used. A wrong
+name is possible (a name that is mentioned but belongs to a third person); check the minutes.
+
+**Local language model.** The provider "Local (llama-server)" (default address `http://127.0.0.1:8081/v1`) sits next to the others on
+the Post-Processing page. `handy --set-llm local|cloud|NAME` (Talon: "language model local" / "language model cloud") switches the
+provider in use without opening the page; `cloud` means the `custom` provider, where the LiteLLM address is. Setup and benchmark
+results are in `fork/SETUP.md`. Speaker identification uses the `custom` provider when "local" is selected.
+
+**More than lists in the sync file.** `handy --sync-lists FILE` now also carries your own prompts (ids `prompt_...`; the built-in ones
+come with the program), the per-app and per-language rules, and four switches ("prompt per app" on, "model per language" on, the
+meeting language, speakers on). It still only adds: an entry that exists on both sides with different content stays as it is on
+each machine and is reported as a conflict, and a switch from the file is taken only where this machine still has the default (so
+nothing you set on purpose is overwritten, and a switch you turn off again does not travel). Paths (recorder and minutes folders), keys and
+the model choice are never in the file. Old files without these parts still load.
+
 **Model switching.** `handy --set-model NAME` switches the speech-to-text model by (part of) its id or name, ignoring case:
 an exact id wins, otherwise the words must occur in exactly one downloaded model (ambiguous or unknown names say so and list the
 downloaded ones). It uses the same switch as the settings page and tray menu (the model is loaded right away unless unloading is

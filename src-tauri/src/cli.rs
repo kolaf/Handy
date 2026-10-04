@@ -61,6 +61,11 @@ pub struct CliArgs {
     #[arg(long)]
     pub meeting_speakers: bool,
 
+    /// Switch the post-processing language model: `local` (a llama-server on this computer), `cloud` (the custom
+    /// provider, e.g. the LiteLLM) or part of a provider's name (sent to running instance)
+    #[arg(long, value_name = "NAME")]
+    pub set_llm: Option<String>,
+
     /// Switch the speech model by (part of) its name or id, e.g. `parakeet` (sent to running instance)
     #[arg(long, value_name = "NAME")]
     pub set_model: Option<String>,

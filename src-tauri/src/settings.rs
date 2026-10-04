@@ -132,6 +132,10 @@ pub struct MeetingSettings {
     /// (`diarize_model`) instead of being transcribed locally. Off by default; the audio leaves the computer.
     #[serde(default)]
     pub speakers: bool,
+    /// With speaker identification: replace "Speaker 2" by a name when the conversation itself makes the name clear
+    /// (introductions, being addressed by name). The language model is asked; it must not guess.
+    #[serde(default = "default_true")]
+    pub name_speakers: bool,
     /// The transcription model that labels speakers, served by the same endpoint as the post-processing model.
     #[serde(default = "default_diarize_model")]
     pub diarize_model: String,
@@ -160,6 +164,7 @@ impl Default for MeetingSettings {
             output_dir: String::new(),
             model_id: String::new(),
             speakers: false,
+            name_speakers: true,
             diarize_model: default_diarize_model(),
             recordings_dir: String::new(),
             group_minutes: default_meeting_group_minutes(),
@@ -182,7 +187,7 @@ pub struct Snippet {
     pub text: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Type)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Type)]
 pub struct LLMPrompt {
     pub id: String,
     pub name: String,
@@ -774,6 +779,11 @@ fn default_show_tray_icon() -> bool {
     true
 }
 
+/// The provider for a language model running on this computer.
+pub const LOCAL_PROVIDER_ID: &str = "local";
+/// What `--set-llm cloud` switches to: the provider the work LiteLLM is entered under.
+pub const CLOUD_PROVIDER_ID: &str = "custom";
+
 fn default_post_process_provider_id() -> String {
     "openai".to_string()
 }
@@ -854,6 +864,17 @@ fn default_post_process_providers() -> Vec<PostProcessProvider> {
         allow_base_url_edit: false,
         models_endpoint: Some("/models".to_string()),
         supports_structured_output: true,
+    });
+
+    // A language model on this computer, for example llama.cpp's `llama-server` (see fork/SETUP.md). Switch with
+    // `handy --set-llm local` and back with `handy --set-llm cloud`.
+    providers.push(PostProcessProvider {
+        id: LOCAL_PROVIDER_ID.to_string(),
+        label: "Local (llama-server)".to_string(),
+        base_url: "http://127.0.0.1:8081/v1".to_string(),
+        allow_base_url_edit: true,
+        models_endpoint: Some("/models".to_string()),
+        supports_structured_output: false,
     });
 
     // Custom provider always comes last

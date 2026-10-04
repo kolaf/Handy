@@ -114,8 +114,10 @@ fallback. Not tried on the work laptop.
    - 10 GB or more: the 7B. Models of 12B and up were slower and not better.
 3. Start it (leave the window open, or make a shortcut):
    `llama-server.exe -m C:\llm\models\Qwen3-4B-Instruct-2507-Q4_K_M.gguf -ngl 99 -c 4096 --host 127.0.0.1 --port 8081`
-4. In Handy (Post-Processing): provider "custom", address `http://127.0.0.1:8081/v1`, any API key (for example `x`), any model name.
-   Switch back to the LiteLLM address when you want gpt-5.4. Speaker identification in meetings always needs the cloud endpoint.
+4. In Handy (Post-Processing): choose the provider "Local (llama-server)" (address `http://127.0.0.1:8081/v1`, change it there if
+   you use another port), any API key (for example `x`), any model name. Your LiteLLM settings stay under "Custom". Switch with
+   `handy --set-llm local` and `handy --set-llm cloud` (Talon: "language model local" / "language model cloud"). Speaker
+   identification in meetings always uses the cloud (custom) endpoint, also while "local" is selected.
 5. Check quality yourself before trusting it:
    `BENCH_BASE_URL=http://127.0.0.1:8081/v1 BENCH_API_KEY=x BENCH_MODEL=local python3 fork/prompts/bench.py` (standard library
    only; Talon's `python.exe` also runs it on Windows).

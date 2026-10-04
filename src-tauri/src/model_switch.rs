@@ -231,6 +231,84 @@ pub fn run_set(app: &AppHandle, query: String) {
     });
 }
 
+/// Picks a post-processing provider by `local`, `cloud` (the custom provider, where the LiteLLM address is entered), or by
+/// (part of) its id or label.
+pub fn resolve_provider(
+    providers: &[crate::settings::PostProcessProvider],
+    query: &str,
+) -> Result<String, String> {
+    let q = query.trim().to_lowercase();
+    if q.is_empty() {
+        return Err("No language model was named. Say local or cloud.".into());
+    }
+    let wanted = match q.as_str() {
+        "cloud" | "remote" => crate::settings::CLOUD_PROVIDER_ID,
+        other => other,
+    };
+    if let Some(p) = providers.iter().find(|p| p.id.to_lowercase() == wanted) {
+        return Ok(p.id.clone());
+    }
+    let matches: Vec<_> = providers
+        .iter()
+        .filter(|p| p.label.to_lowercase().contains(wanted) || p.id.to_lowercase().contains(wanted))
+        .collect();
+    match matches.as_slice() {
+        [one] => Ok(one.id.clone()),
+        [] => Err(format!(
+            "No language model provider matches '{query}'. Available: {}.",
+            providers
+                .iter()
+                .map(|p| p.label.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )),
+        many => Err(format!(
+            "'{query}' matches several providers: {}.",
+            many.iter()
+                .map(|p| p.label.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )),
+    }
+}
+
+/// `handy --set-llm local|cloud|NAME`: the language model for post-processing, without opening the settings page.
+pub fn run_set_llm(app: &AppHandle, query: String) {
+    let mut settings = get_settings(app);
+    match resolve_provider(&settings.post_process_providers, &query) {
+        Ok(id) => {
+            let provider = settings
+                .post_process_providers
+                .iter()
+                .find(|p| p.id == id)
+                .cloned()
+                .expect("resolved provider exists");
+            let model = settings
+                .post_process_models
+                .get(&id)
+                .cloned()
+                .unwrap_or_default();
+            let mut details = format!("{} at {}", provider.label, provider.base_url);
+            if model.trim().is_empty() {
+                details.push_str("\nNo model name is set for it yet (Post-Processing page): post-processing will be skipped until one is.");
+            }
+            if settings.post_process_provider_id == id {
+                details = format!("Already in use. {details}");
+            } else {
+                settings.post_process_provider_id = id.clone();
+                crate::settings::write_settings(app, settings);
+                use tauri::Emitter;
+                let _ = app.emit(
+                    "settings-changed",
+                    serde_json::json!({ "setting": "post_process_provider_id", "value": id }),
+                );
+            }
+            crate::learn::announce_with(app, "llm", provider.label, details);
+        }
+        Err(reason) => crate::learn::announce_with(app, "llm-failed", query, reason),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -328,5 +406,37 @@ mod tests {
         );
         assert!(resolve_id(&models(), "  ").is_err());
         assert!(resolve_id(&[], "x").unwrap_err().contains("none"));
+    }
+
+    fn providers() -> Vec<crate::settings::PostProcessProvider> {
+        [
+            "openai:OpenAI",
+            "local:Local (llama-server)",
+            "custom:Custom",
+        ]
+        .iter()
+        .map(|p| {
+            let (id, label) = p.split_once(':').unwrap();
+            crate::settings::PostProcessProvider {
+                id: id.into(),
+                label: label.into(),
+                base_url: String::new(),
+                allow_base_url_edit: false,
+                models_endpoint: None,
+                supports_structured_output: false,
+            }
+        })
+        .collect()
+    }
+
+    #[test]
+    fn local_and_cloud_pick_the_right_provider() {
+        assert_eq!(resolve_provider(&providers(), "local").unwrap(), "local");
+        assert_eq!(resolve_provider(&providers(), "Cloud").unwrap(), "custom");
+        assert_eq!(resolve_provider(&providers(), "open").unwrap(), "openai");
+        assert!(resolve_provider(&providers(), "").is_err());
+        assert!(resolve_provider(&providers(), "banana")
+            .unwrap_err()
+            .contains("Available"));
     }
 }

@@ -746,6 +746,8 @@
         "scratched": "Dictation removed",
         "model": "Speech model switched",
         "model-failed": "Speech model not switched",
+        "llm": "Language model switched",
+        "llm-failed": "Language model not switched",
         "meeting": "Meeting minutes",
         "meeting-failed": "Meeting minutes failed"
       }
@@ -779,6 +781,8 @@
       "groupPlaceholder": "Minutes between files that belong together (default 5)",
       "speakers": "Identify the speakers",
       "speakersDescription": "Sends the audio to the post-processing endpoint (the same address and key as the language model), where a diarizing transcription model labels who speaks. The recording leaves this computer, and the speech model above is not used. Off: everything stays local.",
+      "nameSpeakers": "Use names that are said in the conversation",
+      "nameSpeakersDescription": "Asks the language model for a speaker's name only when the conversation makes it certain (an introduction, or being addressed by name). Otherwise the label stays Speaker 1, 2... The Activity page lists what was used.",
       "diarizeModelPlaceholder": "Diarizing model (default gpt-4o-transcribe-diarize)"
     }
   },
@@ -863,6 +867,8 @@
     "noticeScratched": "Last dictation removed",
     "noticeModel": "Speech model: {{value}}",
     "noticeModelFailed": "Could not switch model (see Activity)",
+    "noticeLlm": "Language model: {{value}}",
+    "noticeLlmFailed": "Could not switch language model (see Activity)",
     "noticeMeeting": "Meeting minutes saved: {{value}}"
   },
   "secureInput": {

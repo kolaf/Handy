@@ -36,6 +36,7 @@ export const MeetingsSettings: React.FC = () => {
     String(saved.group_minutes ?? 5),
   );
   const [speakers, setSpeakers] = useState(saved.speakers ?? false);
+  const [nameSpeakers, setNameSpeakers] = useState(saved.name_speakers ?? true);
   const [diarizeModel, setDiarizeModel] = useState(
     saved.diarize_model ?? "gpt-4o-transcribe-diarize",
   );
@@ -106,6 +107,7 @@ export const MeetingsSettings: React.FC = () => {
     recordings_dir: recordingsDir,
     group_minutes: Math.max(1, Number.parseInt(groupMinutes, 10) || 5),
     speakers,
+    name_speakers: nameSpeakers,
     diarize_model: diarizeModel.trim() || "gpt-4o-transcribe-diarize",
   });
 
@@ -240,6 +242,23 @@ export const MeetingsSettings: React.FC = () => {
               </span>
             </span>
           </label>
+          {speakers ? (
+            <label className="flex items-start gap-2">
+              <input
+                type="checkbox"
+                checked={nameSpeakers}
+                onChange={(e) => setNameSpeakers(e.target.checked)}
+                disabled={running}
+                className="mt-1"
+              />
+              <span>
+                {t("settings.meetings.nameSpeakers")}
+                <span className="block text-xs text-mid-gray">
+                  {t("settings.meetings.nameSpeakersDescription")}
+                </span>
+              </span>
+            </label>
+          ) : null}
           {speakers ? (
             <Input
               type="text"
