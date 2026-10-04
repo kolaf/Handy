@@ -1142,7 +1142,7 @@ key_down: number; key_up: number; flags_changed: number; mouse: number; duration
 export type KeyboardImplementation = "tauri" | "handy_keys"
 export type LLMPrompt = { id: string; name: string; prompt: string; examples: string }
 export type ActivityEntry = { timestamp: number; kind: string; title: string; details: string }
-export type MeetingSettings = { language?: string; output_dir?: string }
+export type MeetingSettings = { language?: string; output_dir?: string; model_id?: string }
 export type LanguageModel = { language: string; model_id: string }
 export type AppPrompt = { app: string; title?: string; prompt_id: string }
 export type Correction = { wrong: string; right: string; hint?: boolean }

@@ -901,6 +901,7 @@ pub fn run(cli_args: CliArgs) {
                     app,
                     &files,
                     signal_handle::flag_value(&args, "--meeting-language"),
+                    signal_handle::flag_value(&args, "--meeting-model"),
                 );
                 handled_setting = true;
             }

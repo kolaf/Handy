@@ -121,6 +121,10 @@ pub struct MeetingSettings {
     /// Where the minutes are saved; empty = a "meeting_notes" folder in the home folder.
     #[serde(default)]
     pub output_dir: String,
+    /// Speech model for the transcription; empty = the one used for dictation. A different one is loaded for the job
+    /// and the dictation model is put back afterwards.
+    #[serde(default)]
+    pub model_id: String,
 }
 
 fn default_meeting_language() -> String {
@@ -132,6 +136,7 @@ impl Default for MeetingSettings {
         Self {
             language: default_meeting_language(),
             output_dir: String::new(),
+            model_id: String::new(),
         }
     }
 }

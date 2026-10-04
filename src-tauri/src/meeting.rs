@@ -361,8 +361,99 @@ async fn run_job(app: &AppHandle, files: &[PathBuf], language: &str) -> Result<P
     }
 }
 
-/// Starts a job on its own thread. Only one runs at a time.
-pub fn start(app: &AppHandle, files: Vec<PathBuf>, language: String) -> Result<(), String> {
+const AUDIO_EXTENSIONS: &[&str] = &["mp3", "m4a", "aac", "wav", "flac", "ogg"];
+
+/// A sort key in which numbers compare as numbers and case is ignored: part2 comes before part10.
+pub fn natural_key(name: &str) -> Vec<(u8, u128, String)> {
+    let mut key = Vec::new();
+    let mut text = String::new();
+    let mut digits = String::new();
+    let flush_text = |text: &mut String, key: &mut Vec<(u8, u128, String)>| {
+        if !text.is_empty() {
+            key.push((1, 0, std::mem::take(text).to_lowercase()));
+        }
+    };
+    for c in name.chars() {
+        if c.is_ascii_digit() {
+            flush_text(&mut text, &mut key);
+            digits.push(c);
+        } else {
+            if !digits.is_empty() {
+                key.push((
+                    0,
+                    std::mem::take(&mut digits).parse().unwrap_or(u128::MAX),
+                    String::new(),
+                ));
+            }
+            text.push(c);
+        }
+    }
+    flush_text(&mut text, &mut key);
+    if !digits.is_empty() {
+        key.push((0, digits.parse().unwrap_or(u128::MAX), String::new()));
+    }
+    key
+}
+
+/// Files as given, with every folder replaced by the audio files in it, sorted by name (parts of one recording are
+/// usually named so that they sort in order).
+pub fn expand_inputs(paths: Vec<PathBuf>) -> Result<Vec<PathBuf>, String> {
+    let mut out = Vec::new();
+    for path in paths {
+        if path.is_dir() {
+            let mut found: Vec<PathBuf> = std::fs::read_dir(&path)
+                .map_err(|e| format!("Cannot read {}: {e}", path.display()))?
+                .flatten()
+                .map(|e| e.path())
+                .filter(|p| {
+                    p.is_file()
+                        && p.extension()
+                            .and_then(|e| e.to_str())
+                            .is_some_and(|e| AUDIO_EXTENSIONS.contains(&e.to_lowercase().as_str()))
+                })
+                .collect();
+            found.sort_by_key(|p| {
+                natural_key(
+                    &p.file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_default(),
+                )
+            });
+            if found.is_empty() {
+                return Err(format!("No audio files in {}.", path.display()));
+            }
+            out.extend(found);
+        } else {
+            out.push(path);
+        }
+    }
+    Ok(out)
+}
+
+/// Which model to switch to for the job: the one asked for (command line) or set for meetings, unless it is the one in use.
+/// `candidates` are the (id, name) pairs of the downloaded models.
+pub fn choose_model(
+    asked: Option<&str>,
+    configured: &str,
+    current: &str,
+    candidates: &[(String, String)],
+) -> Result<Option<String>, String> {
+    let wanted = asked.unwrap_or(configured).trim();
+    if wanted.is_empty() {
+        return Ok(None);
+    }
+    let id = crate::model_switch::resolve_id(candidates, wanted)?;
+    Ok((id != current).then_some(id))
+}
+
+/// Starts a job on its own thread. Only one runs at a time. `model`: a speech model name for this job only.
+pub fn start(
+    app: &AppHandle,
+    files: Vec<PathBuf>,
+    language: String,
+    model: Option<String>,
+) -> Result<(), String> {
+    let files = expand_inputs(files)?;
     if files.is_empty() {
         return Err("No audio file was given.".into());
     }
@@ -379,7 +470,58 @@ pub fn start(app: &AppHandle, files: Vec<PathBuf>, language: String) -> Result<(
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         info!("Meeting: {} file(s), language {language}", files.len());
-        let result = run_job(&app, &files, &language).await;
+        let settings = get_settings(&app);
+        let previous = settings.selected_model.clone();
+        let candidates: Vec<(String, String)> = crate::model_switch::downloaded(&app)
+            .into_iter()
+            .map(|m| (m.id, m.name))
+            .collect();
+        let mut switched = false;
+        let mut result = match choose_model(
+            model.as_deref(),
+            &settings.meeting.model_id,
+            &previous,
+            &candidates,
+        ) {
+            Ok(Some(id)) => {
+                emit(
+                    &app,
+                    "loading",
+                    0,
+                    0,
+                    format!("Loading the speech model '{id}'"),
+                    None,
+                );
+                let handle = app.clone();
+                let target = id.clone();
+                match tokio::task::spawn_blocking(move || {
+                    crate::commands::models::switch_active_model(&handle, &target)
+                })
+                .await
+                {
+                    Ok(Ok(())) => {
+                        switched = true;
+                        Ok(())
+                    }
+                    Ok(Err(e)) => Err(format!("Could not load the speech model '{id}': {e}")),
+                    Err(e) => Err(e.to_string()),
+                }
+            }
+            Ok(None) => Ok(()),
+            Err(e) => Err(e),
+        }
+        .map(|()| PathBuf::new());
+        if result.is_ok() {
+            result = run_job(&app, &files, &language).await;
+        }
+        // Put the dictation model back.
+        if switched {
+            let handle = app.clone();
+            let _ = tokio::task::spawn_blocking(move || {
+                crate::commands::models::switch_active_model(&handle, &previous)
+            })
+            .await;
+        }
         RUNNING.store(false, Ordering::SeqCst);
         match result {
             Ok(path) => {
@@ -415,10 +557,10 @@ pub fn split_paths(list: &str) -> Vec<PathBuf> {
         .collect()
 }
 
-/// `handy --meeting-minutes "a.m4a;b.m4a" [--meeting-language no]`
-pub fn run_cli(app: &AppHandle, list: &str, language: Option<String>) {
+/// `handy --meeting-minutes "a.m4a;b.m4a" [--meeting-language no] [--meeting-model parakeet]` (a folder works too)
+pub fn run_cli(app: &AppHandle, list: &str, language: Option<String>, model: Option<String>) {
     let language = language.unwrap_or_else(|| get_settings(app).meeting.language);
-    if let Err(reason) = start(app, split_paths(list), language) {
+    if let Err(reason) = start(app, split_paths(list), language, model) {
         warn!("Meeting: {reason}");
         crate::activity::log(
             app,
@@ -436,6 +578,7 @@ pub fn start_meeting(app: AppHandle, files: Vec<String>, language: String) -> Re
         &app,
         files.into_iter().map(PathBuf::from).collect(),
         language,
+        None,
     )
 }
 
@@ -474,6 +617,52 @@ pub fn update_meeting_settings(app: AppHandle, meeting: MeetingSettings) -> Resu
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn folders_become_their_sorted_audio_files() {
+        let dir = std::env::temp_dir().join(format!("handy-meeting-dir-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        for name in ["part2.M4A", "part1.m4a", "notes.txt", "Part10.mp3"] {
+            std::fs::write(dir.join(name), b"x").unwrap();
+        }
+        let single = dir.join("part1.m4a");
+        let expanded = expand_inputs(vec![dir.clone(), single.clone()]).unwrap();
+        let names: Vec<String> = expanded
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+        assert_eq!(
+            names,
+            vec!["part1.m4a", "part2.M4A", "Part10.mp3", "part1.m4a"]
+        );
+        let empty = dir.join("empty");
+        std::fs::create_dir_all(&empty).unwrap();
+        assert!(expand_inputs(vec![empty]).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn the_meeting_model_is_only_switched_when_it_differs() {
+        let have = vec![
+            ("nb".to_string(), "NB-Whisper".to_string()),
+            ("parakeet-v3".to_string(), "Parakeet V3".to_string()),
+        ];
+        assert_eq!(choose_model(None, "", "nb", &have), Ok(None));
+        assert_eq!(
+            choose_model(None, "parakeet", "nb", &have),
+            Ok(Some("parakeet-v3".into()))
+        );
+        assert_eq!(
+            choose_model(None, "parakeet", "parakeet-v3", &have),
+            Ok(None)
+        );
+        assert_eq!(
+            choose_model(Some("nb"), "parakeet", "parakeet-v3", &have),
+            Ok(Some("nb".into()))
+        );
+        assert!(choose_model(Some("ghost"), "", "nb", &have).is_err());
+    }
 
     #[test]
     fn filenames_are_safe() {

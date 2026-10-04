@@ -752,7 +752,7 @@
     },
     "meetings": {
       "title": "Meeting minutes",
-      "description": "Choose one or more audio files (parts of the same meeting, in order). Handy transcribes them with the speech model you have loaded, so the recording never leaves this computer, writes the minutes with the post-processing model, saves the minutes and the transcript, and opens the minutes.",
+      "description": "Choose or drop one or more audio files, or a folder (its audio files are used in name order, so part2 comes before part10). Handy transcribes them with a speech model on this computer, so the recording never leaves it, writes the minutes with the post-processing model, saves the minutes and the transcript, and opens the minutes. If you pick another speech model here, it is loaded for the job and your dictation model is put back afterwards.",
       "chooseFiles": "Choose audio files...",
       "audioFiles": "Audio files",
       "languagePlaceholder": "Language, e.g. en or no",
@@ -767,8 +767,12 @@
         "saving": "Saving",
         "done": "Done",
         "failed": "Failed",
-        "cancelled": "Cancelled"
-      }
+        "cancelled": "Cancelled",
+        "loading": "Loading the speech model"
+      },
+      "dropHere": "Drop audio files or a folder here",
+      "chooseFolder": "Choose a folder...",
+      "modelSame": "Speech model: the one used for dictation"
     }
   },
   "footer": {

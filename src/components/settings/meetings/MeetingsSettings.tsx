@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useTranslation } from "react-i18next";
-import { commands, type MeetingSettings } from "@/bindings";
+import { commands, type MeetingSettings, type ModelInfo } from "@/bindings";
 import { useSettings } from "../../../hooks/useSettings";
 import { Button } from "../../ui/Button";
+import { Dropdown } from "../../ui/Dropdown";
 import { Input } from "../../ui/Input";
 import { SettingsGroup } from "../../ui/SettingsGroup";
 
@@ -26,6 +28,9 @@ export const MeetingsSettings: React.FC = () => {
   const saved: MeetingSettings = getSetting("meeting") ?? {};
   const [language, setLanguage] = useState(saved.language ?? "en");
   const [outputDir, setOutputDir] = useState(saved.output_dir ?? "");
+  const [modelId, setModelId] = useState(saved.model_id ?? "");
+  const [models, setModels] = useState<ModelInfo[]>([]);
+  const [dragging, setDragging] = useState(false);
   const [files, setFiles] = useState<string[]>([]);
   const [progress, setProgress] = useState<Progress | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -37,8 +42,26 @@ export const MeetingsSettings: React.FC = () => {
     const unlisten = listen<Progress>("meeting-progress", (event) =>
       setProgress(event.payload),
     );
+    commands.getAvailableModels().then((result) => {
+      if (result.status === "ok") setModels(result.data);
+    });
+    // Files (or folders) dropped on the window are added to the list.
+    const unlistenDrop = getCurrentWebview().onDragDropEvent((event) => {
+      const payload = event.payload;
+      if (payload.type === "enter" || payload.type === "over")
+        setDragging(true);
+      else if (payload.type === "leave") setDragging(false);
+      else if (payload.type === "drop") {
+        setDragging(false);
+        setFiles((previous) => [
+          ...previous,
+          ...payload.paths.filter((p) => !previous.includes(p)),
+        ]);
+      }
+    });
     return () => {
       unlisten.then((fn) => fn());
+      unlistenDrop.then((fn) => fn());
     };
   }, []);
 
@@ -56,11 +79,17 @@ export const MeetingsSettings: React.FC = () => {
     else if (typeof picked === "string") setFiles([picked]);
   };
 
+  const chooseFolder = async () => {
+    const picked = await open({ directory: true });
+    if (typeof picked === "string") setFiles([picked]);
+  };
+
   const start = async () => {
     setError(null);
     const saveResult = await commands.updateMeetingSettings({
       language,
       output_dir: outputDir,
+      model_id: modelId,
     });
     if (saveResult.status !== "ok") {
       setError(saveResult.error);
@@ -76,20 +105,50 @@ export const MeetingsSettings: React.FC = () => {
         <div className="px-4 py-3 flex flex-col gap-3 text-sm">
           <p className="text-mid-gray">{t("settings.meetings.description")}</p>
           <div className="flex flex-col gap-2">
-            <Button
-              onClick={choose}
-              variant="secondary"
-              size="md"
-              disabled={running}
+            <div
+              className={`rounded-lg border border-dashed px-3 py-4 text-center text-mid-gray ${
+                dragging
+                  ? "border-logo-primary bg-logo-primary/10"
+                  : "border-mid-gray/40"
+              }`}
             >
-              {t("settings.meetings.chooseFiles")}
-            </Button>
+              {t("settings.meetings.dropHere")}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={choose}
+                variant="secondary"
+                size="md"
+                disabled={running}
+              >
+                {t("settings.meetings.chooseFiles")}
+              </Button>
+              <Button
+                onClick={chooseFolder}
+                variant="secondary"
+                size="md"
+                disabled={running}
+              >
+                {t("settings.meetings.chooseFolder")}
+              </Button>
+            </div>
             {files.map((file) => (
               <div key={file} className="break-all text-xs text-text/70">
                 {file}
               </div>
             ))}
           </div>
+          <Dropdown
+            options={[
+              { value: "", label: t("settings.meetings.modelSame") },
+              ...models
+                .filter((m) => m.is_downloaded)
+                .map((m) => ({ value: m.id, label: m.name })),
+            ]}
+            selectedValue={modelId}
+            onSelect={setModelId}
+            disabled={running}
+          />
           <Input
             type="text"
             value={language}

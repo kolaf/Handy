@@ -149,12 +149,15 @@ a rule for a model that is not downloaded says so and changes nothing). Language
 the switch off nothing changes. Combined with `--swap-language` this makes "English ↔ Norwegian" a single action.
 
 **Meeting minutes.** The old standalone `meeting-transcriber` script (`~/dev/openai-transcribe`) is now part of Handy: sidebar
-page **Meetings**, or `handy --meeting-minutes "part1.m4a;part2.m4a" [--meeting-language no]`. The audio files (MP3, M4A/AAC,
-WAV, FLAC, OGG; several parts of one session in order) are decoded and resampled to 16 kHz mono, cut into 5-minute chunks and
-transcribed with the speech model Handy has loaded, so the recording never leaves the computer. (The script transcribed in the
+page **Meetings** (choose files or a folder, or drop them on the page; pick the speech model for the job; language; output folder), or
+`handy --meeting-minutes "part1.m4a;part2.m4a" [--meeting-language no] [--meeting-model parakeet]`, or Talon: select the files in Explorer and say
+"transcribe meeting" (also "transcribe meeting norwegian" / "english"). The audio files (MP3, M4A/AAC,
+WAV, FLAC, OGG; several parts of one session in order, or a folder, whose audio files are used in natural name order) are decoded and resampled to 16 kHz mono, cut into 5-minute chunks and
+transcribed with a local speech model, so the recording never leaves the computer: the one Handy has loaded, or the one chosen for
+meetings (it is loaded for the job and the dictation model is put back afterwards; dictation during the job uses the meeting model). (The script transcribed in the
 cloud; that option was left out on purpose, so there are no extra endpoint or key settings.) The transcript goes to the
-post-processing model with the minutes prompt (`t_meeting_minutes_en` / `_no`, editable in the prompt list; the Norwegian one is
-carried over from the script and is worded for conversations/therapy sessions), then a short title is made, and
+post-processing model with the minutes prompt (`t_meeting_minutes_en` / `_no`, both general
+prompts for meetings and conversations, editable in the prompt list), then a short title is made, and
 `<folder>/<time>-<title>.md` plus `...-transcript.txt` are saved (folder: setting, default `meeting_notes` in the home folder) and
 the minutes opened. Progress is shown on the page and the result on the Activity page ("Meeting minutes"). Files are never deleted
 (the script offered to). One job at a time; Cancel stops after the current chunk. Decoding, mixing down and resampling are
