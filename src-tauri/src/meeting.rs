@@ -361,7 +361,162 @@ async fn run_job(app: &AppHandle, files: &[PathBuf], language: &str) -> Result<P
     }
 }
 
-const AUDIO_EXTENSIONS: &[&str] = &["mp3", "m4a", "aac", "wav", "flac", "ogg"];
+/// Audio files, and the video containers recorders like OBS write (their first audio track is used).
+const AUDIO_EXTENSIONS: &[&str] = &[
+    "mp3", "m4a", "aac", "wav", "flac", "ogg", "mkv", "mp4", "mov",
+];
+
+// ---- the latest recording(s) from the recorder's folder ---------------------------------------------------------------
+
+/// A recording found in the recorder's folder: when it was last written, and how long it is if that can be told cheaply.
+#[derive(Debug, Clone)]
+pub struct Recording {
+    pub path: PathBuf,
+    pub modified: std::time::SystemTime,
+    pub duration: Option<Duration>,
+}
+
+/// A file counts as finished when it has not been written for this long.
+const SETTLE: Duration = Duration::from_secs(20);
+/// How many of the newest files are looked at.
+const SCAN_LIMIT: usize = 40;
+
+/// The newest recording and the files that belong to it. The files are sorted newest first; a file belongs to the group
+/// when it ended no more than `tolerance` before the group's earliest file started. A file's start is its last-write
+/// time minus its length; if the length is unknown the start is taken as its last-write time. Returns the group oldest
+/// first, or why there is none. `now` is a parameter for tests.
+pub fn latest_group(
+    recordings: &[Recording],
+    tolerance: Duration,
+    now: std::time::SystemTime,
+    single: bool,
+) -> Result<Vec<PathBuf>, String> {
+    let mut sorted: Vec<&Recording> = recordings.iter().collect();
+    sorted.sort_by(|a, b| b.modified.cmp(&a.modified));
+    let Some(newest) = sorted.first() else {
+        return Err("There are no recordings in the folder.".into());
+    };
+    if now.duration_since(newest.modified).unwrap_or_default() < SETTLE {
+        return Err(format!(
+            "{} was written just now, so the recording may still be running. Stop it and try again.",
+            newest.path.display()
+        ));
+    }
+    let mut group = vec![newest.path.clone()];
+    if !single {
+        let mut start = newest.modified - newest.duration.unwrap_or_default();
+        for earlier in &sorted[1..] {
+            // It belongs if it ended about when the group starts (a little before or after).
+            let apart = if earlier.modified <= start {
+                start.duration_since(earlier.modified)
+            } else {
+                earlier.modified.duration_since(start)
+            }
+            .unwrap_or_default();
+            if apart > tolerance {
+                break;
+            }
+            group.push(earlier.path.clone());
+            start = earlier.modified - earlier.duration.unwrap_or_default();
+        }
+    }
+    group.reverse();
+    Ok(group)
+}
+
+/// Length of an audio/video file from its headers, without decoding it.
+pub fn probe_duration(path: &Path) -> Option<Duration> {
+    use symphonia::core::codecs::CODEC_TYPE_NULL;
+    use symphonia::core::formats::FormatOptions;
+    use symphonia::core::io::MediaSourceStream;
+    use symphonia::core::meta::MetadataOptions;
+    use symphonia::core::probe::Hint;
+    let file = std::fs::File::open(path).ok()?;
+    let stream = MediaSourceStream::new(Box::new(file), Default::default());
+    let mut hint = Hint::new();
+    if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+        hint.with_extension(ext);
+    }
+    let probed = symphonia::default::get_probe()
+        .format(
+            &hint,
+            stream,
+            &FormatOptions::default(),
+            &MetadataOptions::default(),
+        )
+        .ok()?;
+    let track = probed
+        .format
+        .tracks()
+        .iter()
+        .find(|t| t.codec_params.codec != CODEC_TYPE_NULL)?;
+    let time = track
+        .codec_params
+        .time_base?
+        .calc_time(track.codec_params.n_frames?);
+    Some(Duration::from_secs_f64(time.seconds as f64 + time.frac))
+}
+
+fn is_recording_file(path: &Path) -> bool {
+    path.is_file()
+        && path
+            .extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(|e| AUDIO_EXTENSIONS.contains(&e.to_lowercase().as_str()))
+}
+
+/// The folder the recorder writes to: the setting, else the Videos folder in the home folder.
+pub fn recordings_dir(cfg: &MeetingSettings, override_dir: Option<&str>) -> PathBuf {
+    let chosen = override_dir.unwrap_or(&cfg.recordings_dir).trim();
+    if !chosen.is_empty() {
+        return PathBuf::from(chosen);
+    }
+    let home = std::env::var_os("USERPROFILE")
+        .or_else(|| std::env::var_os("HOME"))
+        .unwrap_or_default();
+    PathBuf::from(home).join("Videos")
+}
+
+/// The newest `SCAN_LIMIT` recordings in the folder (not looking into sub-folders).
+pub fn scan_recordings(dir: &Path) -> Result<Vec<Recording>, String> {
+    let mut found: Vec<Recording> = std::fs::read_dir(dir)
+        .map_err(|e| format!("Cannot read the recordings folder {}: {e}", dir.display()))?
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| is_recording_file(p))
+        .filter_map(|p| {
+            let modified = std::fs::metadata(&p).ok()?.modified().ok()?;
+            Some(Recording {
+                path: p,
+                modified,
+                duration: None,
+            })
+        })
+        .collect();
+    found.sort_by(|a, b| b.modified.cmp(&a.modified));
+    found.truncate(SCAN_LIMIT);
+    for recording in &mut found {
+        recording.duration = probe_duration(&recording.path);
+    }
+    Ok(found)
+}
+
+/// The files of the latest recording (or just the newest file with `single`).
+pub fn find_latest(
+    cfg: &MeetingSettings,
+    folder: Option<&str>,
+    single: bool,
+) -> Result<Vec<PathBuf>, String> {
+    let dir = recordings_dir(cfg, folder);
+    let tolerance = Duration::from_secs(u64::from(cfg.group_minutes.clamp(1, 120)) * 60);
+    latest_group(
+        &scan_recordings(&dir)?,
+        tolerance,
+        std::time::SystemTime::now(),
+        single,
+    )
+    .map_err(|e| format!("{e} (folder: {})", dir.display()))
+}
 
 /// A sort key in which numbers compare as numbers and case is ignored: part2 comes before part10.
 pub fn natural_key(name: &str) -> Vec<(u8, u128, String)> {
@@ -548,6 +703,37 @@ pub fn start(
     Ok(())
 }
 
+/// `handy --meeting-latest [--meeting-folder DIR] [--meeting-single]`: minutes for the latest recording in the recorder's folder.
+pub fn run_latest(
+    app: &AppHandle,
+    folder: Option<String>,
+    single: bool,
+    language: Option<String>,
+    model: Option<String>,
+) {
+    let cfg = get_settings(app).meeting;
+    let language = language.unwrap_or_else(|| cfg.language.clone());
+    let result = find_latest(&cfg, folder.as_deref(), single)
+        .and_then(|files| start(app, files, language, model));
+    if let Err(reason) = result {
+        warn!("Meeting: {reason}");
+        crate::learn::announce_with(
+            app,
+            "meeting-failed",
+            "Meeting minutes could not start".to_string(),
+            reason,
+        );
+    }
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn find_latest_recordings(app: AppHandle, single: bool) -> Result<Vec<String>, String> {
+    let cfg = get_settings(&app).meeting;
+    find_latest(&cfg, None, single)
+        .map(|files| files.into_iter().map(|p| p.display().to_string()).collect())
+}
+
 /// Splits `;`-separated paths (the command line form for several parts).
 pub fn split_paths(list: &str) -> Vec<PathBuf> {
     list.split(';')
@@ -617,6 +803,75 @@ pub fn update_meeting_settings(app: AppHandle, meeting: MeetingSettings) -> Resu
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn rec(name: &str, end_secs: u64, minutes: Option<u64>) -> Recording {
+        Recording {
+            path: PathBuf::from(name),
+            modified: std::time::UNIX_EPOCH + Duration::from_secs(end_secs),
+            duration: minutes.map(|m| Duration::from_secs(m * 60)),
+        }
+    }
+
+    fn at(secs: u64) -> std::time::SystemTime {
+        std::time::UNIX_EPOCH + Duration::from_secs(secs)
+    }
+
+    #[test]
+    fn split_parts_of_one_recording_are_grouped_and_other_recordings_are_not() {
+        let hour = 3600;
+        // yesterday's meeting (one file), then a meeting split in three 30-minute parts that follow each other
+        let files = vec![
+            rec("old.mkv", 10 * hour, Some(60)),
+            rec("p1.mkv", 20 * hour + 1800, Some(30)),
+            rec("p2.mkv", 21 * hour, Some(30)),
+            rec("p3.mkv", 21 * hour + 1800, Some(30)),
+        ];
+        let tolerance = Duration::from_secs(5 * 60);
+        let group = latest_group(&files, tolerance, at(30 * hour), false).unwrap();
+        assert_eq!(
+            group,
+            vec![
+                PathBuf::from("p1.mkv"),
+                PathBuf::from("p2.mkv"),
+                PathBuf::from("p3.mkv")
+            ]
+        );
+        // only the newest file when asked
+        assert_eq!(
+            latest_group(&files, tolerance, at(30 * hour), true).unwrap(),
+            vec![PathBuf::from("p3.mkv")]
+        );
+    }
+
+    #[test]
+    fn without_lengths_only_files_written_close_together_are_grouped() {
+        let tolerance = Duration::from_secs(300);
+        let files = vec![
+            rec("a", 1000, None),
+            rec("b", 1200, None),
+            rec("c", 9000, None),
+        ];
+        // c was written long after the others: it is a recording of its own
+        assert_eq!(
+            latest_group(&files, tolerance, at(20_000), false).unwrap(),
+            vec![PathBuf::from("c")]
+        );
+        // a and b were written 200 s apart: with no lengths known they count as one
+        let files = vec![rec("a", 1000, None), rec("b", 1200, None)];
+        assert_eq!(
+            latest_group(&files, tolerance, at(20_000), false).unwrap(),
+            vec![PathBuf::from("a"), PathBuf::from("b")]
+        );
+    }
+
+    #[test]
+    fn a_recording_that_is_still_being_written_or_a_missing_folder_is_reported() {
+        let files = vec![rec("live.mkv", 1000, Some(10))];
+        let err = latest_group(&files, Duration::from_secs(300), at(1005), false).unwrap_err();
+        assert!(err.contains("still be running"), "{err}");
+        assert!(latest_group(&[], Duration::from_secs(300), at(0), false).is_err());
+        assert!(scan_recordings(Path::new("/definitely/not/a/folder")).is_err());
+    }
 
     #[test]
     fn folders_become_their_sorted_audio_files() {

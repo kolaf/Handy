@@ -703,6 +703,7 @@ pub fn run(cli_args: CliArgs) {
             activity::clear_activity,
             meeting::start_meeting,
             meeting::cancel_meeting,
+            meeting::find_latest_recordings,
             meeting::open_meeting_file,
             meeting::update_meeting_settings,
             model_switch::update_language_models,
@@ -900,6 +901,16 @@ pub fn run(cli_args: CliArgs) {
                 meeting::run_cli(
                     app,
                     &files,
+                    signal_handle::flag_value(&args, "--meeting-language"),
+                    signal_handle::flag_value(&args, "--meeting-model"),
+                );
+                handled_setting = true;
+            }
+            if args.iter().any(|a| a == "--meeting-latest") {
+                meeting::run_latest(
+                    app,
+                    signal_handle::flag_value(&args, "--meeting-folder"),
+                    args.iter().any(|a| a == "--meeting-single"),
                     signal_handle::flag_value(&args, "--meeting-language"),
                     signal_handle::flag_value(&args, "--meeting-model"),
                 );

@@ -125,6 +125,17 @@ pub struct MeetingSettings {
     /// and the dictation model is put back afterwards.
     #[serde(default)]
     pub model_id: String,
+    /// Where the recorder (OBS Studio...) puts its files; empty = the Videos folder in the home folder.
+    #[serde(default)]
+    pub recordings_dir: String,
+    /// Recording files that follow each other within this many minutes (the gap between the end of one and the start of
+    /// the next) count as parts of the same recording.
+    #[serde(default = "default_meeting_group_minutes")]
+    pub group_minutes: u32,
+}
+
+fn default_meeting_group_minutes() -> u32 {
+    5
 }
 
 fn default_meeting_language() -> String {
@@ -137,6 +148,8 @@ impl Default for MeetingSettings {
             language: default_meeting_language(),
             output_dir: String::new(),
             model_id: String::new(),
+            recordings_dir: String::new(),
+            group_minutes: default_meeting_group_minutes(),
         }
     }
 }

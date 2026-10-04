@@ -40,6 +40,18 @@ pub struct CliArgs {
     #[arg(long, value_name = "CODE")]
     pub meeting_language: Option<String>,
 
+    /// Write minutes for the latest recording in the recorder's folder (OBS Studio...) (sent to running instance)
+    #[arg(long)]
+    pub meeting_latest: bool,
+
+    /// With --meeting-latest: use only the newest file, not the files that belong to the same recording
+    #[arg(long)]
+    pub meeting_single: bool,
+
+    /// With --meeting-latest: look in this folder instead of the one set on the Meetings page
+    #[arg(long, value_name = "FOLDER")]
+    pub meeting_folder: Option<String>,
+
     /// Speech model for the meeting transcription only, e.g. nb or parakeet (with --meeting-minutes)
     #[arg(long, value_name = "NAME")]
     pub meeting_model: Option<String>,
