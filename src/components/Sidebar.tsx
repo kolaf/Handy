@@ -6,6 +6,7 @@ import {
   FlaskConical,
   History,
   ScrollText,
+  FileAudio,
   Info,
   Sparkles,
   Cpu,
@@ -18,6 +19,7 @@ import {
   AdvancedSettings,
   HistorySettings,
   ActivitySettings,
+  MeetingsSettings,
   DebugSettings,
   AboutSettings,
   GuideSettings,
@@ -53,6 +55,12 @@ export const SECTIONS_CONFIG = {
     labelKey: "sidebar.history",
     icon: History,
     component: HistorySettings,
+    enabled: () => true,
+  },
+  meetings: {
+    labelKey: "sidebar.meetings",
+    icon: FileAudio,
+    component: MeetingsSettings,
     enabled: () => true,
   },
   activity: {

@@ -547,11 +547,13 @@ pub(crate) fn run_redo(app: &AppHandle, prompt_id: String) {
     let app = app.clone();
     std::thread::spawn(move || {
         let settings = get_settings(&app);
-        if prompt_id == "edit"
-            || !settings
-                .post_process_prompts
-                .iter()
-                .any(|p| p.id == prompt_id)
+        // "raw" is not a prompt: it puts back the transcript exactly as the speech model produced it.
+        if prompt_id != "raw"
+            && (prompt_id == "edit"
+                || !settings
+                    .post_process_prompts
+                    .iter()
+                    .any(|p| p.id == prompt_id))
         {
             warn!("Redo: there is no usable prompt '{}'", prompt_id);
             crate::learn::announce(&app, "reformat-setup", String::new());
@@ -574,12 +576,15 @@ pub(crate) fn run_redo(app: &AppHandle, prompt_id: String) {
                 return;
             }
         };
-        crate::utils::show_processing_overlay(&app);
-        crate::context::set_one_shot(&prompt_id);
-        let processed =
-            tauri::async_runtime::block_on(process_transcription_output(&app, &raw, true));
+        let text = if prompt_id == "raw" {
+            raw.trim().to_string()
+        } else {
+            crate::utils::show_processing_overlay(&app);
+            crate::context::set_one_shot(&prompt_id);
+            tauri::async_runtime::block_on(process_transcription_output(&app, &raw, true))
+                .final_text
+        };
         let handle = app.clone();
-        let text = processed.final_text;
         let _ = app.run_on_main_thread(move || {
             if !text.trim().is_empty() {
                 // Checked again: the user may have moved on while the model worked.

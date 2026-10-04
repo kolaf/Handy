@@ -112,6 +112,52 @@ pub struct AppPrompt {
     pub prompt_id: String,
 }
 
+/// Settings of the meeting minutes feature (`meeting.rs`). The cloud API key is not here: it is kept with the other keys.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Type)]
+pub struct MeetingSettings {
+    /// "local" (the speech model Handy has loaded) or "cloud" (Azure OpenAI or an OpenAI-compatible endpoint).
+    #[serde(default = "default_meeting_engine")]
+    pub engine: String,
+    /// Language of the recording and of the minutes, e.g. "en" or "no".
+    #[serde(default = "default_meeting_language")]
+    pub language: String,
+    #[serde(default)]
+    pub endpoint: String,
+    #[serde(default = "default_meeting_api_version")]
+    pub api_version: String,
+    #[serde(default = "default_meeting_model")]
+    pub transcribe_model: String,
+    /// Where the minutes are saved; empty = a "meeting_notes" folder in the home folder.
+    #[serde(default)]
+    pub output_dir: String,
+}
+
+fn default_meeting_engine() -> String {
+    "local".to_string()
+}
+fn default_meeting_language() -> String {
+    "en".to_string()
+}
+fn default_meeting_api_version() -> String {
+    "2025-03-01-preview".to_string()
+}
+fn default_meeting_model() -> String {
+    "gpt-4o-transcribe".to_string()
+}
+
+impl Default for MeetingSettings {
+    fn default() -> Self {
+        Self {
+            engine: default_meeting_engine(),
+            language: default_meeting_language(),
+            endpoint: String::new(),
+            api_version: default_meeting_api_version(),
+            transcribe_model: default_meeting_model(),
+            output_dir: String::new(),
+        }
+    }
+}
+
 /// Which speech model goes with a dictation language (optional): choosing `language` also switches to `model_id`.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Type)]
 pub struct LanguageModel {
@@ -505,6 +551,9 @@ pub struct AppSettings {
     /// Learned `wrong -> right` fixes applied to each new transcript.
     #[serde(default)]
     pub corrections: Vec<Correction>,
+    /// Meeting minutes from audio files.
+    #[serde(default)]
+    pub meeting: MeetingSettings,
     /// Switch the speech model together with the dictation language, following `language_models`.
     #[serde(default)]
     pub language_models_enabled: bool,
@@ -1098,6 +1147,7 @@ pub fn get_default_settings() -> AppSettings {
         snippets: Vec::new(),
         corrections: Vec::new(),
         paste_focus_guard: true,
+        meeting: MeetingSettings::default(),
         language_models_enabled: false,
         language_models: Vec::new(),
         app_prompts_enabled: false,

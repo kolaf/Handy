@@ -106,6 +106,7 @@ handy --prompt-picker            # Open the numbered prompt picker
 handy --rerun                   # Re-run the last dictation with the next prompt
 handy --paste-last              # Paste the most recent dictation again
 handy --learn                   # Learn words and fixes from the selected, corrected text
+handy --meeting-minutes "a.m4a" # Transcribe audio files and write meeting minutes (see the Meetings page)
 handy --reformat                # Run the selected text through the selected prompt and replace it
 handy --transform t_formal      # Run the selection (or the last dictation) through a prompt and replace it
 handy --use-prompt-once reply   # Use this prompt for the next dictation only

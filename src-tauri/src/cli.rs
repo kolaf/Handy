@@ -32,6 +32,18 @@ pub struct CliArgs {
     #[arg(long)]
     pub rerun: bool,
 
+    /// Write meeting minutes from audio files; several parts of one session separated by ';' (sent to running instance)
+    #[arg(long, value_name = "FILES")]
+    pub meeting_minutes: Option<String>,
+
+    /// Language of the meeting recording and minutes, e.g. no or en (with --meeting-minutes)
+    #[arg(long, value_name = "CODE")]
+    pub meeting_language: Option<String>,
+
+    /// local or cloud (with --meeting-minutes)
+    #[arg(long, value_name = "ENGINE")]
+    pub meeting_engine: Option<String>,
+
     /// Switch the speech model by (part of) its name or id, e.g. `parakeet` (sent to running instance)
     #[arg(long, value_name = "NAME")]
     pub set_model: Option<String>,

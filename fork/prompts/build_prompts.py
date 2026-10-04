@@ -185,6 +185,16 @@ TRANSFORMS = [
  ("t_bullets", "Transform: bullet list", tp("Turn it into a short bullet list, one point per line, each starting with '- '. Keep every distinct point; no introduction or conclusion.")),
  ("t_summary", "Transform: summarize", tp("Summarize it in one to three sentences that carry the main points, decisions and any requested action.")),
 ]
+# Meeting minutes (meeting.rs): the text comes from the md files that are also compiled into the app as defaults. The
+# t_ prefix keeps them out of the prompt picker; editing them in Handy's prompt list changes the minutes.
+def _md(name):
+    from pathlib import Path
+    return (Path(__file__).resolve().parent / name).read_text(encoding="utf-8").rstrip() + "\n"
+
+TRANSFORMS += [
+ ("t_meeting_minutes_en", "Meeting minutes (English)", _md("meeting_minutes_en.md")),
+ ("t_meeting_minutes_no", "Meeting minutes (Norwegian)", _md("meeting_minutes_no.md")),
+]
 PROMPTS.extend(TRANSFORMS)
 
 if __name__ == "__main__":

@@ -17,6 +17,7 @@ mod learn;
 mod listsync;
 mod llm_client;
 mod managers;
+mod meeting;
 mod memory;
 mod model_switch;
 mod overlay;
@@ -700,6 +701,11 @@ pub fn run(cli_args: CliArgs) {
             learn::update_corrections,
             activity::get_activity,
             activity::clear_activity,
+            meeting::start_meeting,
+            meeting::cancel_meeting,
+            meeting::open_meeting_file,
+            meeting::update_meeting_settings,
+            meeting::set_meeting_api_key,
             model_switch::update_language_models,
             model_switch::change_language_models_enabled_setting,
             context::update_app_prompts,
@@ -889,6 +895,15 @@ pub fn run(cli_args: CliArgs) {
             }
             if let Some(id) = signal_handle::flag_value(&args, "--use-prompt-once") {
                 context::set_one_shot(&id);
+                handled_setting = true;
+            }
+            if let Some(files) = signal_handle::flag_value(&args, "--meeting-minutes") {
+                meeting::run_cli(
+                    app,
+                    &files,
+                    signal_handle::flag_value(&args, "--meeting-language"),
+                    signal_handle::flag_value(&args, "--meeting-engine"),
+                );
                 handled_setting = true;
             }
             if let Some(name) = signal_handle::flag_value(&args, "--set-model") {

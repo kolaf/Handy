@@ -5,6 +5,7 @@ export { DebugSettings } from "./debug/DebugSettings";
 export type { OnboardingPreviewStep } from "./debug/OnboardingPreview";
 export { HistorySettings } from "./history/HistorySettings";
 export { ActivitySettings } from "./activity/ActivitySettings";
+export { MeetingsSettings } from "./meetings/MeetingsSettings";
 export { AboutSettings } from "./about/AboutSettings";
 export { GuideSettings } from "./guide/GuideSettings";
 export { PostProcessingSettings } from "./post-processing/PostProcessingSettings";

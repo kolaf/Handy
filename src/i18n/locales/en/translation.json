@@ -18,7 +18,8 @@
     "debug": "Debug",
     "guide": "Guide",
     "about": "About",
-    "activity": "Activity"
+    "activity": "Activity",
+    "meetings": "Meetings"
   },
   "onboarding": {
     "subtitle": "To get started, choose a transcription model",
@@ -744,7 +745,39 @@
         "paste-moved": "Not pasted: window changed",
         "scratched": "Dictation removed",
         "model": "Speech model switched",
-        "model-failed": "Speech model not switched"
+        "model-failed": "Speech model not switched",
+        "meeting": "Meeting minutes",
+        "meeting-failed": "Meeting minutes failed"
+      }
+    },
+    "meetings": {
+      "title": "Meeting minutes",
+      "description": "Choose one or more audio files (parts of the same meeting, in order). Handy transcribes them, writes the minutes with the post-processing model, saves the minutes and the transcript, and opens the minutes. Local uses the speech model you have loaded and the recording never leaves this computer; cloud sends the audio to the endpoint below.",
+      "chooseFiles": "Choose audio files...",
+      "audioFiles": "Audio files",
+      "engineLocal": "Local (loaded speech model)",
+      "engineCloud": "Cloud (Azure OpenAI / OpenAI)",
+      "languagePlaceholder": "Language, e.g. en or no",
+      "start": "Write minutes",
+      "cancel": "Cancel",
+      "openMinutes": "Open the minutes",
+      "settingsTitle": "Settings",
+      "outputPlaceholder": "Folder for the minutes (empty: meeting_notes in your home folder)",
+      "cloudHelp": "Only for the cloud engine:",
+      "endpointPlaceholder": "Endpoint, e.g. https://name.cognitiveservices.azure.com/ (empty: api.openai.com)",
+      "modelPlaceholder": "Transcription model or deployment, e.g. gpt-4o-transcribe",
+      "apiVersionPlaceholder": "Azure API version, e.g. 2025-03-01-preview",
+      "keyPlaceholder": "API key",
+      "keySavedPlaceholder": "API key saved (type a new one to replace it)",
+      "saveNote": "Settings are saved when you press Write minutes. The key is stored with Handy's other API keys.",
+      "stages": {
+        "decoding": "Reading the audio",
+        "transcribing": "Transcribing",
+        "summarizing": "Writing the minutes",
+        "saving": "Saving",
+        "done": "Done",
+        "failed": "Failed",
+        "cancelled": "Cancelled"
       }
     }
   },
@@ -828,7 +861,8 @@
     "noticePasteMoved": "Window changed: dictation is on the clipboard",
     "noticeScratched": "Last dictation removed",
     "noticeModel": "Speech model: {{value}}",
-    "noticeModelFailed": "Could not switch model (see Activity)"
+    "noticeModelFailed": "Could not switch model (see Activity)",
+    "noticeMeeting": "Meeting minutes saved: {{value}}"
   },
   "secureInput": {
     "blockedWithCulprit_one": "{{name}} may be blocking 1 shortcut",
