@@ -4,11 +4,19 @@ name: "Fork build (portable + deb)"
 #   - Handy-<version>-<commit>-portable.zip  (Windows x64, unzip and run; keeps its data in Data\ next to handy.exe)
 #   - handy_<version>_amd64.deb              (Ubuntu 22.04 build, installs on 22.04 and newer)
 #
-# Run it by hand: Actions > "Fork build (portable + deb)" > Run workflow (or `gh workflow run fork-build.yml`).
-# The files are kept as workflow artefacts for 30 days. Tick "release" to also attach them to a GitHub pre-release
-# (fork-<commit>), which does not expire. Nothing is signed: Windows SmartScreen / AppLocker may refuse the unsigned exe.
+# How to start it:
+#   - push a tag:  git tag build-1 && git push git@github.com:kolaf/Handy.git build-1   (also makes a pre-release, see below)
+#   - or, once this file is on the repository's default branch: Actions > Run workflow (or `gh workflow run fork-build.yml`)
+#   - or edit this file on dev/hotkeys-build: a push that touches it builds too (this is how it is tested)
+# The files are kept as workflow artefacts for 30 days. A tag build (or "release" ticked in the manual run) also attaches
+# them to a GitHub pre-release (fork-<commit>), which does not expire. Nothing is signed: Windows SmartScreen / AppLocker
+# may refuse the unsigned exe.
 
 on:
+  push:
+    tags: ["build-*"]
+    branches: [dev/hotkeys-build]
+    paths: [".github/workflows/fork-build.yml"]
   workflow_dispatch:
     inputs:
       release:
@@ -162,7 +170,7 @@ jobs:
           retention-days: 30
 
   release:
-    if: ${{ inputs.release }}
+    if: ${{ inputs.release || github.ref_type == 'tag' }}
     needs: [deb, portable]
     runs-on: ubuntu-latest
     permissions:
