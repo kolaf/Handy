@@ -128,10 +128,21 @@ pub struct MeetingSettings {
     /// Where the recorder (OBS Studio...) puts its files; empty = the Videos folder in the home folder.
     #[serde(default)]
     pub recordings_dir: String,
+    /// Identify the speakers: the audio is sent to the post-processing endpoint's diarizing transcription model
+    /// (`diarize_model`) instead of being transcribed locally. Off by default; the audio leaves the computer.
+    #[serde(default)]
+    pub speakers: bool,
+    /// The transcription model that labels speakers, served by the same endpoint as the post-processing model.
+    #[serde(default = "default_diarize_model")]
+    pub diarize_model: String,
     /// Recording files that follow each other within this many minutes (the gap between the end of one and the start of
     /// the next) count as parts of the same recording.
     #[serde(default = "default_meeting_group_minutes")]
     pub group_minutes: u32,
+}
+
+fn default_diarize_model() -> String {
+    "gpt-4o-transcribe-diarize".to_string()
 }
 
 fn default_meeting_group_minutes() -> u32 {
@@ -148,6 +159,8 @@ impl Default for MeetingSettings {
             language: default_meeting_language(),
             output_dir: String::new(),
             model_id: String::new(),
+            speakers: false,
+            diarize_model: default_diarize_model(),
             recordings_dir: String::new(),
             group_minutes: default_meeting_group_minutes(),
         }

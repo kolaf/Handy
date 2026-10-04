@@ -224,12 +224,19 @@ fn output_dir(cfg: &MeetingSettings) -> PathBuf {
 // ---- the job --------------------------------------------------------------------------------------------------------
 
 /// `files` are parts of one session, in order. Returns the path of the minutes.
-async fn run_job(app: &AppHandle, files: &[PathBuf], language: &str) -> Result<PathBuf, String> {
+async fn run_job(
+    app: &AppHandle,
+    files: &[PathBuf],
+    language: &str,
+    speakers: bool,
+) -> Result<PathBuf, String> {
     let settings = get_settings(app);
     let cfg = settings.meeting.clone();
-    let manager = app.state::<Arc<crate::managers::transcription::TranscriptionManager>>();
-    if !manager.is_model_loaded() {
-        manager.initiate_model_load();
+    if !speakers {
+        let manager = app.state::<Arc<crate::managers::transcription::TranscriptionManager>>();
+        if !manager.is_model_loaded() {
+            manager.initiate_model_load();
+        }
     }
 
     // 1. decode every part
@@ -255,47 +262,133 @@ async fn run_job(app: &AppHandle, files: &[PathBuf], language: &str) -> Result<P
         }
     }
 
-    // 2. transcribe chunk by chunk (chunks are global across the parts, like the original script)
-    let chunks: Vec<&[f32]> = pieces.iter().flat_map(|p| chunk(p, CHUNK_SECS)).collect();
-    let total = chunks.len() as u32;
-    let mut transcripts: Vec<String> = Vec::new();
-    for (i, piece) in chunks.iter().enumerate() {
-        if CANCEL.load(Ordering::SeqCst) {
-            return Err("cancelled".into());
-        }
-        emit(
-            app,
-            "transcribing",
-            i as u32,
-            total,
-            format!(
-                "Transcribing chunk {} of {} ({} s)",
-                i + 1,
+    let mut speaker_note = String::new();
+    let (transcript, total) = if speakers {
+        // 2a. cloud transcription with speaker labels: ten-minute chunks, voices carried over from chunk to chunk
+        let provider = settings.active_post_process_provider().cloned().ok_or(
+            "Speaker identification uses the post-processing endpoint, but none is set up.",
+        )?;
+        let api_key = settings
+            .post_process_api_keys
+            .get(&provider.id)
+            .cloned()
+            .unwrap_or_default();
+        let chunks: Vec<&[f32]> = pieces
+            .iter()
+            .flat_map(|p| chunk(p, SPEAKER_CHUNK_SECS))
+            .collect();
+        let total = chunks.len() as u32;
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(900))
+            .build()
+            .map_err(|e| e.to_string())?;
+        let mut book = Speakers::default();
+        let mut done: Vec<(f64, Vec<Turn>)> = Vec::new();
+        let mut offset = 0.0f64;
+        for (i, piece) in chunks.iter().enumerate() {
+            if CANCEL.load(Ordering::SeqCst) {
+                return Err("cancelled".into());
+            }
+            emit(
+                app,
+                "transcribing",
+                i as u32,
                 total,
-                piece.len() / TARGET_HZ as usize
-            ),
-            None,
-        );
-        let audio = piece.to_vec();
-        let handle = app.clone();
-        let text = tokio::task::spawn_blocking(move || {
-            handle
-                .state::<Arc<crate::managers::transcription::TranscriptionManager>>()
-                .transcribe(audio)
-                .map_err(|e| e.to_string())
-        })
-        .await
-        .map_err(|e| e.to_string())??;
-        transcripts.push(text.trim().to_string());
-    }
-    let transcript = transcripts
-        .into_iter()
-        .filter(|t| !t.is_empty())
-        .collect::<Vec<_>>()
-        .join("\n\n");
-    if transcript.trim().is_empty() {
-        return Err("The transcription came back empty.".into());
-    }
+                format!(
+                    "Transcribing and identifying speakers, part {} of {}",
+                    i + 1,
+                    total
+                ),
+                None,
+            );
+            let response = transcribe_diarized(
+                &client,
+                &provider.base_url,
+                &api_key,
+                &cfg.diarize_model,
+                wav_bytes(piece)?,
+                language,
+                &book.references(),
+            )
+            .await?;
+            let seconds = piece.len() as f64 / TARGET_HZ as f64;
+            let turns = if response.turns.is_empty() {
+                // an endpoint that drops the segments still gives the text
+                vec![Turn {
+                    speaker: String::new(),
+                    start: 0.0,
+                    end: seconds,
+                    text: response.text.clone(),
+                }]
+            } else {
+                book.relabel(response.turns)
+            };
+            book.learn_samples(&turns, piece);
+            done.push((offset, turns));
+            offset += seconds;
+        }
+        speaker_note = if book.names().is_empty() {
+            format!(
+                "The endpoint ({}) answered without speaker labels, so the transcript has none. Check that it passes the diarizing model's diarized_json format through.",
+                provider.base_url
+            )
+        } else {
+            format!(
+                "{} speakers found by {} at {}.",
+                book.names().len(),
+                cfg.diarize_model,
+                provider.base_url
+            )
+        };
+        let transcript = format_speaker_transcript(&done);
+        if transcript.trim().is_empty() {
+            return Err("The transcription came back empty.".into());
+        }
+        (transcript, total)
+    } else {
+        // 2b. local transcription: chunk by chunk (chunks are global across the parts, like the original script)
+        let chunks: Vec<&[f32]> = pieces.iter().flat_map(|p| chunk(p, CHUNK_SECS)).collect();
+        let total = chunks.len() as u32;
+        let mut transcripts: Vec<String> = Vec::new();
+        for (i, piece) in chunks.iter().enumerate() {
+            if CANCEL.load(Ordering::SeqCst) {
+                return Err("cancelled".into());
+            }
+            emit(
+                app,
+                "transcribing",
+                i as u32,
+                total,
+                format!(
+                    "Transcribing chunk {} of {} ({} s)",
+                    i + 1,
+                    total,
+                    piece.len() / TARGET_HZ as usize
+                ),
+                None,
+            );
+            let audio = piece.to_vec();
+            let handle = app.clone();
+            let text = tokio::task::spawn_blocking(move || {
+                handle
+                    .state::<Arc<crate::managers::transcription::TranscriptionManager>>()
+                    .transcribe(audio)
+                    .map_err(|e| e.to_string())
+            })
+            .await
+            .map_err(|e| e.to_string())??;
+            transcripts.push(text.trim().to_string());
+        }
+        let transcript = transcripts
+            .into_iter()
+            .filter(|t| !t.is_empty())
+            .collect::<Vec<_>>()
+            .join("\n\n");
+        if transcript.trim().is_empty() {
+            return Err("The transcription came back empty.".into());
+        }
+        (transcript, total)
+    };
 
     // 3. minutes and title from the post-processing model
     emit(
@@ -342,7 +435,12 @@ async fn run_job(app: &AppHandle, files: &[PathBuf], language: &str) -> Result<P
                 "meeting",
                 &format!("{name} ({} min)", total_secs / 60),
                 &format!(
-                    "Language: {language}\nFiles: {}\nMinutes: {}\nTranscript: {}",
+                    "Language: {language}\n{}Files: {}\nMinutes: {}\nTranscript: {}",
+                    if speaker_note.is_empty() {
+                        String::new()
+                    } else {
+                        format!("Speakers: {speaker_note}\n")
+                    },
                     files
                         .iter()
                         .map(|f| f.display().to_string())
@@ -365,6 +463,280 @@ async fn run_job(app: &AppHandle, files: &[PathBuf], language: &str) -> Result<P
 const AUDIO_EXTENSIONS: &[&str] = &[
     "mp3", "m4a", "aac", "wav", "flac", "ogg", "mkv", "mp4", "mov",
 ];
+
+// ---- speakers (cloud diarization) --------------------------------------------------------------------------------------
+
+/// Chunks for the diarizing model: ten minutes of 16 kHz mono WAV is 19 MB, under the 25 MB limit of the API.
+const SPEAKER_CHUNK_SECS: usize = 10 * 60;
+/// Speaker voice samples carried to later chunks so that the same person keeps the same label (the API takes a few).
+const MAX_REFERENCE_SPEAKERS: usize = 4;
+
+/// One piece of speech with its speaker, as returned by the diarizing model. Times are seconds from the chunk start.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Turn {
+    pub speaker: String,
+    pub start: f64,
+    pub end: f64,
+    pub text: String,
+}
+
+#[derive(Debug, Default)]
+pub struct Diarized {
+    pub turns: Vec<Turn>,
+    /// The whole text as the API returned it (used when there are no segments).
+    pub text: String,
+}
+
+/// 16-bit mono 16 kHz WAV file bytes.
+pub fn wav_bytes(samples: &[f32]) -> Result<Vec<u8>, String> {
+    let spec = hound::WavSpec {
+        channels: 1,
+        sample_rate: TARGET_HZ,
+        bits_per_sample: 16,
+        sample_format: hound::SampleFormat::Int,
+    };
+    let mut cursor = std::io::Cursor::new(Vec::with_capacity(samples.len() * 2 + 64));
+    {
+        let mut writer = hound::WavWriter::new(&mut cursor, spec).map_err(|e| e.to_string())?;
+        for s in samples {
+            writer
+                .write_sample((s.clamp(-1.0, 1.0) * i16::MAX as f32) as i16)
+                .map_err(|e| e.to_string())?;
+        }
+        writer.finalize().map_err(|e| e.to_string())?;
+    }
+    Ok(cursor.into_inner())
+}
+
+/// The `diarized_json` response: `{"text": "...", "segments": [{"speaker": "A", "start": 0.0, "end": 4.2, "text": "..."}]}`.
+pub fn parse_diarized(body: &str) -> Result<Diarized, String> {
+    let value: serde_json::Value = serde_json::from_str(body).map_err(|_| {
+        format!(
+            "Unexpected response: {}",
+            body.chars().take(200).collect::<String>()
+        )
+    })?;
+    let text = value
+        .get("text")
+        .and_then(|t| t.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    let turns: Vec<Turn> = value
+        .get("segments")
+        .and_then(|s| s.as_array())
+        .map(|segments| {
+            segments
+                .iter()
+                .filter_map(|seg| {
+                    let text = seg.get("text")?.as_str()?.trim().to_string();
+                    if text.is_empty() {
+                        return None;
+                    }
+                    Some(Turn {
+                        speaker: seg
+                            .get("speaker")
+                            .and_then(|s| s.as_str())
+                            .unwrap_or("")
+                            .to_string(),
+                        start: seg.get("start").and_then(|v| v.as_f64()).unwrap_or(0.0),
+                        end: seg.get("end").and_then(|v| v.as_f64()).unwrap_or(0.0),
+                        text,
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    if turns.is_empty() && text.is_empty() {
+        return Err(format!(
+            "The response has no text: {}",
+            body.chars().take(200).collect::<String>()
+        ));
+    }
+    Ok(Diarized { turns, text })
+}
+
+/// Keeps the speaker labels the same from chunk to chunk. The API labels people "A", "B" ... within one request; here they
+/// become "Speaker 1", "Speaker 2" ... in order of first appearance, and a short voice sample of each is passed to the
+/// later requests as `known_speaker_references`, which makes the API reuse the same names.
+#[derive(Default)]
+pub struct Speakers {
+    names: Vec<String>,
+    samples: Vec<(String, Vec<f32>)>,
+}
+
+impl Speakers {
+    pub fn names(&self) -> &[String] {
+        &self.names
+    }
+
+    /// Rewrites one chunk's labels to the stable ones. Labels the API got from our references are already stable.
+    pub fn relabel(&mut self, turns: Vec<Turn>) -> Vec<Turn> {
+        let mut raw_to_stable: std::collections::HashMap<String, String> =
+            std::collections::HashMap::new();
+        turns
+            .into_iter()
+            .map(|mut turn| {
+                let raw = turn.speaker.clone();
+                if raw.is_empty() {
+                    return turn;
+                }
+                let stable = if self.names.contains(&raw) {
+                    raw.clone()
+                } else {
+                    raw_to_stable
+                        .entry(raw.clone())
+                        .or_insert_with(|| {
+                            let name = format!("Speaker {}", self.names.len() + 1);
+                            self.names.push(name.clone());
+                            name
+                        })
+                        .clone()
+                };
+                turn.speaker = stable;
+                turn
+            })
+            .collect()
+    }
+
+    /// Remembers a few seconds of each speaker who has no sample yet, taken from their longest turn in this chunk.
+    pub fn learn_samples(&mut self, turns: &[Turn], audio: &[f32]) {
+        for name in self.names.clone() {
+            if self.samples.len() >= MAX_REFERENCE_SPEAKERS
+                || self.samples.iter().any(|(n, _)| *n == name)
+            {
+                continue;
+            }
+            let best = turns
+                .iter()
+                .filter(|t| t.speaker == name && t.end - t.start >= 3.0)
+                .max_by(|a, b| (a.end - a.start).total_cmp(&(b.end - b.start)));
+            if let Some(turn) = best {
+                let from = (turn.start.max(0.0) * TARGET_HZ as f64) as usize;
+                let to =
+                    ((turn.start + (turn.end - turn.start).min(8.0)) * TARGET_HZ as f64) as usize;
+                if from < to && to <= audio.len() {
+                    self.samples.push((name, audio[from..to].to_vec()));
+                }
+            }
+        }
+    }
+
+    /// (name, WAV bytes) of every speaker with a sample.
+    pub fn references(&self) -> Vec<(String, Vec<u8>)> {
+        self.samples
+            .iter()
+            .filter_map(|(n, s)| wav_bytes(s).ok().map(|w| (n.clone(), w)))
+            .collect()
+    }
+}
+
+fn clock(seconds: f64) -> String {
+    let total = seconds.max(0.0) as u64;
+    if total >= 3600 {
+        format!(
+            "{}:{:02}:{:02}",
+            total / 3600,
+            (total % 3600) / 60,
+            total % 60
+        )
+    } else {
+        format!("{:02}:{:02}", total / 60, total % 60)
+    }
+}
+
+/// The transcript with speakers: `[mm:ss] Speaker 1: text`, one line per stretch of one speaker. `chunks` holds each chunk's
+/// start (seconds from the beginning of the recording) and its turns with stable labels.
+pub fn format_speaker_transcript(chunks: &[(f64, Vec<Turn>)]) -> String {
+    let mut lines: Vec<(f64, f64, String, String)> = Vec::new(); // (start, end, speaker, text)
+    for (offset, turns) in chunks {
+        for turn in turns {
+            let (start, end) = (offset + turn.start, offset + turn.end);
+            match lines.last_mut() {
+                Some(last) if last.2 == turn.speaker && start - last.1 <= 30.0 => {
+                    last.1 = end;
+                    last.3.push(' ');
+                    last.3.push_str(&turn.text);
+                }
+                _ => lines.push((start, end, turn.speaker.clone(), turn.text.clone())),
+            }
+        }
+    }
+    lines
+        .into_iter()
+        .map(|(start, _, speaker, text)| {
+            if speaker.is_empty() {
+                format!("[{}] {}", clock(start), text)
+            } else {
+                format!("[{}] {}: {}", clock(start), speaker, text)
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n\n")
+}
+
+/// One request to the diarizing model. `references` are (speaker name, WAV bytes) of people already heard.
+async fn transcribe_diarized(
+    client: &reqwest::Client,
+    base_url: &str,
+    api_key: &str,
+    model: &str,
+    wav: Vec<u8>,
+    language: &str,
+    references: &[(String, Vec<u8>)],
+) -> Result<Diarized, String> {
+    use base64::Engine as _;
+    let url = format!("{}/audio/transcriptions", base_url.trim_end_matches('/'));
+    let mut last_error = String::new();
+    for attempt in 1..=3u32 {
+        let file = reqwest::multipart::Part::bytes(wav.clone())
+            .file_name("chunk.wav")
+            .mime_str("audio/wav")
+            .map_err(|e| e.to_string())?;
+        let mut form = reqwest::multipart::Form::new()
+            .part("file", file)
+            .text("model", model.to_string())
+            .text("response_format", "diarized_json")
+            .text("chunking_strategy", "auto");
+        if !language.is_empty() && language != "auto" {
+            form = form.text("language", language.to_string());
+        }
+        for (name, sample) in references {
+            form = form.text("known_speaker_names[]", name.clone()).text(
+                "known_speaker_references[]",
+                format!(
+                    "data:audio/wav;base64,{}",
+                    base64::engine::general_purpose::STANDARD.encode(sample)
+                ),
+            );
+        }
+        let mut request = client.post(&url).multipart(form);
+        if !api_key.is_empty() {
+            request = request.bearer_auth(api_key);
+        }
+        match request.send().await {
+            Ok(response) => {
+                let status = response.status();
+                let body = response.text().await.unwrap_or_default();
+                if status.is_success() {
+                    return parse_diarized(&body);
+                }
+                last_error = format!(
+                    "HTTP {status}: {}",
+                    body.chars().take(400).collect::<String>()
+                );
+                if !(status.as_u16() == 429 || status.is_server_error()) {
+                    return Err(last_error);
+                }
+            }
+            Err(e) => last_error = format!("Request failed: {e}"),
+        }
+        if attempt < 3 {
+            tokio::time::sleep(Duration::from_secs(2u64.pow(attempt))).await;
+        }
+    }
+    Err(last_error)
+}
 
 // ---- the latest recording(s) from the recorder's folder ---------------------------------------------------------------
 
@@ -607,6 +979,7 @@ pub fn start(
     files: Vec<PathBuf>,
     language: String,
     model: Option<String>,
+    speakers: bool,
 ) -> Result<(), String> {
     let files = expand_inputs(files)?;
     if files.is_empty() {
@@ -632,12 +1005,18 @@ pub fn start(
             .map(|m| (m.id, m.name))
             .collect();
         let mut switched = false;
-        let mut result = match choose_model(
-            model.as_deref(),
-            &settings.meeting.model_id,
-            &previous,
-            &candidates,
-        ) {
+        let speakers = speakers || settings.meeting.speakers;
+        // With speaker identification the audio goes to the endpoint, so no local model is loaded.
+        let mut result = match if speakers {
+            Ok(None)
+        } else {
+            choose_model(
+                model.as_deref(),
+                &settings.meeting.model_id,
+                &previous,
+                &candidates,
+            )
+        } {
             Ok(Some(id)) => {
                 emit(
                     &app,
@@ -667,7 +1046,7 @@ pub fn start(
         }
         .map(|()| PathBuf::new());
         if result.is_ok() {
-            result = run_job(&app, &files, &language).await;
+            result = run_job(&app, &files, &language, speakers).await;
         }
         // Put the dictation model back.
         if switched {
@@ -710,11 +1089,12 @@ pub fn run_latest(
     single: bool,
     language: Option<String>,
     model: Option<String>,
+    speakers: bool,
 ) {
     let cfg = get_settings(app).meeting;
     let language = language.unwrap_or_else(|| cfg.language.clone());
     let result = find_latest(&cfg, folder.as_deref(), single)
-        .and_then(|files| start(app, files, language, model));
+        .and_then(|files| start(app, files, language, model, speakers));
     if let Err(reason) = result {
         warn!("Meeting: {reason}");
         crate::learn::announce_with(
@@ -744,9 +1124,15 @@ pub fn split_paths(list: &str) -> Vec<PathBuf> {
 }
 
 /// `handy --meeting-minutes "a.m4a;b.m4a" [--meeting-language no] [--meeting-model parakeet]` (a folder works too)
-pub fn run_cli(app: &AppHandle, list: &str, language: Option<String>, model: Option<String>) {
+pub fn run_cli(
+    app: &AppHandle,
+    list: &str,
+    language: Option<String>,
+    model: Option<String>,
+    speakers: bool,
+) {
     let language = language.unwrap_or_else(|| get_settings(app).meeting.language);
-    if let Err(reason) = start(app, split_paths(list), language, model) {
+    if let Err(reason) = start(app, split_paths(list), language, model, speakers) {
         warn!("Meeting: {reason}");
         crate::activity::log(
             app,
@@ -765,6 +1151,7 @@ pub fn start_meeting(app: AppHandle, files: Vec<String>, language: String) -> Re
         files.into_iter().map(PathBuf::from).collect(),
         language,
         None,
+        false,
     )
 }
 
@@ -988,5 +1375,160 @@ mod tests {
         std::fs::write(dir.join("junk.mp3"), b"not audio at all").unwrap();
         assert!(decode_to_16k(&dir.join("junk.mp3")).is_err());
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    fn turn(speaker: &str, start: f64, end: f64, text: &str) -> Turn {
+        Turn {
+            speaker: speaker.into(),
+            start,
+            end,
+            text: text.into(),
+        }
+    }
+
+    #[test]
+    fn a_diarized_response_is_parsed() {
+        let body = r#"{"task":"transcribe","duration":9.0,"text":"Hi. Hello.","segments":[
+            {"type":"transcript.text.segment","id":"s1","start":0.0,"end":2.0,"text":" Hi.","speaker":"A"},
+            {"type":"transcript.text.segment","id":"s2","start":2.0,"end":4.5,"text":"Hello.","speaker":"B"},
+            {"type":"transcript.text.segment","id":"s3","start":5.0,"end":6.0,"text":"  ","speaker":"A"}]}"#;
+        let parsed = parse_diarized(body).unwrap();
+        assert_eq!(parsed.turns.len(), 2);
+        assert_eq!(parsed.turns[0], turn("A", 0.0, 2.0, "Hi."));
+        assert_eq!(parsed.turns[1].speaker, "B");
+        // plain text without segments still works, nothing at all is an error
+        let plain = parse_diarized(r#"{"text":"Just text"}"#).unwrap();
+        assert!(plain.turns.is_empty() && plain.text == "Just text");
+        assert!(parse_diarized(r#"{"segments":[]}"#).is_err());
+        assert!(parse_diarized("<html>").is_err());
+    }
+
+    #[test]
+    fn labels_stay_the_same_between_chunks() {
+        let mut book = Speakers::default();
+        let first = book.relabel(vec![
+            turn("B", 0.0, 4.0, "one"),
+            turn("A", 4.0, 8.0, "two"),
+            turn("B", 8.0, 9.0, "three"),
+        ]);
+        assert_eq!(first[0].speaker, "Speaker 1");
+        assert_eq!(first[1].speaker, "Speaker 2");
+        assert_eq!(first[2].speaker, "Speaker 1");
+        // a later chunk that was given our names back keeps them; a new person gets the next number
+        let second = book.relabel(vec![
+            turn("Speaker 2", 0.0, 3.0, "four"),
+            turn("C", 3.0, 6.0, "five"),
+        ]);
+        assert_eq!(second[0].speaker, "Speaker 2");
+        assert_eq!(second[1].speaker, "Speaker 3");
+        assert_eq!(book.names().len(), 3);
+    }
+
+    #[test]
+    fn voice_samples_come_from_a_long_turn_of_each_speaker() {
+        let mut book = Speakers::default();
+        let audio = vec![0.1f32; 40 * TARGET_HZ as usize];
+        let turns = book.relabel(vec![
+            turn("A", 0.0, 2.0, "short"),
+            turn("A", 2.0, 20.0, "long"),
+            turn("B", 20.0, 22.0, "too short"),
+        ]);
+        book.learn_samples(&turns, &audio);
+        let refs = book.references();
+        // only Speaker 1 has a turn of at least 3 s; the sample is cut to 8 s
+        assert_eq!(refs.len(), 1);
+        assert_eq!(refs[0].0, "Speaker 1");
+        let reader = hound::WavReader::new(std::io::Cursor::new(&refs[0].1)).unwrap();
+        assert_eq!(reader.spec().sample_rate, TARGET_HZ);
+        assert_eq!(reader.len() as usize, 8 * TARGET_HZ as usize);
+    }
+
+    #[test]
+    fn the_speaker_transcript_merges_turns_and_adds_chunk_offsets() {
+        let chunks = vec![
+            (
+                0.0,
+                vec![
+                    turn("Speaker 1", 0.0, 4.0, "Hello."),
+                    turn("Speaker 1", 4.5, 8.0, "Welcome."),
+                    turn("Speaker 2", 8.0, 12.0, "Thanks."),
+                ],
+            ),
+            (600.0, vec![turn("Speaker 2", 1.0, 3.0, "Back again.")]),
+        ];
+        let text = format_speaker_transcript(&chunks);
+        assert_eq!(
+            text,
+            "[00:00] Speaker 1: Hello. Welcome.\n\n[00:08] Speaker 2: Thanks.\n\n[10:01] Speaker 2: Back again."
+        );
+        assert_eq!(clock(3725.0), "1:02:05");
+        // a response without labels is shown without a name
+        let plain = format_speaker_transcript(&[(0.0, vec![turn("", 0.0, 5.0, "Text only")])]);
+        assert_eq!(plain, "[00:00] Text only");
+    }
+
+    #[test]
+    fn a_wav_chunk_for_ten_minutes_stays_under_the_upload_limit() {
+        let bytes = wav_bytes(&vec![0.0; SPEAKER_CHUNK_SECS * TARGET_HZ as usize]).unwrap();
+        assert!(bytes.len() < 25 * 1024 * 1024, "{}", bytes.len());
+    }
+
+    #[tokio::test]
+    async fn the_diarize_request_has_the_expected_shape() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut received = Vec::new();
+            let mut buffer = [0u8; 8192];
+            // read until the closing multipart boundary has arrived
+            loop {
+                let n = socket.read(&mut buffer).await.unwrap();
+                received.extend_from_slice(&buffer[..n]);
+                if n == 0
+                    || received.windows(4).any(|w| w == b"--\r\n") && received.ends_with(b"--\r\n")
+                {
+                    break;
+                }
+            }
+            let body =
+                r#"{"text":"Hi","segments":[{"start":0.0,"end":1.0,"text":"Hi","speaker":"A"}]}"#;
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            socket.write_all(response.as_bytes()).await.unwrap();
+            String::from_utf8_lossy(&received).to_string()
+        });
+        let client = reqwest::Client::new();
+        let references = vec![("Speaker 1".to_string(), wav_bytes(&[0.0; 1600]).unwrap())];
+        let got = transcribe_diarized(
+            &client,
+            &format!("http://127.0.0.1:{port}/v1/"),
+            "secret",
+            "gpt-4o-transcribe-diarize",
+            wav_bytes(&[0.0; 1600]).unwrap(),
+            "no",
+            &references,
+        )
+        .await
+        .unwrap();
+        assert_eq!(got.turns.len(), 1);
+        let request = server.await.unwrap();
+        assert!(
+            request.starts_with("POST /v1/audio/transcriptions "),
+            "{request:.80}"
+        );
+        let lower = request.to_lowercase();
+        assert!(lower.contains("authorization: bearer secret"));
+        assert!(
+            request.contains("name=\"model\"") && request.contains("gpt-4o-transcribe-diarize")
+        );
+        assert!(request.contains("diarized_json") && request.contains("chunking_strategy"));
+        assert!(request.contains("name=\"language\"") && request.contains("\r\n\r\nno\r\n"));
+        assert!(request.contains("known_speaker_names[]") && request.contains("Speaker 1"));
+        assert!(request.contains("data:audio/wav;base64,UklGR"));
     }
 }

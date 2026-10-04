@@ -903,6 +903,7 @@ pub fn run(cli_args: CliArgs) {
                     &files,
                     signal_handle::flag_value(&args, "--meeting-language"),
                     signal_handle::flag_value(&args, "--meeting-model"),
+                    args.iter().any(|a| a == "--meeting-speakers"),
                 );
                 handled_setting = true;
             }
@@ -913,6 +914,7 @@ pub fn run(cli_args: CliArgs) {
                     args.iter().any(|a| a == "--meeting-single"),
                     signal_handle::flag_value(&args, "--meeting-language"),
                     signal_handle::flag_value(&args, "--meeting-model"),
+                    args.iter().any(|a| a == "--meeting-speakers"),
                 );
                 handled_setting = true;
             }

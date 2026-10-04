@@ -56,6 +56,11 @@ pub struct CliArgs {
     #[arg(long, value_name = "NAME")]
     pub meeting_model: Option<String>,
 
+    /// Identify the speakers in the minutes (with --meeting-minutes or --meeting-latest): the audio is sent to the
+    /// post-processing endpoint's diarizing model instead of being transcribed locally
+    #[arg(long)]
+    pub meeting_speakers: bool,
+
     /// Switch the speech model by (part of) its name or id, e.g. `parakeet` (sent to running instance)
     #[arg(long, value_name = "NAME")]
     pub set_model: Option<String>,

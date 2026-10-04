@@ -35,6 +35,10 @@ export const MeetingsSettings: React.FC = () => {
   const [groupMinutes, setGroupMinutes] = useState(
     String(saved.group_minutes ?? 5),
   );
+  const [speakers, setSpeakers] = useState(saved.speakers ?? false);
+  const [diarizeModel, setDiarizeModel] = useState(
+    saved.diarize_model ?? "gpt-4o-transcribe-diarize",
+  );
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [dragging, setDragging] = useState(false);
   const [files, setFiles] = useState<string[]>([]);
@@ -101,6 +105,8 @@ export const MeetingsSettings: React.FC = () => {
     model_id: modelId,
     recordings_dir: recordingsDir,
     group_minutes: Math.max(1, Number.parseInt(groupMinutes, 10) || 5),
+    speakers,
+    diarize_model: diarizeModel.trim() || "gpt-4o-transcribe-diarize",
   });
 
   // Fills the list with the latest recording from the recorder's folder (the files that belong together).
@@ -219,6 +225,31 @@ export const MeetingsSettings: React.FC = () => {
             variant="compact"
             disabled={running}
           />
+          <label className="flex items-start gap-2">
+            <input
+              type="checkbox"
+              checked={speakers}
+              onChange={(e) => setSpeakers(e.target.checked)}
+              disabled={running}
+              className="mt-1"
+            />
+            <span>
+              {t("settings.meetings.speakers")}
+              <span className="block text-xs text-mid-gray">
+                {t("settings.meetings.speakersDescription")}
+              </span>
+            </span>
+          </label>
+          {speakers ? (
+            <Input
+              type="text"
+              value={diarizeModel}
+              onChange={(e) => setDiarizeModel(e.target.value)}
+              placeholder={t("settings.meetings.diarizeModelPlaceholder")}
+              variant="compact"
+              disabled={running}
+            />
+          ) : null}
           <Input
             type="text"
             value={outputDir}

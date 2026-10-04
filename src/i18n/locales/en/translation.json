@@ -776,7 +776,10 @@
       "useLatest": "Use the latest recording",
       "browse": "Browse...",
       "recordingsPlaceholder": "Recorder folder, e.g. where OBS saves (empty: Videos in your home folder)",
-      "groupPlaceholder": "Minutes between files that belong together (default 5)"
+      "groupPlaceholder": "Minutes between files that belong together (default 5)",
+      "speakers": "Identify the speakers",
+      "speakersDescription": "Sends the audio to the post-processing endpoint (the same address and key as the language model), where a diarizing transcription model labels who speaks. The recording leaves this computer, and the speech model above is not used. Off: everything stays local.",
+      "diarizeModelPlaceholder": "Diarizing model (default gpt-4o-transcribe-diarize)"
     }
   },
   "footer": {

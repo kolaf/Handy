@@ -177,6 +177,17 @@ meetings apart. If a length cannot be read, only files written within N minutes 
 written less than 20 seconds ago is refused ("the recording may still be running"). MKV files with Opus audio cannot be decoded; set OBS
 to AAC. Everything is plain file-system code, so it behaves the same on Windows and Linux; the Talon commands do not touch the clipboard.
 
+**Speakers in meeting minutes (cloud, off by default; untested against the real endpoint).** The Meetings page checkbox "Identify the
+speakers", `--meeting-speakers`, and Talon "transcribe latest meeting with speakers" / "transcribe meeting [norwegian|english] with
+speakers" send the audio (16 kHz mono WAV, ten-minute pieces under the 25 MB limit) to `POST {post-processing base URL}/audio/transcriptions`
+with the post-processing API key, model `diarize_model` (default `gpt-4o-transcribe-diarize`), `response_format=diarized_json` and
+`chunking_strategy=auto`. No local speech model is used or loaded. The transcript becomes `[mm:ss] Speaker N: text` (consecutive turns of one
+speaker are joined) and the minutes prompts attribute views, decisions and actions to the labels without guessing names. Labels from the API
+("A", "B") only hold within one request, so for the following pieces Handy sends an 8 s voice sample of up to 4 known speakers
+(`known_speaker_names[]` / `known_speaker_references[]`) to keep "Speaker 1" the same person. Names are not looked up; say them in the
+minutes by editing. If the endpoint (LiteLLM, for instance) drops the segments, the transcript is plain text and the Activity entry says so.
+Privacy: unlike plain transcription, the recording leaves the computer.
+
 **Model switching.** `handy --set-model NAME` switches the speech-to-text model by (part of) its id or name, ignoring case:
 an exact id wins, otherwise the words must occur in exactly one downloaded model (ambiguous or unknown names say so and list the
 downloaded ones). It uses the same switch as the settings page and tray menu (the model is loaded right away unless unloading is
