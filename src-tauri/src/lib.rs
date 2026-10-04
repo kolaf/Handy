@@ -700,6 +700,8 @@ pub fn run(cli_args: CliArgs) {
             learn::update_corrections,
             activity::get_activity,
             activity::clear_activity,
+            model_switch::update_language_models,
+            model_switch::change_language_models_enabled_setting,
             context::update_app_prompts,
             context::change_app_prompts_enabled_setting,
             context::change_paste_focus_guard_setting,

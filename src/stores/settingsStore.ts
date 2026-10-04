@@ -10,6 +10,7 @@ import type {
   Snippet,
   Correction,
   AppPrompt,
+  LanguageModel,
   VadBackend,
 } from "@/bindings";
 import { commands } from "@/bindings";
@@ -143,6 +144,10 @@ const settingUpdaters: {
   custom_words: (value) => commands.updateCustomWords(value as string[]),
   snippets: (value) => commands.updateSnippets(value as Snippet[]),
   corrections: (value) => commands.updateCorrections(value as Correction[]),
+  language_models: (value) =>
+    commands.updateLanguageModels(value as LanguageModel[]),
+  language_models_enabled: (value) =>
+    commands.changeLanguageModelsEnabledSetting(value as boolean),
   paste_focus_guard: (value) =>
     commands.changePasteFocusGuardSetting(value as boolean),
   app_prompts: (value) => commands.updateAppPrompts(value as AppPrompt[]),

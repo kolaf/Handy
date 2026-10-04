@@ -103,6 +103,119 @@ pub fn switch_and_report(app: &AppHandle, id: &str) {
     }
 }
 
+/// What to do when the dictation language becomes `language`.
+#[derive(Debug, PartialEq)]
+pub enum LanguagePlan {
+    /// No rule for the language, or the model is already the right one.
+    Nothing,
+    /// Switch to this downloaded model.
+    Switch(String),
+    /// The rule names a model that is not downloaded.
+    Missing(String),
+}
+
+pub fn plan_for_language(
+    rules: &[crate::settings::LanguageModel],
+    language: &str,
+    current_model: &str,
+    downloaded_ids: &[String],
+) -> LanguagePlan {
+    let Some(rule) = rules
+        .iter()
+        .find(|r| r.language.eq_ignore_ascii_case(language.trim()))
+    else {
+        return LanguagePlan::Nothing;
+    };
+    if rule.model_id == current_model {
+        LanguagePlan::Nothing
+    } else if downloaded_ids.contains(&rule.model_id) {
+        LanguagePlan::Switch(rule.model_id.clone())
+    } else {
+        LanguagePlan::Missing(rule.model_id.clone())
+    }
+}
+
+/// Called after the dictation language changed: if the link is on and a rule names a model for it, switch to that model.
+/// Runs the switch on its own thread (loading a model takes a moment).
+pub fn follow_language(app: &AppHandle, language: &str) {
+    let settings = get_settings(app);
+    if !settings.language_models_enabled || settings.language_models.is_empty() {
+        return;
+    }
+    let ids: Vec<String> = downloaded(app).into_iter().map(|m| m.id).collect();
+    match plan_for_language(
+        &settings.language_models,
+        language,
+        &settings.selected_model,
+        &ids,
+    ) {
+        LanguagePlan::Nothing => {}
+        LanguagePlan::Switch(id) => {
+            let app = app.clone();
+            std::thread::spawn(move || switch_and_report(&app, &id));
+        }
+        LanguagePlan::Missing(id) => crate::learn::announce_with(
+            app,
+            "model-failed",
+            id.clone(),
+            format!("The model for language '{language}' is '{id}', but it is not downloaded."),
+        ),
+    }
+}
+
+fn valid_rules(
+    rules: &[crate::settings::LanguageModel],
+    known_ids: &[String],
+) -> Result<(), String> {
+    if rules.len() > 30 {
+        return Err("At most 30 language rules are allowed".into());
+    }
+    for (i, rule) in rules.iter().enumerate() {
+        let lang = rule.language.trim();
+        if lang.is_empty() || lang.chars().count() > 12 || lang.chars().any(|c| c.is_control()) {
+            return Err(format!("Invalid language '{}'", rule.language));
+        }
+        if !known_ids.contains(&rule.model_id) {
+            return Err(format!("Unknown model '{}'", rule.model_id));
+        }
+        if rules[..i]
+            .iter()
+            .any(|o| o.language.eq_ignore_ascii_case(lang))
+        {
+            return Err(format!("Language '{lang}' appears twice"));
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn update_language_models(
+    app: AppHandle,
+    rules: Vec<crate::settings::LanguageModel>,
+) -> Result<(), String> {
+    let known: Vec<String> = app
+        .state::<Arc<ModelManager>>()
+        .get_available_models()
+        .into_iter()
+        .map(|m| m.id)
+        .collect();
+    valid_rules(&rules, &known)?;
+    let mut settings = get_settings(&app);
+    settings.language_models = rules;
+    crate::settings::write_settings(&app, settings);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn change_language_models_enabled_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = get_settings(&app);
+    settings.language_models_enabled = enabled;
+    crate::settings::write_settings(&app, settings);
+    Ok(())
+}
+
 /// `handy --set-model QUERY`
 pub fn run_set(app: &AppHandle, query: String) {
     let app = app.clone();
@@ -148,6 +261,57 @@ mod tests {
             resolve_id(&models(), " v3 ").unwrap(),
             "parakeet-tdt-0.6b-v3"
         );
+    }
+
+    #[test]
+    fn a_language_rule_picks_the_downloaded_model_unless_it_is_already_active() {
+        use crate::settings::LanguageModel;
+        let rules = vec![
+            LanguageModel {
+                language: "no".into(),
+                model_id: "nb".into(),
+            },
+            LanguageModel {
+                language: "en".into(),
+                model_id: "parakeet".into(),
+            },
+        ];
+        let have = vec!["nb".to_string(), "parakeet".to_string()];
+        assert_eq!(
+            plan_for_language(&rules, "en", "nb", &have),
+            LanguagePlan::Switch("parakeet".into())
+        );
+        assert_eq!(
+            plan_for_language(&rules, "EN", "parakeet", &have),
+            LanguagePlan::Nothing
+        );
+        assert_eq!(
+            plan_for_language(&rules, "sv", "nb", &have),
+            LanguagePlan::Nothing
+        );
+        assert_eq!(
+            plan_for_language(&rules, "en", "nb", &["nb".to_string()]),
+            LanguagePlan::Missing("parakeet".into())
+        );
+        assert_eq!(
+            plan_for_language(&[], "en", "nb", &have),
+            LanguagePlan::Nothing
+        );
+    }
+
+    #[test]
+    fn language_rules_are_validated() {
+        use crate::settings::LanguageModel;
+        let known = vec!["nb".to_string(), "parakeet".to_string()];
+        let rule = |l: &str, m: &str| LanguageModel {
+            language: l.into(),
+            model_id: m.into(),
+        };
+        assert!(valid_rules(&[rule("no", "nb"), rule("en", "parakeet")], &known).is_ok());
+        assert!(valid_rules(&[rule("", "nb")], &known).is_err());
+        assert!(valid_rules(&[rule("no", "ghost")], &known).is_err());
+        assert!(valid_rules(&[rule("no", "nb"), rule("NO", "parakeet")], &known).is_err());
+        assert!(valid_rules(&[rule("a\tb", "nb")], &known).is_err());
     }
 
     #[test]

@@ -112,6 +112,13 @@ pub struct AppPrompt {
     pub prompt_id: String,
 }
 
+/// Which speech model goes with a dictation language (optional): choosing `language` also switches to `model_id`.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Type)]
+pub struct LanguageModel {
+    pub language: String,
+    pub model_id: String,
+}
+
 /// A named block of text that the post-processing prompt can insert by name
 /// (`[[snippet: NAME]]`); see `extras.rs`.
 #[derive(Serialize, Deserialize, Debug, Clone, Type, PartialEq)]
@@ -498,6 +505,11 @@ pub struct AppSettings {
     /// Learned `wrong -> right` fixes applied to each new transcript.
     #[serde(default)]
     pub corrections: Vec<Correction>,
+    /// Switch the speech model together with the dictation language, following `language_models`.
+    #[serde(default)]
+    pub language_models_enabled: bool,
+    #[serde(default)]
+    pub language_models: Vec<LanguageModel>,
     /// Do not paste a dictation into another window than the one it was started in (Windows only): keep it on the
     /// clipboard and say so instead.
     #[serde(default = "default_true")]
@@ -1086,6 +1098,8 @@ pub fn get_default_settings() -> AppSettings {
         snippets: Vec::new(),
         corrections: Vec::new(),
         paste_focus_guard: true,
+        language_models_enabled: false,
+        language_models: Vec::new(),
         app_prompts_enabled: false,
         app_prompts: Vec::new(),
         post_process_min_words: 0,

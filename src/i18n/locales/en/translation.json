@@ -241,6 +241,16 @@
           "push_to_talk": "Records while you hold the shortcut",
           "toggle": "Tap the shortcut to start recording, tap again to stop"
         }
+      },
+      "languageModels": {
+        "title": "Model per language",
+        "enabledLabel": "Switch the speech model with the language",
+        "enabledDescription": "When you change the dictation language (swap shortcut, command line, Talon or the language setting), also switch to the model named for that language below, for example English → Parakeet and Norwegian → NB-Whisper. A language without a rule leaves the model alone. Only downloaded models can be used.",
+        "rulesTitle": "Rules",
+        "languagePlaceholder": "Language code, e.g. no or en",
+        "modelPlaceholder": "Model",
+        "add": "Add rule",
+        "remove": "Remove"
       }
     },
     "models": {

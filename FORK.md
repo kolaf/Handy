@@ -142,6 +142,12 @@ community behaviour runs. It does not matter how a dictation was started (hotkey
 known to neither side. Talon: "scratch dictation", "redo as email|message|
 note|meeting|document|formal|informal|simple".
 
+**Model per language (optional).** Settings → General → "Model per language": turn it on and add rules "language code →
+downloaded model" (for example `en` → Parakeet, `no` → NB-Whisper). Whenever the dictation language changes through the swap
+shortcut, `--set-language`, Talon, or the language setting, Handy also switches to that language's model (toast and Activity entry;
+a rule for a model that is not downloaded says so and changes nothing). Languages without a rule leave the model alone, and with
+the switch off nothing changes. Combined with `--swap-language` this makes "English ↔ Norwegian" a single action.
+
 **Model switching.** `handy --set-model NAME` switches the speech-to-text model by (part of) its id or name, ignoring case:
 an exact id wins, otherwise the words must occur in exactly one downloaded model (ambiguous or unknown names say so and list the
 downloaded ones). It uses the same switch as the settings page and tray menu (the model is loaded right away unless unloading is

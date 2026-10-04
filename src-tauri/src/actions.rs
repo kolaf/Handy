@@ -1089,6 +1089,10 @@ pub(crate) fn announce_setting_change(
         serde_json::json!({ "setting": setting, "value": value }),
     );
     crate::overlay::show_notice_overlay(app, kind, shown);
+    // The dictation language and the speech model can be linked (Settings: "Model per language").
+    if setting == "selected_language" {
+        crate::model_switch::follow_language(app, value);
+    }
 }
 
 /// Selects a post-processing prompt by id (the `--set-prompt` CLI flag).

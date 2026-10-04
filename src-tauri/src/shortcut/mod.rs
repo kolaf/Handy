@@ -640,8 +640,9 @@ pub fn change_translate_to_english_setting(app: AppHandle, enabled: bool) -> Res
 #[specta::specta]
 pub fn change_selected_language_setting(app: AppHandle, language: String) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
-    settings.selected_language = language;
+    settings.selected_language = language.clone();
     settings::write_settings(&app, settings);
+    crate::model_switch::follow_language(&app, &language);
     Ok(())
 }
 
