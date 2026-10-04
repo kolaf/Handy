@@ -133,7 +133,13 @@ per character (plus one for the trailing space). Nothing is selected or copied, 
 terminal panel without risking a Ctrl+C. It only runs if the same window still has focus (the program and the window; the title is
 ignored), the paste is at most 5 minutes old and at most 1500 characters long; otherwise it does nothing and the Activity page says
 why. It cannot see whether you moved the cursor inside that window, so use it right after dictating. After a scratch the memory
-is empty, so a second "scratch" does not eat more text. Paste-last and redo count as dictations; reformat results do not. Talon: "scratch dictation", "redo as email|message|
+is empty, so a second "scratch" does not eat more text. Paste-last and redo count as dictations; reformat results do not.
+
+Handy writes the time of its last undoable paste to `%USERPROFILE%\\.cache\\hv\\handy-paste.txt` (`none` once taken back). Talon's
+"scratch that" / "nope that" is overridden (`kolaf/handy/scratch_that.py`): Talon stamps each phrase it types, and "scratch that"
+asks Handy to scratch when Handy's paste is newer than Talon's last phrase and at most 5 minutes old; otherwise the normal
+community behaviour runs. It does not matter how a dictation was started (hotkey, tray, Talon command). Text typed by hand is
+known to neither side. Talon: "scratch dictation", "redo as email|message|
 note|meeting|document|formal|informal|simple".
 
 **Prompt per app.** Post-processing page → "Prompt per app": turn it on and add rules (program name such as `slack.exe`, an

@@ -66,7 +66,7 @@ const UNDO_MAX_AGE: Duration = Duration::from_secs(5 * 60);
 /// Each character is a key press.
 const UNDO_MAX_CHARS: usize = 1500;
 
-/// Remembers a dictation that was just pasted into the window that has focus.
+/// Remembers a dictation that was just pasted into the window that has focus, and tells other tools (Talon) when.
 pub fn note_paste(app: &tauri::AppHandle, text: &str) {
     let trailing = usize::from(get_settings(app).append_trailing_space);
     let last = LastPaste {
@@ -75,9 +75,11 @@ pub fn note_paste(app: &tauri::AppHandle, text: &str) {
         window: foreground(),
         pasted_at: Instant::now(),
     };
+    let chars = last.chars;
     if let Ok(mut slot) = LAST_PASTE.lock() {
         *slot = Some(last);
     }
+    write_paste_state(Some(chars));
 }
 
 pub fn last_paste() -> Option<LastPaste> {
@@ -88,6 +90,7 @@ pub fn clear_last_paste() {
     if let Ok(mut slot) = LAST_PASTE.lock() {
         *slot = None;
     }
+    write_paste_state(None);
 }
 
 /// How many Backspace presses take the last paste back, or why that is not safe. `now` is the window with focus now
@@ -464,6 +467,29 @@ fn write_state(recording: bool) {
         if recording { "recording" } else { "idle" },
         now
     );
+    let tmp = path.with_extension("tmp");
+    if std::fs::write(&tmp, text).is_ok() {
+        let _ = std::fs::rename(&tmp, &path);
+    }
+}
+
+/// `%USERPROFILE%\.cache\hv\handy-paste.txt` says when Handy last pasted a dictation that can still be taken back:
+/// `<unix milliseconds>` and `<characters>` on two lines, or `none`. Talon compares that time with the time of its own
+/// last phrase to decide whether "scratch that" is Talon's or Handy's.
+fn write_paste_state(chars: Option<usize>) {
+    let Some(state) = state_file() else {
+        return;
+    };
+    let path = state.with_file_name("handy-paste.txt");
+    let text = match chars {
+        Some(n) => {
+            let ms = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |d| d.as_millis());
+            format!("{ms}\n{n}\n")
+        }
+        None => "none\n".to_string(),
+    };
     let tmp = path.with_extension("tmp");
     if std::fs::write(&tmp, text).is_ok() {
         let _ = std::fs::rename(&tmp, &path);
