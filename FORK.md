@@ -9,6 +9,8 @@ This is a fork of [cjpais/Handy](https://github.com/cjpais/Handy) that has delib
 - Everything below is **unverified against a real language model unless it says otherwise**; run the prompt bench (see
   [Prompts](#prompts-and-the-test-bench)).
 
+> **Setting up a new Windows + WSL machine (for example a work computer): see [`fork/SETUP.md`](fork/SETUP.md).**
+
 ## What was added
 
 | Feature | How to use it | Where to configure |
