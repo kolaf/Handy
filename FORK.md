@@ -148,20 +148,18 @@ shortcut, `--set-language`, Talon, or the language setting, Handy also switches 
 a rule for a model that is not downloaded says so and changes nothing). Languages without a rule leave the model alone, and with
 the switch off nothing changes. Combined with `--swap-language` this makes "English ↔ Norwegian" a single action.
 
-**Meeting minutes.** The old standalone `meeting-transcriber` script (`~/dev/openai-transcribe`) is now part of Handy:
-sidebar page **Meetings**, or `handy --meeting-minutes "part1.m4a;part2.m4a" [--meeting-language no] [--meeting-engine cloud]`.
-The audio files (MP3, M4A/AAC, WAV, FLAC, OGG; several parts of one session in order) are decoded and resampled to 16 kHz mono,
-cut into chunks (5 minutes locally, 10 minutes for the cloud) and transcribed. Engine **local** (the default) uses the speech
-model Handy has loaded, so the recording never leaves the computer; engine **cloud** posts the chunks to Azure OpenAI
-(`<endpoint>/openai/deployments/<model>/audio/transcriptions?api-version=...`, `api-key` header) or to any OpenAI-compatible
-endpoint (bearer token, `model` field; an empty endpoint means api.openai.com), with retries on rate limits and server errors.
-The transcript goes to the post-processing model with the minutes prompt (`t_meeting_minutes_en` / `_no`, editable in the prompt
-list; the Norwegian one is carried over from the script and is worded for conversations/therapy sessions), then a short title is
-made, and `<folder>/<time>-<title>.md` plus `...-transcript.txt` are saved (folder: setting, default `meeting_notes` in the home
-folder) and the minutes opened. Progress is shown on the page and the result on the Activity page ("Meeting minutes"). Files
-are never deleted (the script offered to). The cloud API key is kept with the other keys (never logged). One job at a time;
-Cancel stops after the current chunk. Decoding, resampling and the cloud URL logic have unit tests; the cloud call itself and a
-long local run have not been tried.
+**Meeting minutes.** The old standalone `meeting-transcriber` script (`~/dev/openai-transcribe`) is now part of Handy: sidebar
+page **Meetings**, or `handy --meeting-minutes "part1.m4a;part2.m4a" [--meeting-language no]`. The audio files (MP3, M4A/AAC,
+WAV, FLAC, OGG; several parts of one session in order) are decoded and resampled to 16 kHz mono, cut into 5-minute chunks and
+transcribed with the speech model Handy has loaded, so the recording never leaves the computer. (The script transcribed in the
+cloud; that option was left out on purpose, so there are no extra endpoint or key settings.) The transcript goes to the
+post-processing model with the minutes prompt (`t_meeting_minutes_en` / `_no`, editable in the prompt list; the Norwegian one is
+carried over from the script and is worded for conversations/therapy sessions), then a short title is made, and
+`<folder>/<time>-<title>.md` plus `...-transcript.txt` are saved (folder: setting, default `meeting_notes` in the home folder) and
+the minutes opened. Progress is shown on the page and the result on the Activity page ("Meeting minutes"). Files are never deleted
+(the script offered to). One job at a time; Cancel stops after the current chunk. Decoding, mixing down and resampling are
+tested on a generated WAV file; a long local run has not been timed. The speech model is shared with dictation, so dictating
+while a meeting is being transcribed makes both wait.
 
 **Model switching.** `handy --set-model NAME` switches the speech-to-text model by (part of) its id or name, ignoring case:
 an exact id wins, otherwise the words must occur in exactly one downloaded model (ambiguous or unknown names say so and list the

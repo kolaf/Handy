@@ -40,10 +40,6 @@ pub struct CliArgs {
     #[arg(long, value_name = "CODE")]
     pub meeting_language: Option<String>,
 
-    /// local or cloud (with --meeting-minutes)
-    #[arg(long, value_name = "ENGINE")]
-    pub meeting_engine: Option<String>,
-
     /// Switch the speech model by (part of) its name or id, e.g. `parakeet` (sent to running instance)
     #[arg(long, value_name = "NAME")]
     pub set_model: Option<String>,

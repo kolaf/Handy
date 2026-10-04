@@ -5,7 +5,6 @@ import { useTranslation } from "react-i18next";
 import { commands, type MeetingSettings } from "@/bindings";
 import { useSettings } from "../../../hooks/useSettings";
 import { Button } from "../../ui/Button";
-import { Dropdown } from "../../ui/Dropdown";
 import { Input } from "../../ui/Input";
 import { SettingsGroup } from "../../ui/SettingsGroup";
 
@@ -19,24 +18,14 @@ interface Progress {
 
 const AUDIO_EXTENSIONS = ["mp3", "m4a", "aac", "wav", "flac", "ogg"];
 
-// Meeting minutes from audio files: transcribe (locally with the loaded speech model, or in the cloud), then write the
-// minutes with the post-processing model. The result is saved, opened, and listed on the Activity page.
+// Meeting minutes from audio files: transcribed with the speech model Handy has loaded, then written up by the
+// post-processing model. The result is saved, opened, and listed on the Activity page.
 export const MeetingsSettings: React.FC = () => {
   const { t } = useTranslation();
   const { getSetting } = useSettings();
   const saved: MeetingSettings = getSetting("meeting") ?? {};
-  const [engine, setEngine] = useState(saved.engine ?? "local");
   const [language, setLanguage] = useState(saved.language ?? "en");
-  const [endpoint, setEndpoint] = useState(saved.endpoint ?? "");
-  const [apiVersion, setApiVersion] = useState(
-    saved.api_version ?? "2025-03-01-preview",
-  );
-  const [model, setModel] = useState(
-    saved.transcribe_model ?? "gpt-4o-transcribe",
-  );
   const [outputDir, setOutputDir] = useState(saved.output_dir ?? "");
-  const [apiKey, setApiKey] = useState("");
-  const keySaved = Boolean(getSetting("post_process_api_keys")?.["meeting"]);
   const [files, setFiles] = useState<string[]>([]);
   const [progress, setProgress] = useState<Progress | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -52,15 +41,6 @@ export const MeetingsSettings: React.FC = () => {
       unlisten.then((fn) => fn());
     };
   }, []);
-
-  const current = (): MeetingSettings => ({
-    engine,
-    language,
-    endpoint,
-    api_version: apiVersion,
-    transcribe_model: model,
-    output_dir: outputDir,
-  });
 
   const choose = async () => {
     const picked = await open({
@@ -78,16 +58,15 @@ export const MeetingsSettings: React.FC = () => {
 
   const start = async () => {
     setError(null);
-    const saveResult = await commands.updateMeetingSettings(current());
+    const saveResult = await commands.updateMeetingSettings({
+      language,
+      output_dir: outputDir,
+    });
     if (saveResult.status !== "ok") {
       setError(saveResult.error);
       return;
     }
-    if (apiKey) {
-      await commands.setMeetingApiKey(apiKey);
-      setApiKey("");
-    }
-    const result = await commands.startMeeting(files, language, engine);
+    const result = await commands.startMeeting(files, language);
     if (result.status !== "ok") setError(result.error);
   };
 
@@ -111,25 +90,22 @@ export const MeetingsSettings: React.FC = () => {
               </div>
             ))}
           </div>
-          <div className="flex gap-2 items-center">
-            <Dropdown
-              options={[
-                { value: "local", label: t("settings.meetings.engineLocal") },
-                { value: "cloud", label: t("settings.meetings.engineCloud") },
-              ]}
-              selectedValue={engine}
-              onSelect={setEngine}
-              disabled={running}
-            />
-            <Input
-              type="text"
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-              placeholder={t("settings.meetings.languagePlaceholder")}
-              variant="compact"
-              disabled={running}
-            />
-          </div>
+          <Input
+            type="text"
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            placeholder={t("settings.meetings.languagePlaceholder")}
+            variant="compact"
+            disabled={running}
+          />
+          <Input
+            type="text"
+            value={outputDir}
+            onChange={(e) => setOutputDir(e.target.value)}
+            placeholder={t("settings.meetings.outputPlaceholder")}
+            variant="compact"
+            disabled={running}
+          />
           <div className="flex gap-2">
             <Button
               onClick={start}
@@ -176,55 +152,6 @@ export const MeetingsSettings: React.FC = () => {
             </div>
           ) : null}
           {error ? <div className="text-red-500">{error}</div> : null}
-        </div>
-      </SettingsGroup>
-      <SettingsGroup title={t("settings.meetings.settingsTitle")}>
-        <div className="px-4 py-3 flex flex-col gap-2 text-sm">
-          <Input
-            type="text"
-            value={outputDir}
-            onChange={(e) => setOutputDir(e.target.value)}
-            placeholder={t("settings.meetings.outputPlaceholder")}
-            variant="compact"
-          />
-          <p className="text-xs text-mid-gray">
-            {t("settings.meetings.cloudHelp")}
-          </p>
-          <Input
-            type="text"
-            value={endpoint}
-            onChange={(e) => setEndpoint(e.target.value)}
-            placeholder={t("settings.meetings.endpointPlaceholder")}
-            variant="compact"
-          />
-          <Input
-            type="text"
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            placeholder={t("settings.meetings.modelPlaceholder")}
-            variant="compact"
-          />
-          <Input
-            type="text"
-            value={apiVersion}
-            onChange={(e) => setApiVersion(e.target.value)}
-            placeholder={t("settings.meetings.apiVersionPlaceholder")}
-            variant="compact"
-          />
-          <Input
-            type="password"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            placeholder={
-              keySaved
-                ? t("settings.meetings.keySavedPlaceholder")
-                : t("settings.meetings.keyPlaceholder")
-            }
-            variant="compact"
-          />
-          <p className="text-xs text-mid-gray">
-            {t("settings.meetings.saveNote")}
-          </p>
         </div>
       </SettingsGroup>
     </div>

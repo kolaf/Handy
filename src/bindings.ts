@@ -374,9 +374,9 @@ async changeLanguageModelsEnabledSetting(enabled: boolean) : Promise<Result<null
     else return { status: "error", error: e  as any };
 }
 },
-async startMeeting(files: string[], language: string, engine: string) : Promise<Result<null, string>> {
+async startMeeting(files: string[], language: string) : Promise<Result<null, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("start_meeting", { files, language, engine }) };
+    return { status: "ok", data: await TAURI_INVOKE("start_meeting", { files, language }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -396,14 +396,6 @@ async cancelMeeting() : Promise<null> {
 async updateMeetingSettings(meeting: MeetingSettings) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("update_meeting_settings", { meeting }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async setMeetingApiKey(apiKey: string) : Promise<Result<null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("set_meeting_api_key", { apiKey }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -1150,7 +1142,7 @@ key_down: number; key_up: number; flags_changed: number; mouse: number; duration
 export type KeyboardImplementation = "tauri" | "handy_keys"
 export type LLMPrompt = { id: string; name: string; prompt: string; examples: string }
 export type ActivityEntry = { timestamp: number; kind: string; title: string; details: string }
-export type MeetingSettings = { engine?: string; language?: string; endpoint?: string; api_version?: string; transcribe_model?: string; output_dir?: string }
+export type MeetingSettings = { language?: string; output_dir?: string }
 export type LanguageModel = { language: string; model_id: string }
 export type AppPrompt = { app: string; title?: string; prompt_id: string }
 export type Correction = { wrong: string; right: string; hint?: boolean }

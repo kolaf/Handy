@@ -1,16 +1,15 @@
 //! Meeting minutes from audio files: a port of the standalone `meeting-transcriber` script into Handy.
 //!
 //! One or more audio files (parts of the same session) are decoded, resampled to 16 kHz mono, cut into chunks and
-//! transcribed either locally with the speech model Handy has loaded (private, the default) or with a cloud model
-//! (Azure OpenAI or any OpenAI-compatible endpoint, e.g. `gpt-4o-transcribe`). The transcript is then turned into minutes
-//! by the post-processing model, given a short title, and both are saved (`<folder>/<time>-<title>.md` and
-//! `...-transcript.txt`) and the minutes opened. Progress goes to the Meetings page and the result to the Activity page.
+//! transcribed with the speech model Handy has loaded (the recording never leaves the computer). The transcript is then
+//! turned into minutes by the post-processing model, given a short title, and both are saved
+//! (`<folder>/<time>-<title>.md` and `...-transcript.txt`) and the minutes opened. Progress goes to the Meetings page and
+//! the result to the Activity page.
 
 use crate::audio_toolkit::audio::FrameResampler;
 use crate::settings::{get_settings, write_settings, AppSettings, MeetingSettings};
 use log::{info, warn};
 use serde::Serialize;
-use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -18,12 +17,9 @@ use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
 
 const TARGET_HZ: u32 = 16_000;
-/// Cloud chunks: ten minutes of 16 kHz mono WAV is 19 MB, under the 25 MB limit of the transcription APIs.
-const CLOUD_CHUNK_SECS: usize = 10 * 60;
-/// Local chunks: shorter, so one slow chunk does not hold everything and memory stays small.
-const LOCAL_CHUNK_SECS: usize = 5 * 60;
+/// Chunks of this many seconds: one slow chunk does not hold everything and memory stays small.
+const CHUNK_SECS: usize = 5 * 60;
 const MAX_FILES: usize = 20;
-const CLOUD_ATTEMPTS: u32 = 3;
 
 const MINUTES_EN: &str = include_str!("../../fork/prompts/meeting_minutes_en.md");
 const MINUTES_NO: &str = include_str!("../../fork/prompts/meeting_minutes_no.md");
@@ -157,131 +153,6 @@ pub fn chunk(samples: &[f32], secs: usize) -> Vec<&[f32]> {
     samples.chunks((secs * TARGET_HZ as usize).max(1)).collect()
 }
 
-/// 16-bit mono 16 kHz WAV file bytes.
-pub fn wav_bytes(samples: &[f32]) -> Result<Vec<u8>, String> {
-    let spec = hound::WavSpec {
-        channels: 1,
-        sample_rate: TARGET_HZ,
-        bits_per_sample: 16,
-        sample_format: hound::SampleFormat::Int,
-    };
-    let mut cursor = Cursor::new(Vec::with_capacity(samples.len() * 2 + 64));
-    {
-        let mut writer = hound::WavWriter::new(&mut cursor, spec).map_err(|e| e.to_string())?;
-        for s in samples {
-            writer
-                .write_sample((s.clamp(-1.0, 1.0) * i16::MAX as f32) as i16)
-                .map_err(|e| e.to_string())?;
-        }
-        writer.finalize().map_err(|e| e.to_string())?;
-    }
-    Ok(cursor.into_inner())
-}
-
-// ---- cloud transcription ------------------------------------------------------------------------------------------
-
-/// The request URL and whether it is an Azure OpenAI deployment (which authenticates with an `api-key` header and puts the
-/// model in the path) or a plain OpenAI-compatible endpoint (a bearer token and a `model` form field).
-pub fn transcription_url(cfg: &MeetingSettings) -> (String, bool) {
-    let base = cfg.endpoint.trim().trim_end_matches('/');
-    let azure = base.contains("azure.com")
-        || base.contains(".cognitiveservices.")
-        || base.contains("openai.azure");
-    if azure {
-        let version = if cfg.api_version.trim().is_empty() {
-            "2025-03-01-preview"
-        } else {
-            cfg.api_version.trim()
-        };
-        (
-            format!(
-                "{base}/openai/deployments/{}/audio/transcriptions?api-version={version}",
-                cfg.transcribe_model.trim()
-            ),
-            true,
-        )
-    } else if base.is_empty() {
-        (
-            "https://api.openai.com/v1/audio/transcriptions".to_string(),
-            false,
-        )
-    } else {
-        (format!("{base}/audio/transcriptions"), false)
-    }
-}
-
-/// The transcript text out of a transcription response (`{"text": "..."}`).
-pub fn parse_transcription(body: &str) -> Result<String, String> {
-    let value: serde_json::Value = serde_json::from_str(body).map_err(|_| {
-        format!(
-            "Unexpected response: {}",
-            body.chars().take(200).collect::<String>()
-        )
-    })?;
-    value
-        .get("text")
-        .and_then(|t| t.as_str())
-        .map(|t| t.trim().to_string())
-        .ok_or_else(|| {
-            format!(
-                "The response has no text: {}",
-                body.chars().take(200).collect::<String>()
-            )
-        })
-}
-
-async fn transcribe_cloud(
-    client: &reqwest::Client,
-    cfg: &MeetingSettings,
-    api_key: &str,
-    wav: Vec<u8>,
-    language: &str,
-) -> Result<String, String> {
-    let (url, azure) = transcription_url(cfg);
-    let mut last_error = String::new();
-    for attempt in 1..=CLOUD_ATTEMPTS {
-        let file = reqwest::multipart::Part::bytes(wav.clone())
-            .file_name("chunk.wav")
-            .mime_str("audio/wav")
-            .map_err(|e| e.to_string())?;
-        let mut form = reqwest::multipart::Form::new().part("file", file);
-        if !language.is_empty() && language != "auto" {
-            form = form.text("language", language.to_string());
-        }
-        if !azure {
-            form = form.text("model", cfg.transcribe_model.trim().to_string());
-        }
-        let request = client.post(&url).multipart(form);
-        let request = if azure {
-            request.header("api-key", api_key)
-        } else {
-            request.bearer_auth(api_key)
-        };
-        match request.send().await {
-            Ok(response) => {
-                let status = response.status();
-                let body = response.text().await.unwrap_or_default();
-                if status.is_success() {
-                    return parse_transcription(&body);
-                }
-                last_error = format!(
-                    "HTTP {status}: {}",
-                    body.chars().take(300).collect::<String>()
-                );
-                // Rate limits and server errors are worth another try; anything else (bad key, wrong deployment) is not.
-                if !(status.as_u16() == 429 || status.is_server_error()) {
-                    return Err(last_error);
-                }
-            }
-            Err(e) => last_error = format!("Request failed: {e}"),
-        }
-        if attempt < CLOUD_ATTEMPTS {
-            tokio::time::sleep(Duration::from_secs(2u64.pow(attempt))).await;
-        }
-    }
-    Err(last_error)
-}
-
 // ---- text ---------------------------------------------------------------------------------------------------------
 
 /// A file name from a title: no characters Windows or Unix reject, spaces become dashes, at most 80 characters.
@@ -353,37 +224,12 @@ fn output_dir(cfg: &MeetingSettings) -> PathBuf {
 // ---- the job --------------------------------------------------------------------------------------------------------
 
 /// `files` are parts of one session, in order. Returns the path of the minutes.
-async fn run_job(
-    app: &AppHandle,
-    files: &[PathBuf],
-    language: &str,
-    engine: &str,
-) -> Result<PathBuf, String> {
+async fn run_job(app: &AppHandle, files: &[PathBuf], language: &str) -> Result<PathBuf, String> {
     let settings = get_settings(app);
     let cfg = settings.meeting.clone();
-    let cloud = engine == "cloud";
-    let api_key = settings
-        .post_process_api_keys
-        .get("meeting")
-        .cloned()
-        .unwrap_or_default();
-    if cloud
-        && (cfg.endpoint.trim().is_empty()
-            || api_key.is_empty()
-            || cfg.transcribe_model.trim().is_empty())
-    {
-        return Err(
-            "The cloud engine needs an endpoint, a model and an API key (Meetings page).".into(),
-        );
-    }
-    if !cloud
-        && !app
-            .state::<Arc<crate::managers::transcription::TranscriptionManager>>()
-            .inner()
-            .is_model_loaded()
-    {
-        app.state::<Arc<crate::managers::transcription::TranscriptionManager>>()
-            .initiate_model_load();
+    let manager = app.state::<Arc<crate::managers::transcription::TranscriptionManager>>();
+    if !manager.is_model_loaded() {
+        manager.initiate_model_load();
     }
 
     // 1. decode every part
@@ -410,17 +256,8 @@ async fn run_job(
     }
 
     // 2. transcribe chunk by chunk (chunks are global across the parts, like the original script)
-    let secs = if cloud {
-        CLOUD_CHUNK_SECS
-    } else {
-        LOCAL_CHUNK_SECS
-    };
-    let chunks: Vec<&[f32]> = pieces.iter().flat_map(|p| chunk(p, secs)).collect();
+    let chunks: Vec<&[f32]> = pieces.iter().flat_map(|p| chunk(p, CHUNK_SECS)).collect();
     let total = chunks.len() as u32;
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(600))
-        .build()
-        .map_err(|e| e.to_string())?;
     let mut transcripts: Vec<String> = Vec::new();
     for (i, piece) in chunks.iter().enumerate() {
         if CANCEL.load(Ordering::SeqCst) {
@@ -439,20 +276,16 @@ async fn run_job(
             ),
             None,
         );
-        let text = if cloud {
-            transcribe_cloud(&client, &cfg, &api_key, wav_bytes(piece)?, language).await?
-        } else {
-            let audio = piece.to_vec();
-            let handle = app.clone();
-            tokio::task::spawn_blocking(move || {
-                handle
-                    .state::<Arc<crate::managers::transcription::TranscriptionManager>>()
-                    .transcribe(audio)
-                    .map_err(|e| e.to_string())
-            })
-            .await
-            .map_err(|e| e.to_string())??
-        };
+        let audio = piece.to_vec();
+        let handle = app.clone();
+        let text = tokio::task::spawn_blocking(move || {
+            handle
+                .state::<Arc<crate::managers::transcription::TranscriptionManager>>()
+                .transcribe(audio)
+                .map_err(|e| e.to_string())
+        })
+        .await
+        .map_err(|e| e.to_string())??;
         transcripts.push(text.trim().to_string());
     }
     let transcript = transcripts
@@ -509,8 +342,12 @@ async fn run_job(
                 "meeting",
                 &format!("{name} ({} min)", total_secs / 60),
                 &format!(
-                    "Engine: {engine}\nLanguage: {language}\nFiles: {}\nMinutes: {}\nTranscript: {}",
-                    files.iter().map(|f| f.display().to_string()).collect::<Vec<_>>().join("; "),
+                    "Language: {language}\nFiles: {}\nMinutes: {}\nTranscript: {}",
+                    files
+                        .iter()
+                        .map(|f| f.display().to_string())
+                        .collect::<Vec<_>>()
+                        .join("; "),
                     minutes_path.display(),
                     transcript_path.display()
                 ),
@@ -525,12 +362,7 @@ async fn run_job(
 }
 
 /// Starts a job on its own thread. Only one runs at a time.
-pub fn start(
-    app: &AppHandle,
-    files: Vec<PathBuf>,
-    language: String,
-    engine: String,
-) -> Result<(), String> {
+pub fn start(app: &AppHandle, files: Vec<PathBuf>, language: String) -> Result<(), String> {
     if files.is_empty() {
         return Err("No audio file was given.".into());
     }
@@ -546,11 +378,8 @@ pub fn start(
     CANCEL.store(false, Ordering::SeqCst);
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
-        info!(
-            "Meeting: {} file(s), language {language}, engine {engine}",
-            files.len()
-        );
-        let result = run_job(&app, &files, &language, &engine).await;
+        info!("Meeting: {} file(s), language {language}", files.len());
+        let result = run_job(&app, &files, &language).await;
         RUNNING.store(false, Ordering::SeqCst);
         match result {
             Ok(path) => {
@@ -586,12 +415,10 @@ pub fn split_paths(list: &str) -> Vec<PathBuf> {
         .collect()
 }
 
-/// `handy --meeting-minutes "a.m4a;b.m4a" [--meeting-language no] [--meeting-engine cloud]`
-pub fn run_cli(app: &AppHandle, list: &str, language: Option<String>, engine: Option<String>) {
-    let cfg = get_settings(app).meeting;
-    let language = language.unwrap_or(cfg.language);
-    let engine = engine.unwrap_or(cfg.engine);
-    if let Err(reason) = start(app, split_paths(list), language, engine) {
+/// `handy --meeting-minutes "a.m4a;b.m4a" [--meeting-language no]`
+pub fn run_cli(app: &AppHandle, list: &str, language: Option<String>) {
+    let language = language.unwrap_or_else(|| get_settings(app).meeting.language);
+    if let Err(reason) = start(app, split_paths(list), language) {
         warn!("Meeting: {reason}");
         crate::activity::log(
             app,
@@ -604,17 +431,11 @@ pub fn run_cli(app: &AppHandle, list: &str, language: Option<String>, engine: Op
 
 #[tauri::command]
 #[specta::specta]
-pub fn start_meeting(
-    app: AppHandle,
-    files: Vec<String>,
-    language: String,
-    engine: String,
-) -> Result<(), String> {
+pub fn start_meeting(app: AppHandle, files: Vec<String>, language: String) -> Result<(), String> {
     start(
         &app,
         files.into_iter().map(PathBuf::from).collect(),
         language,
-        engine,
     )
 }
 
@@ -644,23 +465,8 @@ pub fn cancel_meeting() {
 #[tauri::command]
 #[specta::specta]
 pub fn update_meeting_settings(app: AppHandle, meeting: MeetingSettings) -> Result<(), String> {
-    if !matches!(meeting.engine.as_str(), "local" | "cloud") {
-        return Err("The engine must be 'local' or 'cloud'.".into());
-    }
     let mut settings = get_settings(&app);
     settings.meeting = meeting;
-    write_settings(&app, settings);
-    Ok(())
-}
-
-/// The cloud API key is kept with the other keys, which are never written to the log.
-#[tauri::command]
-#[specta::specta]
-pub fn set_meeting_api_key(app: AppHandle, api_key: String) -> Result<(), String> {
-    let mut settings = get_settings(&app);
-    settings
-        .post_process_api_keys
-        .insert("meeting".to_string(), api_key);
     write_settings(&app, settings);
     Ok(())
 }
@@ -668,40 +474,6 @@ pub fn set_meeting_api_key(app: AppHandle, api_key: String) -> Result<(), String
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn cfg(endpoint: &str) -> MeetingSettings {
-        MeetingSettings {
-            endpoint: endpoint.into(),
-            transcribe_model: "gpt-4o-transcribe".into(),
-            api_version: "2025-03-01-preview".into(),
-            ..MeetingSettings::default()
-        }
-    }
-
-    #[test]
-    fn azure_and_openai_urls() {
-        let (url, azure) = transcription_url(&cfg("https://x.cognitiveservices.azure.com/"));
-        assert!(azure);
-        assert_eq!(
-            url,
-            "https://x.cognitiveservices.azure.com/openai/deployments/gpt-4o-transcribe/audio/transcriptions?api-version=2025-03-01-preview"
-        );
-        let (url, azure) = transcription_url(&cfg(""));
-        assert!(!azure);
-        assert_eq!(url, "https://api.openai.com/v1/audio/transcriptions");
-        let (url, _) = transcription_url(&cfg("https://gateway.example/v1/"));
-        assert_eq!(url, "https://gateway.example/v1/audio/transcriptions");
-    }
-
-    #[test]
-    fn transcription_responses() {
-        assert_eq!(
-            parse_transcription("{\"text\": \"  hello \"}").unwrap(),
-            "hello"
-        );
-        assert!(parse_transcription("{\"error\": 1}").is_err());
-        assert!(parse_transcription("<html>").is_err());
-    }
 
     #[test]
     fn filenames_are_safe() {
@@ -737,114 +509,10 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![10, 10, 5]
         );
-        assert_eq!(wav_bytes(&[0.0; 160]).unwrap().len(), 44 + 320);
         assert_eq!(
             split_paths("a.m4a; b.m4a;;"),
             vec![PathBuf::from("a.m4a"), PathBuf::from("b.m4a")]
         );
-    }
-
-    /// A one-shot HTTP server on localhost: reads one request completely, answers with `body`, and returns what it read.
-    fn fake_server(body: &'static str) -> (String, std::thread::JoinHandle<String>) {
-        use std::io::{Read, Write};
-        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-        let base = format!("http://{}", listener.local_addr().unwrap());
-        let handle = std::thread::spawn(move || {
-            let (mut stream, _) = listener.accept().unwrap();
-            let mut data: Vec<u8> = Vec::new();
-            let mut buf = [0u8; 8192];
-            loop {
-                let n = stream.read(&mut buf).unwrap();
-                data.extend_from_slice(&buf[..n]);
-                let text = String::from_utf8_lossy(&data);
-                if let Some(split) = text.find("\r\n\r\n") {
-                    let length = text[..split]
-                        .lines()
-                        .find_map(|l| {
-                            l.to_lowercase()
-                                .strip_prefix("content-length:")
-                                .map(|v| v.trim().parse::<usize>().unwrap())
-                        })
-                        .unwrap_or(0);
-                    if data.len() >= split + 4 + length {
-                        break;
-                    }
-                }
-                if n == 0 {
-                    break;
-                }
-            }
-            let response = format!(
-                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-                body.len(),
-                body
-            );
-            stream.write_all(response.as_bytes()).unwrap();
-            String::from_utf8_lossy(&data).to_string()
-        });
-        (base, handle)
-    }
-
-    #[test]
-    fn the_cloud_request_has_the_right_shape_for_openai_and_azure() {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let wav = wav_bytes(&[0.0; 1600]).unwrap();
-        let client = reqwest::Client::new();
-
-        // OpenAI-compatible: bearer token, model and language as form fields, file part
-        let (base, server) = fake_server("{\"text\": \" hello there \"}");
-        let text = rt
-            .block_on(transcribe_cloud(
-                &client,
-                &cfg(&base),
-                "secret-key",
-                wav.clone(),
-                "no",
-            ))
-            .unwrap();
-        assert_eq!(text, "hello there");
-        let request = server.join().unwrap();
-        assert!(
-            request.starts_with("POST /audio/transcriptions"),
-            "{}",
-            &request[..60]
-        );
-        assert!(request
-            .to_lowercase()
-            .contains("authorization: bearer secret-key"));
-        assert!(request.contains("name=\"model\"") && request.contains("gpt-4o-transcribe"));
-        assert!(request.contains("name=\"language\"") && request.contains("\r\n\r\nno\r\n"));
-        assert!(
-            request.contains("name=\"file\"")
-                && request.contains("filename=\"chunk.wav\"")
-                && request.contains("RIFF")
-        );
-
-        // Azure: the model is in the path, the key is an api-key header, there is no model field. (The fake server is on
-        // localhost, so force the Azure form by putting the marker in the path.)
-        let (base, server) = fake_server("{\"text\": \"azure ok\"}");
-        let azure_like = cfg(&format!("{base}/x.cognitiveservices.azure.com"));
-        let (url, is_azure) = transcription_url(&azure_like);
-        assert!(
-            is_azure
-                && url.contains(
-                    "/openai/deployments/gpt-4o-transcribe/audio/transcriptions?api-version="
-                )
-        );
-        let text = rt
-            .block_on(transcribe_cloud(
-                &client,
-                &azure_like,
-                "azure-key",
-                wav.clone(),
-                "",
-            ))
-            .unwrap();
-        assert_eq!(text, "azure ok");
-        let request = server.join().unwrap();
-        assert!(request.to_lowercase().contains("api-key: azure-key"));
-        assert!(!request.to_lowercase().contains("authorization:"));
-        assert!(!request.contains("name=\"model\"") && !request.contains("name=\"language\""));
     }
 
     #[test]

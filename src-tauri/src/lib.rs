@@ -705,7 +705,6 @@ pub fn run(cli_args: CliArgs) {
             meeting::cancel_meeting,
             meeting::open_meeting_file,
             meeting::update_meeting_settings,
-            meeting::set_meeting_api_key,
             model_switch::update_language_models,
             model_switch::change_language_models_enabled_setting,
             context::update_app_prompts,
@@ -902,7 +901,6 @@ pub fn run(cli_args: CliArgs) {
                     app,
                     &files,
                     signal_handle::flag_value(&args, "--meeting-language"),
-                    signal_handle::flag_value(&args, "--meeting-engine"),
                 );
                 handled_setting = true;
             }
