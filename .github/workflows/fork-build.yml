@@ -36,7 +36,8 @@ jobs:
     with:
       platform: "ubuntu-22.04"
       target: "x86_64-unknown-linux-gnu"
-      build-args: "--bundles deb"
+      # the fork has no updater signing key, so the updater artefacts are switched off (src-tauri/tauri.fork.conf.json)
+      build-args: "--bundles deb --config src-tauri/tauri.fork.conf.json"
       asset-prefix: "handy-fork"
       upload-artifacts: true
       sign-binaries: false
