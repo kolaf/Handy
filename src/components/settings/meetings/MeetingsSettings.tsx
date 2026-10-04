@@ -29,6 +29,12 @@ export const MeetingsSettings: React.FC = () => {
   const [language, setLanguage] = useState(saved.language ?? "en");
   const [outputDir, setOutputDir] = useState(saved.output_dir ?? "");
   const [modelId, setModelId] = useState(saved.model_id ?? "");
+  const [recordingsDir, setRecordingsDir] = useState(
+    saved.recordings_dir ?? "",
+  );
+  const [groupMinutes, setGroupMinutes] = useState(
+    String(saved.group_minutes ?? 5),
+  );
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [dragging, setDragging] = useState(false);
   const [files, setFiles] = useState<string[]>([]);
@@ -84,13 +90,35 @@ export const MeetingsSettings: React.FC = () => {
     if (typeof picked === "string") setFiles([picked]);
   };
 
+  const chooseRecordingsFolder = async () => {
+    const picked = await open({ directory: true });
+    if (typeof picked === "string") setRecordingsDir(picked);
+  };
+
+  const settingsToSave = (): MeetingSettings => ({
+    language,
+    output_dir: outputDir,
+    model_id: modelId,
+    recordings_dir: recordingsDir,
+    group_minutes: Math.max(1, Number.parseInt(groupMinutes, 10) || 5),
+  });
+
+  // Fills the list with the latest recording from the recorder's folder (the files that belong together).
+  const useLatest = async () => {
+    setError(null);
+    const saveResult = await commands.updateMeetingSettings(settingsToSave());
+    if (saveResult.status !== "ok") {
+      setError(saveResult.error);
+      return;
+    }
+    const result = await commands.findLatestRecordings(false);
+    if (result.status === "ok") setFiles(result.data);
+    else setError(result.error);
+  };
+
   const start = async () => {
     setError(null);
-    const saveResult = await commands.updateMeetingSettings({
-      language,
-      output_dir: outputDir,
-      model_id: modelId,
-    });
+    const saveResult = await commands.updateMeetingSettings(settingsToSave());
     if (saveResult.status !== "ok") {
       setError(saveResult.error);
       return;
@@ -131,6 +159,14 @@ export const MeetingsSettings: React.FC = () => {
               >
                 {t("settings.meetings.chooseFolder")}
               </Button>
+              <Button
+                onClick={useLatest}
+                variant="secondary"
+                size="md"
+                disabled={running}
+              >
+                {t("settings.meetings.useLatest")}
+              </Button>
             </div>
             {files.map((file) => (
               <div key={file} className="break-all text-xs text-text/70">
@@ -154,6 +190,32 @@ export const MeetingsSettings: React.FC = () => {
             value={language}
             onChange={(e) => setLanguage(e.target.value)}
             placeholder={t("settings.meetings.languagePlaceholder")}
+            variant="compact"
+            disabled={running}
+          />
+          <div className="flex gap-2 items-center">
+            <Input
+              type="text"
+              value={recordingsDir}
+              onChange={(e) => setRecordingsDir(e.target.value)}
+              placeholder={t("settings.meetings.recordingsPlaceholder")}
+              variant="compact"
+              disabled={running}
+            />
+            <Button
+              onClick={chooseRecordingsFolder}
+              variant="secondary"
+              size="sm"
+              disabled={running}
+            >
+              {t("settings.meetings.browse")}
+            </Button>
+          </div>
+          <Input
+            type="text"
+            value={groupMinutes}
+            onChange={(e) => setGroupMinutes(e.target.value)}
+            placeholder={t("settings.meetings.groupPlaceholder")}
             variant="compact"
             disabled={running}
           />

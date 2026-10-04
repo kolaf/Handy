@@ -164,6 +164,17 @@ the minutes opened. Progress is shown on the page and the result on the Activity
 tested on a generated WAV file; a long local run has not been timed. The speech model is shared with dictation, so dictating
 while a meeting is being transcribed makes both wait.
 
+**Latest recording (OBS Studio and others).** Set the recorder's output folder on the Meetings page (empty means the `Videos` folder in the
+home folder, which is OBS Studio's default on Windows and Linux). `handy --meeting-latest [--meeting-single] [--meeting-folder DIR]`, the page
+button "Use the latest recording", and Talon "transcribe latest meeting" / "transcribe latest recording" take the newest file in that folder
+(not its sub-folders) together with the files that belong to the same recording: Handy looks at the 40 newest audio/video files (mp3,
+m4a, aac, wav, flac, ogg, **mkv, mp4, mov**; the first audio track is used, AAC is what OBS writes by default), reads each file's length
+from its header, and a file belongs to the group when it ended within N minutes (default 5, setting) of the moment the group starts.
+That is exact for OBS's automatic file splitting, where each part starts when the previous one is closed, and it keeps two separate
+meetings apart. If a length cannot be read, only files written within N minutes of each other are grouped. A newest file that was
+written less than 20 seconds ago is refused ("the recording may still be running"). MKV files with Opus audio cannot be decoded; set OBS
+to AAC. Everything is plain file-system code, so it behaves the same on Windows and Linux; the Talon commands do not touch the clipboard.
+
 **Model switching.** `handy --set-model NAME` switches the speech-to-text model by (part of) its id or name, ignoring case:
 an exact id wins, otherwise the words must occur in exactly one downloaded model (ambiguous or unknown names say so and list the
 downloaded ones). It uses the same switch as the settings page and tray menu (the model is loaded right away unless unloading is

@@ -390,6 +390,14 @@ async openMeetingFile(path: string) : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+async findLatestRecordings(single: boolean) : Promise<Result<string[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("find_latest_recordings", { single }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async cancelMeeting() : Promise<null> {
     return await TAURI_INVOKE("cancel_meeting");
 },
@@ -1142,7 +1150,7 @@ key_down: number; key_up: number; flags_changed: number; mouse: number; duration
 export type KeyboardImplementation = "tauri" | "handy_keys"
 export type LLMPrompt = { id: string; name: string; prompt: string; examples: string }
 export type ActivityEntry = { timestamp: number; kind: string; title: string; details: string }
-export type MeetingSettings = { language?: string; output_dir?: string; model_id?: string }
+export type MeetingSettings = { language?: string; output_dir?: string; model_id?: string; recordings_dir?: string; group_minutes?: number }
 export type LanguageModel = { language: string; model_id: string }
 export type AppPrompt = { app: string; title?: string; prompt_id: string }
 export type Correction = { wrong: string; right: string; hint?: boolean }
