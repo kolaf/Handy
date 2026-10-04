@@ -177,6 +177,15 @@ meetings apart. If a length cannot be read, only files written within N minutes 
 written less than 20 seconds ago is refused ("the recording may still be running"). MKV files with Opus audio cannot be decoded; set OBS
 to AAC. Everything is plain file-system code, so it behaves the same on Windows and Linux; the Talon commands do not touch the clipboard.
 
+**Cutting silence (local meeting transcription, on by default).** Speech models invent text over silence and noise, so before the
+local transcription the audio goes through the same Silero voice detector as dictation (sensitivity 0.3, so quiet speakers are
+kept). Pauses under 1 s stay, 0.3 s is kept around speech, stretches of speech are packed into chunks of at most 5 minutes so a chunk
+boundary is always in a silence, and joined stretches get 0.4 s of silence between them. The Activity entry says how many minutes
+were kept. If the detector fails, the audio is chunked at fixed lengths as before; a recording without any speech is refused. The
+Meetings page checkbox "Cut silence before transcribing" turns it off (for example for a very quiet speaker). Not used with speaker
+identification, where the cloud model does its own detection; the transcript has no timestamps in the local path, so nothing else
+depends on the original timing. Not tried on a real recording yet.
+
 **Speakers in meeting minutes (cloud, off by default; untested against the real endpoint).** The Meetings page checkbox "Identify the
 speakers", `--meeting-speakers`, and Talon "transcribe latest meeting with speakers" / "transcribe meeting [norwegian|english] with
 speakers" send the audio (16 kHz mono WAV, ten-minute pieces under the 25 MB limit) to `POST {post-processing base URL}/audio/transcriptions`

@@ -35,6 +35,7 @@ export const MeetingsSettings: React.FC = () => {
   const [groupMinutes, setGroupMinutes] = useState(
     String(saved.group_minutes ?? 5),
   );
+  const [skipSilence, setSkipSilence] = useState(saved.skip_silence ?? true);
   const [speakers, setSpeakers] = useState(saved.speakers ?? false);
   const [nameSpeakers, setNameSpeakers] = useState(saved.name_speakers ?? true);
   const [diarizeModel, setDiarizeModel] = useState(
@@ -106,6 +107,7 @@ export const MeetingsSettings: React.FC = () => {
     model_id: modelId,
     recordings_dir: recordingsDir,
     group_minutes: Math.max(1, Number.parseInt(groupMinutes, 10) || 5),
+    skip_silence: skipSilence,
     speakers,
     name_speakers: nameSpeakers,
     diarize_model: diarizeModel.trim() || "gpt-4o-transcribe-diarize",
@@ -227,6 +229,21 @@ export const MeetingsSettings: React.FC = () => {
             variant="compact"
             disabled={running}
           />
+          <label className="flex items-start gap-2">
+            <input
+              type="checkbox"
+              checked={skipSilence}
+              onChange={(e) => setSkipSilence(e.target.checked)}
+              disabled={running}
+              className="mt-1"
+            />
+            <span>
+              {t("settings.meetings.skipSilence")}
+              <span className="block text-xs text-mid-gray">
+                {t("settings.meetings.skipSilenceDescription")}
+              </span>
+            </span>
+          </label>
           <label className="flex items-start gap-2">
             <input
               type="checkbox"

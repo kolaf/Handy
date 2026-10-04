@@ -779,6 +779,8 @@
       "browse": "Browse...",
       "recordingsPlaceholder": "Recorder folder, e.g. where OBS saves (empty: Videos in your home folder)",
       "groupPlaceholder": "Minutes between files that belong together (default 5)",
+      "skipSilence": "Cut silence before transcribing",
+      "skipSilenceDescription": "Removes long pauses and noise with the same voice detector as dictation, so the speech model has nothing to invent text over. Very quiet speakers could be cut; turn it off for such recordings. Not used when speakers are identified.",
       "speakers": "Identify the speakers",
       "speakersDescription": "Sends the audio to the post-processing endpoint (the same address and key as the language model), where a diarizing transcription model labels who speaks. The recording leaves this computer, and the speech model above is not used. Off: everything stays local.",
       "nameSpeakers": "Use names that are said in the conversation",

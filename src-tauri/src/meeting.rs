@@ -263,6 +263,7 @@ async fn run_job(
     }
 
     let mut speaker_note = String::new();
+    let mut silence_note = String::new();
     let (transcript, total) = if speakers {
         // 2a. cloud transcription with speaker labels: ten-minute chunks, voices carried over from chunk to chunk
         let provider = diarize_provider(&settings).ok_or(
@@ -374,7 +375,24 @@ async fn run_job(
         (transcript, total)
     } else {
         // 2b. local transcription: chunk by chunk (chunks are global across the parts, like the original script)
-        let chunks: Vec<&[f32]> = pieces.iter().flat_map(|p| chunk(p, CHUNK_SECS)).collect();
+        let chunks: Vec<Vec<f32>> = if cfg.skip_silence {
+            emit(app, "decoding", 0, 0, "Cutting silence", None);
+            let (chunks, note) = speech_only_chunks(app, &pieces).await;
+            silence_note = note;
+            chunks
+        } else {
+            pieces
+                .iter()
+                .flat_map(|p| chunk(p, CHUNK_SECS))
+                .map(<[f32]>::to_vec)
+                .collect()
+        };
+        if CANCEL.load(Ordering::SeqCst) {
+            return Err("cancelled".into());
+        }
+        if chunks.is_empty() {
+            return Err("No speech was found in the recording.".into());
+        }
         let total = chunks.len() as u32;
         let mut transcripts: Vec<String> = Vec::new();
         for (i, piece) in chunks.iter().enumerate() {
@@ -467,6 +485,10 @@ async fn run_job(
                         String::new()
                     } else {
                         format!("Speakers: {speaker_note}\n")
+                    } + &if silence_note.is_empty() {
+                        String::new()
+                    } else {
+                        format!("{silence_note}\n")
                     },
                     files
                         .iter()
@@ -490,6 +512,145 @@ async fn run_job(
 const AUDIO_EXTENSIONS: &[&str] = &[
     "mp3", "m4a", "aac", "wav", "flac", "ogg", "mkv", "mp4", "mov",
 ];
+
+// ---- cutting silence ---------------------------------------------------------------------------------------------------
+
+const VAD_THRESHOLD: f32 = 0.3; // the same sensitivity as dictation, so quiet speakers are not cut
+/// A pause shorter than this stays in: it is part of the speech.
+const BRIDGE_GAP_SECS: f64 = 1.0;
+/// Kept on each side of speech, so word beginnings and endings are not clipped.
+const PAD_SECS: f64 = 0.3;
+/// Silence put between two stretches of speech that were joined into one chunk.
+const JOIN_SILENCE_SECS: f64 = 0.4;
+
+/// Sample ranges worth keeping, from one speech/no-speech decision per frame: pauses shorter than `BRIDGE_GAP_SECS` are
+/// bridged, `PAD_SECS` is added around speech, and ranges that touch are merged.
+pub fn speech_ranges(
+    flags: &[bool],
+    frame_samples: usize,
+    total_samples: usize,
+) -> Vec<(usize, usize)> {
+    let hz = TARGET_HZ as f64;
+    let bridge = (BRIDGE_GAP_SECS * hz) as usize;
+    let pad = (PAD_SECS * hz) as usize;
+    let mut raw: Vec<(usize, usize)> = Vec::new();
+    let mut i = 0;
+    while i < flags.len() {
+        if flags[i] {
+            let start = i;
+            while i < flags.len() && flags[i] {
+                i += 1;
+            }
+            raw.push((
+                start * frame_samples,
+                (i * frame_samples).min(total_samples),
+            ));
+        } else {
+            i += 1;
+        }
+    }
+    let mut out: Vec<(usize, usize)> = Vec::new();
+    for (start, end) in raw {
+        let (start, end) = (start.saturating_sub(pad), (end + pad).min(total_samples));
+        match out.last_mut() {
+            Some(last) if start <= last.1 + bridge => last.1 = last.1.max(end),
+            _ => out.push((start, end)),
+        }
+    }
+    out
+}
+
+/// Chunks of at most `max_secs` made of whole stretches of speech (a chunk boundary is always in a silence), with a short
+/// silence between joined stretches. A single stretch longer than `max_secs` is split.
+pub fn pack_speech(audio: &[f32], ranges: &[(usize, usize)], max_secs: usize) -> Vec<Vec<f32>> {
+    let max = max_secs * TARGET_HZ as usize;
+    let join = vec![0.0f32; (JOIN_SILENCE_SECS * TARGET_HZ as f64) as usize];
+    let mut chunks: Vec<Vec<f32>> = Vec::new();
+    let mut current: Vec<f32> = Vec::new();
+    for &(start, end) in ranges {
+        for part in audio[start..end].chunks(max) {
+            if !current.is_empty() && current.len() + join.len() + part.len() > max {
+                chunks.push(std::mem::take(&mut current));
+            }
+            if !current.is_empty() {
+                current.extend_from_slice(&join);
+            }
+            current.extend_from_slice(part);
+        }
+    }
+    if !current.is_empty() {
+        chunks.push(current);
+    }
+    chunks
+}
+
+/// One speech/no-speech decision per 30 ms frame, from the Silero model that dictation uses.
+fn speech_flags(app: &AppHandle, audio: &[f32]) -> Result<(Vec<bool>, usize), String> {
+    use crate::audio_toolkit::vad::{SileroVad, VoiceActivityDetector};
+    let path = app
+        .path()
+        .resolve(
+            "resources/models/silero_vad_v4.onnx",
+            tauri::path::BaseDirectory::Resource,
+        )
+        .map_err(|e| e.to_string())?;
+    let mut vad = SileroVad::new(path, VAD_THRESHOLD).map_err(|e| e.to_string())?;
+    let frame = vad.frame_samples();
+    let mut flags = Vec::with_capacity(audio.len() / frame + 1);
+    for window in audio.chunks_exact(frame) {
+        flags.push(vad.is_voice(window).map_err(|e| e.to_string())?);
+    }
+    Ok((flags, frame))
+}
+
+/// The audio parts as chunks for the speech model with the silence cut out. Returns the chunks and a note for the Activity
+/// page. On any problem with the detector the parts are chunked at fixed lengths instead (same as with the option off).
+async fn speech_only_chunks(app: &AppHandle, pieces: &[Vec<f32>]) -> (Vec<Vec<f32>>, String) {
+    let mut chunks = Vec::new();
+    let (mut before, mut after) = (0usize, 0usize);
+    for piece in pieces {
+        if CANCEL.load(Ordering::SeqCst) {
+            break;
+        }
+        let handle = app.clone();
+        let audio = piece.clone();
+        let result = tokio::task::spawn_blocking(move || {
+            let (flags, frame) = speech_flags(&handle, &audio)?;
+            let ranges = speech_ranges(&flags, frame, audio.len());
+            Ok::<_, String>(pack_speech(&audio, &ranges, CHUNK_SECS))
+        })
+        .await
+        .map_err(|e| e.to_string())
+        .and_then(|r| r);
+        match result {
+            Ok(packed) => {
+                before += piece.len();
+                after += packed.iter().map(Vec::len).sum::<usize>();
+                chunks.extend(packed);
+            }
+            Err(e) => {
+                warn!("Meeting: silence removal failed ({e}); using fixed chunks");
+                return (
+                    pieces
+                        .iter()
+                        .flat_map(|p| chunk(p, CHUNK_SECS))
+                        .map(<[f32]>::to_vec)
+                        .collect(),
+                    format!("Silence removal failed ({e}); the audio was transcribed whole."),
+                );
+            }
+        }
+    }
+    let minutes = |samples: usize| samples / TARGET_HZ as usize / 60;
+    (
+        chunks,
+        format!(
+            "Silence removed: {} of {} min kept.",
+            minutes(after),
+            minutes(before)
+        ),
+    )
+}
 
 // ---- speakers (cloud diarization) --------------------------------------------------------------------------------------
 
@@ -1662,5 +1823,61 @@ mod tests {
     fn the_names_prompt_carries_the_transcript_and_the_rules() {
         let p = names_prompt("[00:00] Speaker 1: Hi, I am Kari.");
         assert!(p.contains("I am Kari") && p.contains("Never guess") && p.contains("{}"));
+    }
+
+    #[test]
+    fn short_pauses_stay_and_long_silences_go() {
+        // 30 ms frames: 2 s speech, 0.6 s pause (bridged), 1 s speech, 20 s silence, 1 s speech, 10 s silence
+        let frame = 480usize;
+        let f = |secs: f64| (secs / 0.03).round() as usize;
+        let mut flags = Vec::new();
+        for (speech, secs) in [
+            (true, 2.0),
+            (false, 0.6),
+            (true, 1.0),
+            (false, 20.0),
+            (true, 1.0),
+            (false, 10.0),
+        ] {
+            flags.extend(std::iter::repeat(speech).take(f(secs)));
+        }
+        let total = flags.len() * frame;
+        let ranges = speech_ranges(&flags, frame, total);
+        assert_eq!(ranges.len(), 2, "{ranges:?}");
+        let secs = |s: usize| s as f64 / TARGET_HZ as f64;
+        // the first range holds both stretches and the pause, plus padding; it starts at 0 (no negative start)
+        assert_eq!(ranges[0].0, 0);
+        assert!(
+            (secs(ranges[0].1) - 3.9).abs() < 0.1,
+            "{}",
+            secs(ranges[0].1)
+        );
+        // the second starts 0.3 s before its speech (at 23.6 s) and stops 0.3 s after
+        assert!((secs(ranges[1].0) - 23.3).abs() < 0.1);
+        assert!((secs(ranges[1].1) - 24.9).abs() < 0.1);
+        // no speech at all gives nothing
+        assert!(speech_ranges(&vec![false; 100], frame, 100 * frame).is_empty());
+    }
+
+    #[test]
+    fn chunks_break_only_in_silences_and_respect_the_limit() {
+        let hz = TARGET_HZ as usize;
+        let audio = vec![0.5f32; 1000 * hz];
+        // three stretches of 100 s, 100 s and 250 s with a 10 s limit per chunk of 200 s
+        let ranges = [(0, 100 * hz), (200 * hz, 300 * hz), (400 * hz, 650 * hz)];
+        let chunks = pack_speech(&audio, &ranges, 200);
+        assert!(chunks.iter().all(|c| c.len() <= 200 * hz));
+        // the first two stretches do not fit together with the join (200.4 s), so each starts a chunk;
+        // the long third stretch is split in two
+        assert_eq!(chunks.len(), 4);
+        assert_eq!(chunks[0].len(), 100 * hz);
+        assert!(pack_speech(&audio, &[], 200).is_empty());
+        // small stretches are joined with a silence between them
+        let joined = pack_speech(&audio, &[(0, 5 * hz), (10 * hz, 15 * hz)], 200);
+        assert_eq!(joined.len(), 1);
+        assert_eq!(
+            joined[0].len(),
+            10 * hz + (JOIN_SILENCE_SECS * hz as f64) as usize
+        );
     }
 }

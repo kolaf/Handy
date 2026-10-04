@@ -132,6 +132,10 @@ pub struct MeetingSettings {
     /// (`diarize_model`) instead of being transcribed locally. Off by default; the audio leaves the computer.
     #[serde(default)]
     pub speakers: bool,
+    /// Cut long silences before local transcription (voice-activity detection): speech models tend to invent text over silence
+    /// and noise. Not used with speaker identification, where the cloud model does its own.
+    #[serde(default = "default_true")]
+    pub skip_silence: bool,
     /// With speaker identification: replace "Speaker 2" by a name when the conversation itself makes the name clear
     /// (introductions, being addressed by name). The language model is asked; it must not guess.
     #[serde(default = "default_true")]
@@ -164,6 +168,7 @@ impl Default for MeetingSettings {
             output_dir: String::new(),
             model_id: String::new(),
             speakers: false,
+            skip_silence: true,
             name_speakers: true,
             diarize_model: default_diarize_model(),
             recordings_dir: String::new(),
