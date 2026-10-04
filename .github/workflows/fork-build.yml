@@ -1,0 +1,186 @@
+name: "Fork build (portable + deb)"
+
+# Builds this fork's two artefacts so that they can be downloaded when needed:
+#   - Handy-<version>-<commit>-portable.zip  (Windows x64, unzip and run; keeps its data in Data\ next to handy.exe)
+#   - handy_<version>_amd64.deb              (Ubuntu 22.04 build, installs on 22.04 and newer)
+#
+# Run it by hand: Actions > "Fork build (portable + deb)" > Run workflow (or `gh workflow run fork-build.yml`).
+# The files are kept as workflow artefacts for 30 days. Tick "release" to also attach them to a GitHub pre-release
+# (fork-<commit>), which does not expire. Nothing is signed: Windows SmartScreen / AppLocker may refuse the unsigned exe.
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Also attach the files to a GitHub pre-release (fork-<commit>)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deb:
+    permissions:
+      contents: write
+    uses: ./.github/workflows/build.yml
+    with:
+      platform: "ubuntu-22.04"
+      target: "x86_64-unknown-linux-gnu"
+      build-args: "--bundles deb"
+      asset-prefix: "handy-fork"
+      upload-artifacts: true
+      sign-binaries: false
+    secrets: inherit
+
+  portable:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Enable long paths
+        shell: pwsh
+        run: |
+          New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" `
+            -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force
+          git config --system core.longpaths true
+
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Version and commit
+        id: meta
+        shell: bash
+        run: |
+          VERSION=$(grep -o '"version": "[^"]*"' src-tauri/tauri.conf.json | cut -d'"' -f4)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+          key: fork-portable-v1
+          cache-bin: false
+
+      - name: Install Vulkan SDK
+        uses: humbletim/install-vulkan-sdk@v1.2
+        with:
+          version: 1.4.309.0
+          cache: true
+
+      # The next three steps are the same as in build.yml (Windows x64): the VC++ runtime and ONNX Runtime DLLs that
+      # build.rs stages into src-tauri/transcribe-libs, and the SPIRV headers that ggml-vulkan needs.
+      - name: Locate VC++ runtime redist
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vsRoot = & $vswhere -latest -products * -property installationPath
+          if (-not $vsRoot) { throw "vswhere found no Visual Studio installation" }
+          $versionFile = Join-Path $vsRoot "VC\Auxiliary\Build\Microsoft.VCRedistVersion.default.txt"
+          $redistVersion = (Get-Content $versionFile).Trim()
+          $archDir = Join-Path $vsRoot "VC\Redist\MSVC\$redistVersion\x64"
+          $crt = Get-ChildItem $archDir -Directory -Filter "Microsoft.VC*.CRT" | Sort-Object Name | Select-Object -Last 1
+          $omp = Get-ChildItem $archDir -Directory -Filter "Microsoft.VC*.OpenMP" | Sort-Object Name | Select-Object -Last 1
+          if (-not $crt -or -not $omp) { throw "VC++ redist dirs not found under $archDir" }
+          $dirs = "$($crt.FullName);$($omp.FullName)"
+          Write-Host "HANDY_VC_REDIST_DIRS=$dirs"
+          Add-Content -Path $env:GITHUB_ENV -Value "HANDY_VC_REDIST_DIRS=$dirs"
+
+      - name: Install ONNX Runtime
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ORT_VERSION = "1.24.2"
+          $url = "https://github.com/microsoft/onnxruntime/releases/download/v$ORT_VERSION/onnxruntime-win-x64-$ORT_VERSION.zip"
+          Invoke-WebRequest -Uri $url -OutFile ort.zip
+          Expand-Archive -Path ort.zip -DestinationPath ort-dist -Force
+          $ortLib = (Resolve-Path "ort-dist/onnxruntime-win-x64-$ORT_VERSION/lib").Path
+          Add-Content -Path $env:GITHUB_ENV -Value "ORT_LIB_LOCATION=$ortLib"
+          Add-Content -Path $env:GITHUB_ENV -Value "ORT_PREFER_DYNAMIC_LINK=1"
+
+      - name: Install SPIRV-Headers
+        shell: pwsh
+        run: |
+          vcpkg install spirv-headers:x64-windows
+          if ($LASTEXITCODE -ne 0) { throw "vcpkg install spirv-headers failed" }
+          $prefix = "$env:VCPKG_INSTALLATION_ROOT/installed/x64-windows" -replace '\\','/'
+          $combined = if ($env:CMAKE_PREFIX_PATH) { "$prefix;$env:CMAKE_PREFIX_PATH" } else { $prefix }
+          Add-Content $env:GITHUB_ENV "CMAKE_PREFIX_PATH=$combined"
+
+      - name: Install frontend dependencies
+        run: bun install
+
+      - name: Unit tests
+        working-directory: src-tauri
+        run: cargo test --release --lib
+
+      - name: Build (no installer)
+        run: bun run tauri build --no-bundle
+
+      - name: Package the portable zip
+        id: package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $rel = "src-tauri\target\release"
+          $out = "portable-out"
+          Remove-Item $out -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory $out | Out-Null
+          Copy-Item "$rel\handy.exe" $out
+          Copy-Item "$rel\*.dll" $out
+          if (Test-Path "$rel\resources") { Copy-Item "$rel\resources" "$out\resources" -Recurse }
+          else { Copy-Item "src-tauri\resources" "$out\resources" -Recurse }
+          # What build.rs staged for bundling: the VC++ runtime and onnxruntime.dll.
+          if (Test-Path "src-tauri\transcribe-libs") { Copy-Item "src-tauri\transcribe-libs\*" $out -Recurse -Force }
+          Set-Content -Path "$out\portable" -Value 'Handy Portable Mode' -NoNewline
+          foreach ($need in 'handy.exe','onnxruntime.dll','msvcp140.dll','vcruntime140.dll','transcribe.dll') {
+            if (-not (Test-Path "$out\$need")) { throw "$need is missing from the portable folder" }
+          }
+          if (-not (Test-Path "$out\resources\models\silero_vad_v4.onnx")) { throw "the voice-detection model is missing from resources" }
+          $zip = "Handy-${{ steps.meta.outputs.version }}-${{ steps.meta.outputs.sha }}-portable.zip"
+          Compress-Archive -Path "$out\*" -DestinationPath $zip -Force
+          Get-Item $zip | Select-Object Name,Length | Format-List
+          (Get-FileHash $zip -Algorithm SHA256).Hash | Tee-Object -FilePath "$zip.sha256"
+          "zip=$zip" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Upload the portable zip
+        uses: actions/upload-artifact@v7
+        with:
+          name: handy-fork-portable
+          path: |
+            ${{ steps.package.outputs.zip }}
+            ${{ steps.package.outputs.zip }}.sha256
+          retention-days: 30
+
+  release:
+    if: ${{ inputs.release }}
+    needs: [deb, portable]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download the artefacts
+        uses: actions/download-artifact@v5
+        with:
+          path: dist
+
+      - name: Create the pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="fork-$(echo "${GITHUB_SHA}" | cut -c1-7)"
+          mapfile -t FILES < <(find dist -type f \( -name '*.deb' -o -name '*-portable.zip' -o -name '*.sha256' \))
+          printf 'Attaching: %s\n' "${FILES[@]}"
+          gh release create "$TAG" "${FILES[@]}" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --prerelease --title "Fork build $TAG" \
+            --notes "Unsigned fork build of commit ${GITHUB_SHA}: Windows portable zip and Ubuntu .deb. Windows SmartScreen or AppLocker may refuse the unsigned exe."
