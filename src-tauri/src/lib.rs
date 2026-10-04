@@ -18,6 +18,7 @@ mod listsync;
 mod llm_client;
 mod managers;
 mod memory;
+mod model_switch;
 mod overlay;
 mod paste_tx;
 mod picker;
@@ -888,6 +889,10 @@ pub fn run(cli_args: CliArgs) {
                 context::set_one_shot(&id);
                 handled_setting = true;
             }
+            if let Some(name) = signal_handle::flag_value(&args, "--set-model") {
+                model_switch::run_set(app, name);
+                handled_setting = true;
+            }
             if let Some(id) = signal_handle::flag_value(&args, "--redo-with") {
                 extras::run_redo(app, id);
                 handled_setting = true;
@@ -920,6 +925,8 @@ pub fn run(cli_args: CliArgs) {
                 signal_handle::run_action(app, "rerun_next_prompt", "CLI");
             } else if args.iter().any(|a| a == "--paste-last") {
                 signal_handle::run_action(app, "paste_last", "CLI");
+            } else if args.iter().any(|a| a == "--model-picker") {
+                signal_handle::run_action(app, "model_picker", "CLI");
             } else if args.iter().any(|a| a == "--prompt-picker") {
                 signal_handle::run_action(app, "prompt_picker", "CLI");
             } else if args.iter().any(|a| a == "--reformat") {

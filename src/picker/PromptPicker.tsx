@@ -10,6 +10,7 @@ interface PickerItem {
 }
 
 interface OpenPayload {
+  mode: string;
   items: PickerItem[];
   selected: string | null;
 }
@@ -20,6 +21,7 @@ const PromptPicker: React.FC = () => {
   const { t } = useTranslation();
   const [items, setItems] = useState<PickerItem[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
+  const [mode, setMode] = useState("prompts");
 
   useEffect(() => {
     // The window is created the first time the picker opens, so its page may load after the "picker-open" event
@@ -28,11 +30,13 @@ const PromptPicker: React.FC = () => {
       if (state) {
         setItems(state.items);
         setSelected(state.selected);
+        setMode(state.mode);
       }
     });
     const unlistenOpen = listen<OpenPayload>("picker-open", (event) => {
       setItems(event.payload.items);
       setSelected(event.payload.selected);
+      setMode(event.payload.mode);
     });
     const unlistenClose = listen("picker-close", () => setItems([]));
     return () => {
@@ -44,7 +48,9 @@ const PromptPicker: React.FC = () => {
   return (
     <div className="picker-card">
       <div className="picker-header">
-        <span>{t("picker.title")}</span>
+        <span>
+          {mode === "models" ? t("picker.modelsTitle") : t("picker.title")}
+        </span>
         <button
           className="picker-close"
           aria-label={t("picker.close")}

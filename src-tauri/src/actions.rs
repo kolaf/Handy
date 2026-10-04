@@ -1219,7 +1219,15 @@ pub static ACTION_MAP: Lazy<HashMap<String, Arc<dyn ShortcutAction>>> = Lazy::ne
     );
     map.insert(
         "prompt_picker".to_string(),
-        Arc::new(crate::picker::PickerToggleAction) as Arc<dyn ShortcutAction>,
+        Arc::new(crate::picker::PickerToggleAction {
+            mode: crate::picker::Mode::Prompts,
+        }) as Arc<dyn ShortcutAction>,
+    );
+    map.insert(
+        "model_picker".to_string(),
+        Arc::new(crate::picker::PickerToggleAction {
+            mode: crate::picker::Mode::Models,
+        }) as Arc<dyn ShortcutAction>,
     );
     map.insert(
         "reformat_selection".to_string(),

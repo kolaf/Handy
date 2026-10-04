@@ -40,8 +40,32 @@ struct Item {
 
 #[derive(Serialize, Clone, specta::Type)]
 pub struct OpenPayload {
+    /// "prompts" or "models": what is listed, so the window can say so.
+    mode: String,
     items: Vec<Item>,
     selected: Option<String>,
+}
+
+/// What the picker lists.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Mode {
+    Prompts,
+    Models,
+}
+
+impl Mode {
+    fn name(self) -> &'static str {
+        match self {
+            Mode::Prompts => "prompts",
+            Mode::Models => "models",
+        }
+    }
+}
+
+static MODE: Mutex<Mode> = Mutex::new(Mode::Prompts);
+
+fn current_mode() -> Mode {
+    MODE.lock().map(|m| *m).unwrap_or(Mode::Prompts)
 }
 
 fn window_height(count: usize) -> f64 {
@@ -149,24 +173,40 @@ pub fn is_open() -> bool {
     OPEN.load(Ordering::SeqCst)
 }
 
-/// Opens the picker, or closes it when it is already open.
-pub fn toggle(app: &AppHandle) {
+/// Opens the picker with this list, or closes it when it already shows that list. If it shows the other list, it
+/// switches to this one.
+pub fn toggle_mode(app: &AppHandle, mode: Mode) {
     if is_open() {
+        let same = current_mode() == mode;
         close(app);
-    } else {
-        open(app);
+        if same {
+            return;
+        }
     }
+    open(app, mode);
 }
 
-fn open(app: &AppHandle) {
+fn open(app: &AppHandle, mode: Mode) {
     let settings = get_settings(app);
-    let prompts: Vec<(String, String)> = settings
-        .post_process_prompts
-        .iter()
-        .filter(|p| !crate::extras::is_transform_prompt(&p.id))
-        .map(|p| (p.id.clone(), p.name.clone()))
-        .collect();
-    let items = pick_items(&prompts);
+    let (entries, selected): (Vec<(String, String)>, Option<String>) = match mode {
+        Mode::Prompts => (
+            settings
+                .post_process_prompts
+                .iter()
+                .filter(|p| !crate::extras::is_transform_prompt(&p.id))
+                .map(|p| (p.id.clone(), p.name.clone()))
+                .collect(),
+            settings.post_process_selected_prompt_id.clone(),
+        ),
+        Mode::Models => (
+            crate::model_switch::downloaded(app)
+                .into_iter()
+                .map(|m| (m.id, m.name))
+                .collect(),
+            Some(settings.selected_model.clone()),
+        ),
+    };
+    let items = pick_items(&entries);
     if items.is_empty() {
         crate::learn::announce(app, "reformat-setup", String::new());
         return;
@@ -183,9 +223,13 @@ fn open(app: &AppHandle) {
         *shown = items.iter().map(|i| i.id.clone()).collect();
     }
 
+    if let Ok(mut current_mode) = MODE.lock() {
+        *current_mode = mode;
+    }
     let payload = OpenPayload {
+        mode: mode.name().to_string(),
         items: items.clone(),
-        selected: settings.post_process_selected_prompt_id.clone(),
+        selected,
     };
     if let Ok(mut current) = CURRENT.lock() {
         *current = Some(payload.clone());
@@ -245,22 +289,27 @@ pub fn choose(app: &AppHandle, number: usize) {
         .lock()
         .ok()
         .and_then(|shown| shown.get(number.wrapping_sub(1)).cloned());
+    let mode = current_mode();
     close(app);
-    match id {
-        Some(id) => set_prompt_by_id(app, &id),
-        None => warn!("Prompt picker: no prompt with number {}", number),
+    match (id, mode) {
+        (Some(id), Mode::Prompts) => set_prompt_by_id(app, &id),
+        (Some(id), Mode::Models) => crate::model_switch::switch_and_report(app, &id),
+        (None, _) => warn!("Picker: nothing with number {}", number),
     }
 }
 
 // Shortcut events arrive on the thread that owns the keyboard hook, and (un)registering talks to that same thread, so
 // every action hands its work to a new thread.
 
-pub(crate) struct PickerToggleAction;
+pub(crate) struct PickerToggleAction {
+    pub mode: Mode,
+}
 
 impl ShortcutAction for PickerToggleAction {
     fn start(&self, app: &AppHandle, _binding_id: &str, _shortcut_str: &str) {
         let app = app.clone();
-        std::thread::spawn(move || toggle(&app));
+        let mode = self.mode;
+        std::thread::spawn(move || toggle_mode(&app, mode));
     }
 
     fn stop(&self, _app: &AppHandle, _binding_id: &str, _shortcut_str: &str) {}

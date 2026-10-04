@@ -6,6 +6,7 @@ This build (`0.9.7-hotkeys.1`) adds features on top of Handy. The full reference
 
 - **Swap language** (`Ctrl+Alt+L`): swaps the language with the _Alternate Language_ you set on the General page.
 - **Prompt picker** (`Ctrl+Alt+P`): a numbered list of your prompts in a small window. Press a number key or click a row to choose, `Esc` (or `Ctrl+Alt+P` again) to close. The first nine prompts are listed; the one in use is highlighted. The window never takes focus, so your selection stays where it is.
+- **Model picker** (`Ctrl+Alt+M`) and `handy --set-model NAME` (Talon: "model parakeet", "model norwegian"): switch the speech model among the downloaded ones; the picker is the same numbered window as the prompt picker.
 - **Prompt per app** (Post-Processing page): choose the prompt by the app you dictate into, for example Slack → _Informal message_. Rules are "program (+ optional part of the window title) → prompt"; the first matching rule wins, otherwise the selected prompt is used. Windows, and Linux with X11 (Wayland does not let apps see the active window). On Linux the program name is the process name, for example `slack` or `firefox`. The app is the one you were in when you **started** speaking, not where you are when the text is ready. The Handy log shows the program name it saw.
 - **Keeps dictation out of the wrong window** (Advanced, on by default; Windows and Linux/X11): if you switch to another window or app while a dictation is being prepared, it is not pasted there. It is put on the clipboard and a notice says so.
 - **Paste last dictation** (`Ctrl+Alt+V`): paste your most recent dictation again.
@@ -53,4 +54,4 @@ Next to History. Every on-screen notice (learned, nothing learned, lists synced,
 
 ## Command line
 
-`handy --swap-language`, `--prompt-picker`, `--reformat`, `--transform ID`, `--redo-with ID`, `--scratch-last`, `--use-prompt-once ID`, `--rerun`, `--paste-last`, `--learn`, `--learn-repo FOLDER`, `--import-words FILE`, `--sync-lists FILE`, `--set-language no`, `--set-prompt email`. They work with a running Handy and can be combined with `--toggle-post-process`, for example from a window-manager key binding, a Logitech button or Talon.
+`handy --swap-language`, `--prompt-picker`, `--model-picker`, `--set-model NAME`, `--reformat`, `--transform ID`, `--redo-with ID`, `--scratch-last`, `--use-prompt-once ID`, `--rerun`, `--paste-last`, `--learn`, `--learn-repo FOLDER`, `--import-words FILE`, `--sync-lists FILE`, `--set-language no`, `--set-prompt email`. They work with a running Handy and can be combined with `--toggle-post-process`, for example from a window-manager key binding, a Logitech button or Talon.

@@ -142,6 +142,14 @@ community behaviour runs. It does not matter how a dictation was started (hotkey
 known to neither side. Talon: "scratch dictation", "redo as email|message|
 note|meeting|document|formal|informal|simple".
 
+**Model switching.** `handy --set-model NAME` switches the speech-to-text model by (part of) its id or name, ignoring case:
+an exact id wins, otherwise the words must occur in exactly one downloaded model (ambiguous or unknown names say so and list the
+downloaded ones). It uses the same switch as the settings page and tray menu (the model is loaded right away unless unloading is
+set to "Immediately"), shows a toast, and writes the result to the Activity page, with a note if the model does not list the
+current language. `handy --model-picker` (shortcut `ctrl+alt+m`, setting on the General page) opens the same numbered window as
+the prompt picker, listing the downloaded models. Only downloaded models can be chosen; download more on the Models page. Talon:
+"model parakeet", "model norwegian", "model whisper small", "model picker" (names in `kolaf/handy/models.talon-list`).
+
 **Prompt per app.** Post-processing page → "Prompt per app": turn it on and add rules (program name such as `slack.exe`, an
 optional window-title part, and a prompt). When you dictate with post-processing, the first matching rule decides the prompt;
 a rule with a title part wins over a rule for the whole app; no match means the selected prompt. Windows and Linux with X11 (it reads the

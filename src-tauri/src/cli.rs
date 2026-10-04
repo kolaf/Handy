@@ -32,6 +32,14 @@ pub struct CliArgs {
     #[arg(long)]
     pub rerun: bool,
 
+    /// Switch the speech model by (part of) its name or id, e.g. `parakeet` (sent to running instance)
+    #[arg(long, value_name = "NAME")]
+    pub set_model: Option<String>,
+
+    /// Open the numbered model picker (sent to running instance)
+    #[arg(long)]
+    pub model_picker: bool,
+
     /// Open the numbered prompt picker (sent to running instance)
     #[arg(long)]
     pub prompt_picker: bool,

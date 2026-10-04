@@ -205,6 +205,10 @@
           "rerun_next_prompt": {
             "name": "Re-run With Next Prompt Shortcut",
             "description": "Re-process the last dictation with the next prompt and paste the result. Select the previously pasted text first to replace it."
+          },
+          "model_picker": {
+            "name": "Model Picker Shortcut",
+            "description": "Open a numbered list of the downloaded speech models. Press a number key or click to switch, Esc to close."
           }
         },
         "errors": {
@@ -728,7 +732,9 @@
         "transform-moved": "Transform: last dictation not at the cursor",
         "fallback": "Offline: basic cleanup only",
         "paste-moved": "Not pasted: window changed",
-        "scratched": "Dictation removed"
+        "scratched": "Dictation removed",
+        "model": "Speech model switched",
+        "model-failed": "Speech model not switched"
       }
     }
   },
@@ -810,7 +816,9 @@
     "noticeReformatFailed": "Reformat failed (see log)",
     "noticeNotAtCursor": "The last dictation is not at the cursor",
     "noticePasteMoved": "Window changed: dictation is on the clipboard",
-    "noticeScratched": "Last dictation removed"
+    "noticeScratched": "Last dictation removed",
+    "noticeModel": "Speech model: {{value}}",
+    "noticeModelFailed": "Could not switch model (see Activity)"
   },
   "secureInput": {
     "blockedWithCulprit_one": "{{name}} may be blocking 1 shortcut",
@@ -826,6 +834,7 @@
   "picker": {
     "title": "Prompt",
     "close": "Close",
-    "escape": "Esc"
+    "escape": "Esc",
+    "modelsTitle": "Speech model"
   }
 }

@@ -1009,6 +1009,18 @@ pub fn get_default_settings() -> AppSettings {
         },
     );
     bindings.insert(
+        "model_picker".to_string(),
+        ShortcutBinding {
+            id: "model_picker".to_string(),
+            name: "Model Picker".to_string(),
+            description:
+                "Open a numbered list of the downloaded speech models; press a number or click to switch."
+                    .to_string(),
+            default_binding: "ctrl+alt+m".to_string(),
+            current_binding: "ctrl+alt+m".to_string(),
+        },
+    );
+    bindings.insert(
         "reformat_selection".to_string(),
         ShortcutBinding {
             id: "reformat_selection".to_string(),
