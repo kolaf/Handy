@@ -94,6 +94,32 @@ fallback is Linux (`FORK.md`, Linux build).
    `kolaf/terminal/README.md` ("terminal help" opens it).
 6. The terminal commands need part A's shell hook, which writes `%USERPROFILE%\.cache\hv\terminal-state.txt`.
 
+## Optional: a local language model for post-processing
+
+Nothing here is required. Handy's post-processing can use any OpenAI-compatible server instead of LiteLLM, and `llama-server`
+(llama.cpp) is the simplest one: no other service, it reads model files directly. It needs a **GGUF** file (the old GGML `.bin`
+format is not read, and Whisper's `.bin` files are speech models, a different thing). Benchmarked on the RTX 3080 home machine with
+`fork/prompts/bench.py` (41 cases; gpt-5.4 passes all): Qwen2.5-7B 34, Qwen3-4B 33, Gemma-3-12B 31, Gemma-3-4B 27. Local models are
+weakest at Norwegian spoken punctuation and format commands and at ignoring instructions inside the dictated text, so keep
+gpt-5.4 for Norwegian and for the "make that ..." transforms, and use a local model for quick English cleanup or as an offline
+fallback. Not tried on the work laptop.
+
+1. Download the **Vulkan** build `llama-<tag>-bin-win-vulkan-x64.zip` (about 31 MB, any GPU with a current driver, no CUDA) from
+   `https://github.com/ggml-org/llama.cpp/releases` and unpack it, for example to `C:\llm\bin`. If the machine's policy blocks an
+   unsigned `llama-server.exe`, stop here (same rule as for Handy).
+2. Download one model file (copy it over from another computer if downloads are restricted):
+   - 6 GB GPU (RTX A3000 Laptop): `Qwen3-4B-Instruct-2507-Q4_K_M.gguf` (2.5 GB, from `unsloth/Qwen3-4B-Instruct-2507-GGUF` on
+     Hugging Face) fits completely. `Qwen2.5-7B-Instruct-Q4_K_M.gguf` (4.7 GB, `bartowski/Qwen2.5-7B-Instruct-GGUF`) scores
+     slightly better but is tight next to Handy's speech model; if it is slow, the model did not fit on the GPU, so use the 4B.
+   - 10 GB or more: the 7B. Models of 12B and up were slower and not better.
+3. Start it (leave the window open, or make a shortcut):
+   `llama-server.exe -m C:\llm\models\Qwen3-4B-Instruct-2507-Q4_K_M.gguf -ngl 99 -c 4096 --host 127.0.0.1 --port 8081`
+4. In Handy (Post-Processing): provider "custom", address `http://127.0.0.1:8081/v1`, any API key (for example `x`), any model name.
+   Switch back to the LiteLLM address when you want gpt-5.4. Speaker identification in meetings always needs the cloud endpoint.
+5. Check quality yourself before trusting it:
+   `BENCH_BASE_URL=http://127.0.0.1:8081/v1 BENCH_API_KEY=x BENCH_MODEL=local python3 fork/prompts/bench.py` (standard library
+   only; Talon's `python.exe` also runs it on Windows).
+
 ## Is it working? (checks, in a few minutes)
 
 - Handy: the picker opens with `Ctrl+Alt+P`; a dictation with post-processing pastes; the Activity page lists notices.
