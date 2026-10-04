@@ -503,6 +503,12 @@ fn show_overlay_state(app_handle: &AppHandle, state: &str) {
     // geometry path uniform (a no-op cost on Windows, and it also keeps macOS's
     // NSScreen access main-thread-correct). run_on_main_thread runs the closure
     // inline when already on the main thread, so this never deadlocks.
+    //
+    // The generation is bumped here, at request time, and not when the main thread gets to the show: a delayed hide
+    // that was scheduled just before (and passes its check while the main thread is still busy, as it is at the first
+    // dictation after startup) would otherwise hide the overlay right after it appeared.
+    OVERLAY_SHOW_GENERATION.fetch_add(1, Ordering::SeqCst);
+    OVERLAY_IS_NOTICE.store(state == "notice", Ordering::SeqCst);
     let handle = app_handle.clone();
     let state = state.to_string();
     let _ = app_handle.run_on_main_thread(move || show_overlay_state_on_main(&handle, &state));
@@ -512,10 +518,6 @@ fn show_overlay_state_on_main(app_handle: &AppHandle, state: &str) {
     // Size the overlay for this state (compact vs. streaming), then position it.
     let (width, height) = overlay_dimensions(state);
     if let Some(overlay_window) = app_handle.get_webview_window("recording_overlay") {
-        // Invalidate any delayed hide still in flight from a previous session
-        // (see `hide_recording_overlay`).
-        OVERLAY_SHOW_GENERATION.fetch_add(1, Ordering::SeqCst);
-
         #[cfg(target_os = "linux")]
         let shown_with_layer_shell = if LAYER_SHELL_ACTIVE.load(Ordering::SeqCst) {
             let position = settings::get_settings(app_handle).overlay_position;
@@ -711,6 +713,8 @@ pub fn emit_recording_caption(app_handle: &AppHandle, post_process: bool) {
 
 const NOTICE_DURATION_MS: u64 = 1500;
 static NOTICE_ACTIVE: AtomicBool = AtomicBool::new(false);
+/// The overlay was last shown as a notice (not for recording or transcribing). A notice must never touch it otherwise.
+static OVERLAY_IS_NOTICE: AtomicBool = AtomicBool::new(false);
 static NOTICE_SEQ: AtomicU64 = AtomicU64::new(0);
 
 /// Briefly shows what a shortcut just switched to (e.g. kind "language", value "no")
@@ -734,7 +738,10 @@ pub fn show_notice_overlay_unlogged(app_handle: &AppHandle, kind: &str, value: &
         return;
     };
     let notice_active = NOTICE_ACTIVE.load(Ordering::SeqCst);
-    if !notice_active && overlay_window.is_visible().unwrap_or(true) {
+    let visible = overlay_window.is_visible().unwrap_or(true);
+    // Visible and not showing a notice: a recording or transcription owns the overlay (a notice that is still "active"
+    // from earlier has been taken over), so this one is skipped.
+    if visible && !OVERLAY_IS_NOTICE.load(Ordering::SeqCst) {
         return;
     }
 
@@ -745,21 +752,22 @@ pub fn show_notice_overlay_unlogged(app_handle: &AppHandle, kind: &str, value: &
         serde_json::json!({ "kind": kind, "value": value }),
     );
     let seq = NOTICE_SEQ.fetch_add(1, Ordering::SeqCst) + 1;
-    if !notice_active {
+    if !notice_active || !visible {
         NOTICE_ACTIVE.store(true, Ordering::SeqCst);
         show_overlay_state(app_handle, "notice");
     }
+    // The generation was bumped by the show above (or is the one the active notice already owns).
+    let shown_at = OVERLAY_SHOW_GENERATION.load(Ordering::SeqCst);
 
     let handle = app_handle.clone();
     std::thread::spawn(move || {
-        // The show is queued onto the main thread; read the generation once it has landed.
-        std::thread::sleep(std::time::Duration::from_millis(100));
-        let shown_at = OVERLAY_SHOW_GENERATION.load(Ordering::SeqCst);
         std::thread::sleep(std::time::Duration::from_millis(NOTICE_DURATION_MS));
         if NOTICE_SEQ.load(Ordering::SeqCst) != seq {
             return; // a newer notice owns the overlay now
         }
-        if OVERLAY_SHOW_GENERATION.load(Ordering::SeqCst) == shown_at {
+        if OVERLAY_SHOW_GENERATION.load(Ordering::SeqCst) == shown_at
+            && OVERLAY_IS_NOTICE.load(Ordering::SeqCst)
+        {
             hide_recording_overlay(&handle);
             // Stay "active" through the fade-out so a quick follow-up reuses the window.
             std::thread::sleep(std::time::Duration::from_millis(350));
@@ -783,13 +791,24 @@ pub fn hide_recording_overlay(app_handle: &AppHandle) {
         // Hide the window after a short delay to allow animation to complete,
         // unless a newer session has shown the overlay again by then.
         let window_clone = overlay_window.clone();
+        let handle = app_handle.clone();
         std::thread::spawn(move || {
             std::thread::sleep(std::time::Duration::from_millis(300));
             if OVERLAY_SHOW_GENERATION.load(Ordering::SeqCst) != scheduled_at {
                 log::debug!("Skipping stale overlay hide: a newer session is showing the overlay");
                 return;
             }
-            let _ = window_clone.hide();
+            // Check again on the main thread, in the same queue as the shows: a show that was requested after the check
+            // above but not yet run must still win.
+            let _ = handle.run_on_main_thread(move || {
+                if OVERLAY_SHOW_GENERATION.load(Ordering::SeqCst) == scheduled_at {
+                    let _ = window_clone.hide();
+                } else {
+                    log::debug!(
+                        "Skipping stale overlay hide: a newer session is showing the overlay"
+                    );
+                }
+            });
         });
     }
 }
