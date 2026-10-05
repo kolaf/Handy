@@ -590,7 +590,7 @@ frontend: `LanguageSelector.tsx`, `ModelSettingsCard.tsx`, `PostProcessingSettin
 
 ## What has been tried
 
-Verified: Norwegian dictation (NB-Whisper) with the CI-built 0.9.8 portable zip on the work laptop (RTX A3000, 2026-10-05), which also covers the `transcribe` 0.3.0 bump; the unit tests (368), the prompt bench (41 of 41 on two real endpoints), local-model benchmarks, meeting decoding on a generated
+Verified: the whole upstream-sync loop with a real change on 2026-10-05 (daily job, clean merge, checks, Claude review with verdict, pull request, "merge it" in Telegram, merge, tag `build-3`, CI build of the zip and deb, release, build-finished message); Norwegian dictation (NB-Whisper) with the CI-built 0.9.8 portable zip on the work laptop (RTX A3000, 2026-10-05), which also covers the `transcribe` 0.3.0 bump; the unit tests (368), the prompt bench (41 of 41 on two real endpoints), local-model benchmarks, meeting decoding on a generated
 file, the CI builds (they run), Talon files loading without errors, the Ansible `--check` runs that were done. **Not tried on real data or by
 voice:** meeting transcription of a real recording (silence cutting, OBS grouping, local speed), speaker identification and speaker names
 against a real endpoint, `--set-llm`, most spoken Talon commands, scratch and redo in VS Code and terminals, the paste guard in daily use, the
