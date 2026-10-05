@@ -318,8 +318,8 @@ overlay says "Offline: basic cleanup only" after a failure.
 `fork/scripts/sync-upstream.sh` brings `cjpais/Handy` main into the fork without touching any working copy, and leaves a pull request for you to
 review. It runs unattended on the always-on Linux server: a Hermes cron job `handy-upstream-sync` (schedule `30 7 * * 1`, Monday 07:30 server time,
 no-agent mode, delivery to Telegram) runs `~/.hermes/scripts/handy/sync-upstream.sh`, a wrapper that pulls the repository clone `~/dev/Handy`, sets
-the PATH, runs the script and prints exactly one line, which Hermes sends to Telegram: "no new commits", the pull request link (with "please review
-closely" when Claude resolved conflicts), or the issue link when it did not finish. Requirements on that machine: the clone with `upstream` pointing
+the PATH, runs the script and prints a short result, which Hermes sends to Telegram: "no new commits", or the pull request link (or the issue link when
+it did not finish) followed by Claude's **verdict and summary** (see "The review" below). Requirements on that machine: the clone with `upstream` pointing
 at `cjpais/Handy`, a GitHub token with write access to **this repository only** (fine-grained: Contents, Pull requests and Issues read and write)
 in `~/.config/handy-sync/token` (mode 600; the wrapper exports it as `GH_TOKEN`, so the general `gh` login is not used), Rust, Bun, the Linux build libraries (the list under "Building and installing"), a signed-in Claude Code, `gh` logged in, and
 Hermes with Telegram configured. If the build libraries are missing the script says so and stops before starting Claude.
@@ -331,7 +331,17 @@ Hermes with Telegram configured. If the build libraries are missing the script s
 5. **Conflicts or failing checks:** start Claude Code headless (`claude -p`, budget `CLAUDE_BUDGET_USD`, default 10) in the worktree with instructions to
    follow this file ("Merging upstream"), keep the fork's features, adopt upstream's design where it replaced code, fix what the merge breaks and run
    the checks. It can read, edit, commit and run git (not push), cargo, bun and npx; `git push`, `gh`, `curl` and `rm -rf` are denied.
-6. **The script does not trust Claude's report:** it checks that the merge is finished, nothing is uncommitted, upstream is in the branch, and runs the
+6. **The review (always, whenever there is something new).** A second headless Claude run, read-only (Read, Grep, Glob and `git log|show|diff|merge-base`),
+   looks at the upstream commits and writes, for someone who does not know the upstream project: `VERDICT: MERGE|REVIEW|CAREFUL - why`, a one-paragraph
+   summary of what the changes do for a user, the changes one by one in plain words, the overlap with the fork's features, what to try by hand after
+   merging, and what it could not verify. The script gives it the list of files that both upstream and the fork changed and the dependency, build
+   and CI files upstream touched. **MERGE** means documentation, translations, tests, CI or small isolated fixes in code the fork does not touch, no
+   dependency, engine or settings-format changes, and good automated checks; **REVIEW** means user-visible changes, code the fork also changes, or
+   dependency bumps that look sound; **CAREFUL** means the speech engine or audio, paste or shortcut handling, the overlay, settings migration, many
+   files, a conflict Claude had to resolve, a failed state, or anything it could not judge (when unsure it must pick the stricter one). The full review
+   goes at the top of the pull request, and the verdict and summary go into the Telegram message. Budget: `REVIEW_BUDGET_USD` (default 3). If the
+   review run fails, the verdict is REVIEW with the commit titles instead. The review is Claude's reading of the diff, not a test: the app is never run.
+7. **The script does not trust Claude's report:** it checks that the merge is finished, nothing is uncommitted, upstream is in the branch, and runs the
    checks itself again. Pass: pull request whose body says Claude resolved it, lists the conflicted files and includes Claude's summary. Fail: an
    issue with the end of the checks log (and the branch, if it has commits).
 
