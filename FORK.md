@@ -313,11 +313,15 @@ period/full stop/punktum, colon/kolon, semicolon/semikolon, new line/ny linje, n
 symbol, and sentences are capitalized. It is deliberately simple: a literal "the period of time" is converted too. The
 overlay says "Offline: basic cleanup only" after a failure.
 
-## Weekly upstream sync (local, with Claude Code)
+## Weekly upstream sync (on the Linux server, Hermes cron, Claude Code)
 
-`fork/scripts/sync-upstream.sh` brings `cjpais/Handy` main into the fork without touching your working copy, and leaves a pull request for you to
-review. It runs unattended every Monday 07:30 through a Windows scheduled task named "Handy upstream sync" (`wsl.exe` starts the script in the
-Ubuntu distro; "run when available" is on, so a missed start runs at the next opportunity; the computer must be on and logged in).
+`fork/scripts/sync-upstream.sh` brings `cjpais/Handy` main into the fork without touching any working copy, and leaves a pull request for you to
+review. It runs unattended on the always-on Linux server: a Hermes cron job `handy-upstream-sync` (schedule `30 7 * * 1`, Monday 07:30 server time,
+no-agent mode, delivery to Telegram) runs `~/.hermes/scripts/handy/sync-upstream.sh`, a wrapper that pulls the repository clone `~/dev/Handy`, sets
+the PATH, runs the script and prints exactly one line, which Hermes sends to Telegram: "no new commits", the pull request link (with "please review
+closely" when Claude resolved conflicts), or the issue link when it did not finish. Requirements on that machine: the clone with `upstream` pointing
+at `cjpais/Handy`, Rust, Bun, the Linux build libraries (the list under "Building and installing"), a signed-in Claude Code, `gh` logged in, and
+Hermes with Telegram configured. If the build libraries are missing the script says so and stops before starting Claude.
 
 1. Fetch upstream. Nothing new, or a branch `upstream-sync-<sha>` already on GitHub for that commit: stop.
 2. In a separate worktree (`~/dev/Handy-sync`) make `upstream-sync-<sha>` from `dev/hotkeys-build` and merge upstream into it.
@@ -339,10 +343,12 @@ opens the same session, from the worktree directory, to ask questions or continu
 Code's Remote Control (`claude --remote-control`) is for interactive sessions, not for a headless `-p` run. Watching from another machine
 means running the `tail`/`--watch` commands over SSH; the pull request or issue on GitHub is the result you get notified about.
 
-Run it by hand any time: `fork/scripts/sync-upstream.sh` (`DRY=1` prints the push and the pull request instead of doing them). Tested against
-throwaway repositories (clean merge, a conflict resolved by a stub, a conflict nobody resolves, and a conflict resolved by the real `claude`);
-**not yet run against the real upstream with a real conflict.** Change the weekday or time with Task Scheduler (`taskschd.msc`) or by re-registering
-the task; remove it with `Unregister-ScheduledTask "Handy upstream sync"`.
+Run it by hand any time: `fork/scripts/sync-upstream.sh` (on a terminal it shows everything; `DRY=1` prints the push and the pull request instead
+of doing them; set `UPSTREAM=upstream` where the remote has that name). On the server, `hermes cron run <job id>` runs the job on the next scheduler
+tick, `hermes cron list` shows the schedule and last run, `hermes cron edit` changes the time, `hermes cron pause|resume|remove` stop it. The checks
+pass on the server (368 tests; first compile about 15 minutes, later runs reuse the build cache). Tested against throwaway repositories (clean merge,
+a conflict resolved by a stub, a conflict nobody resolves, and a conflict resolved by the real `claude`) and a no-news run through Hermes;
+**not yet run against the real upstream with a real conflict.** The earlier Windows scheduled task was removed.
 
 ## Command-line flags
 
