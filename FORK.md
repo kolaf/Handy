@@ -357,15 +357,71 @@ All in `fork/prompts/`.
 ## Talon
 
 The Talon files live in the community fork `kolaf/community`, folder `kolaf/` (not in this repo), so a clone of the fork carries them.
-`kolaf/README.md` has the setup for a new machine and how to merge upstream; `kolaf/terminal/README.md` lists every terminal and Handy
-command (say "terminal help"). Folders: `personal/` (wake key `Ctrl+PageUp`, spoken wake commands disabled, `drowse`, `shock`), `hv/`
-(voice shell), `terminal/` (shell navigation from the state file the shell hook writes, yazi, zoxide/fzf/atuin; Linux copies), `handy/`
-(Handy commands, below) and `handy-bridge/` (the old bridge, disabled). Handy commands: "make that formal|informal|shorter|fuller|clearer",
-"fix that up", "translate that to norwegian|english", "bullet that", "summarize that", "dictate as <prompt>", "redo as <prompt>", "redo raw",
-"scratch dictation", context-aware "scratch that", "model <name>", "model picker", "language model local|cloud", "transcribe latest meeting|recording"
-(also "... with speakers"), "transcribe meeting [norwegian|english] [with speakers]" in Explorer, "edit this", "reply to this", "learn this repo".
-Talon starts asleep (`Ctrl+PageUp` wakes it); an utterance said while it sleeps is rejected and nothing happens. **The spoken behaviour
-has been tried only in part; Talon loads the files without errors.**
+`kolaf/README.md` has the setup for a new machine and how to merge upstream; `kolaf/terminal/README.md` lists the terminal commands too (say
+"terminal help"). Folders: `personal/` (wake key `Ctrl+PageUp`, spoken wake commands disabled, `drowse`, `shock`), `hv/` (voice shell),
+`terminal/` (shell navigation from the state file the shell hook writes, yazi, zoxide/fzf/atuin; Linux copies), `handy/` (the Handy commands
+below) and `handy-bridge/` (the old bridge, disabled). **The spoken behaviour has been tried only in part; Talon loads the files without errors.**
+
+### Voice commands for Handy
+
+All of them are in `kolaf/handy/handy.talon` and work in any program, except the two marked. Each one runs `handy ...` (a running Handy
+receives it) through `kolaf/handy/handy_integration.py`. Phrases in `<angle brackets>` come from the lists below.
+
+| Say | What happens | Handy flag / prompt |
+|---|---|---|
+| `make that formal` / `informal` / `shorter` / `fuller` / `clearer` | rewrites the selection, or with nothing selected the last dictation, and replaces it | `--transform t_formal` ... `t_longer`, `t_clear` |
+| `fix that up` | spelling and grammar only | `--transform t_fix` |
+| `translate that to norwegian` / `english` | translates and replaces | `--transform t_to_no` / `t_to_en` |
+| `bullet that` / `summarize that` | bullet list / short summary | `--transform t_bullets` / `t_summary` |
+| `dictate as <prompt>` | starts a dictation that uses that prompt for this one dictation; stop with your Handy key | `--use-prompt-once ID --toggle-post-process` |
+| `reply to this` | copies the selected message, then dictate the reply (the `reply` prompt, message as context) | `--use-prompt-once reply` |
+| `edit this` | copies the selection, then speak the change ("shorter and friendlier, mention Thursday"); the result replaces the selection | `--use-prompt-once edit` |
+| `scratch dictation` | deletes the last dictation with Backspace presses (same window, at most 5 minutes old) | `--scratch-last` |
+| `redo as <prompt>` | processes the last recording again with that prompt and replaces the text | `--redo-with ID` |
+| `redo raw` | replaces the last dictation by the transcript as the speech model produced it | `--redo-with raw` |
+| `scratch that` / `nope that` | the community phrase made context-aware (`scratch_that.py`): takes back whichever came last, Talon's own phrase or Handy's dictation | `--scratch-last` when Handy's was newer |
+| `model <model>` | switches the speech model (it must be downloaded) | `--set-model NAME` |
+| `model picker` | shows the numbered list of downloaded models; say or press a number | `--model-picker` |
+| `language model local` / `cloud` | switches the post-processing language model between the "Local (llama-server)" provider and the custom (cloud) one | `--set-llm local\|cloud` |
+| `transcribe latest meeting` | meeting minutes from the newest recording in the recorder folder together with the files that belong to it | `--meeting-latest` |
+| `transcribe latest recording` | the same for the newest file only | `--meeting-latest --meeting-single` |
+| `transcribe latest meeting with speakers` | the same with speaker labels (the audio goes to the post-processing endpoint) | adds `--meeting-speakers` |
+| `transcribe meeting` / `norwegian` / `english` *(in Explorer)* | minutes from the audio files or folder selected in Explorer; the language defaults to the Meetings page | `--meeting-minutes FILES [--meeting-language no]` |
+| `transcribe meeting [norwegian\|english] with speakers` *(in Explorer)* | the same with speaker labels | adds `--meeting-speakers` |
+| `learn this repo` *(in a terminal, `terminal/`)* | adds the project's names and terms to Custom Words | `--learn-repo FOLDER` |
+
+The commands that copy the selection first (`reply to this`, `edit this`, the transforms with a selection) press Ctrl+C, or Ctrl+Shift+C in
+a terminal; see "How the selection is copied". `scratch dictation`, `redo` and a transform on the last dictation press no copy key, so they are
+safe in terminals.
+
+### The lists you can edit
+
+- `kolaf/handy/prompts.talon-list` (what you can say after `dictate as` and `redo as`; the value is a prompt id): simple, plain -> `simple`;
+  message, chat -> `informal_message`; email -> `email`; note -> `note`; meeting -> `meeting`; document -> `document`; formal -> `formal_text`;
+  informal -> `informal_text`. Add your own prompt's id with a spoken name.
+- `kolaf/handy/models.talon-list` (what you can say after `model`; the value only has to be part of the model's id or name, and it must be
+  downloaded): norwegian -> `nb_ggml`, parakeet, whisper small|medium|large. If two models match, Handy lists them and changes nothing; add
+  an exact name to the list.
+
+### How Talon and Handy talk
+
+- **Talon to Handy:** `run_handy` starts `handy.exe` with the flags; a running Handy picks them up (single-instance forwarding) and the second
+  process exits. The program is the Talon setting `user.kolaf_handy_path` (default `D:/Handy/handy.exe`; if the file does not exist, `handy` from
+  the PATH). Override it in a `.talon` file of your own: `settings():` `user.kolaf_handy_path = "C:/path/to/handy.exe"`.
+- **Handy to Talon:** while recording Handy rewrites `%USERPROFILE%\.cache\hv\handy-state.txt` every 3 seconds ("recording" or "idle" plus a time).
+  Talon polls it, switches its speech off while Handy records and on afterwards (only if it was Talon that switched it off; a "recording" older than
+  12 seconds counts as a crash leftover). Setting `user.kolaf_mute_during_handy` (default on) turns this off. `handy-paste.txt` carries the time of
+  Handy's last undoable paste, which `scratch that` compares with Talon's own phrase history.
+- **Linux:** `terminal_linux.talon`, `yazi_linux.talon` and `explorer_linux.talon` repeat the terminal and Explorer-style commands for Linux
+  terminals and file managers (community `tag: terminal` and `tag: user.file_manager`). Untested.
+
+### Things that go wrong
+
+- Talon starts asleep after a restart; `Ctrl+PageUp` wakes it. A phrase said while it sleeps is rejected and nothing happens (the rejected
+  recording is in `%APPDATA%\talon\recordings\<month>\reject`, named after what Talon heard).
+- Talon is quiet while Handy records, so say nothing to Talon until you have stopped the dictation.
+- A misheard command does nothing; the recordings folder shows what Talon thought it heard, and the phrase can be changed in the `.talon` file.
+- A transform or redo that cannot run (other window, too old, nothing to take back) says why on Handy's Activity page.
 
 ## Voice shell
 

@@ -48,9 +48,16 @@ Next to History. Every notice (learned, synced, model or language-model switched
 
 If the language model cannot be reached, Handy cleans the text locally (spoken punctuation, capitals) and says "Offline: basic cleanup only". **Skip the model for short dictations** (Post-Processing) does the same for dictations under a number of words.
 
-## Together with Talon
+## Talon commands
 
-Handy writes its state to `%USERPROFILE%\.cache\hv\`, so Talon switches its speech off while Handy records. The commands are in the community fork (`kolaf/`): "make that ...", "dictate as ...", "redo as ...", "scratch dictation", "model ...", "language model local|cloud", "transcribe latest meeting", "edit this", "reply to this", "learn this repo". Say "terminal help" in a terminal for the full list.
+Handy is driven by voice through the community fork (`kolaf/handy/`); Talon switches its speech off while Handy records. Wake Talon with `Ctrl+PageUp` after a restart. The full table is in `FORK.md`.
+
+- **Rewrite:** "make that formal|informal|shorter|fuller|clearer", "fix that up", "translate that to norwegian|english", "bullet that", "summarize that" (the selection, or the last dictation).
+- **Dictate in a mode:** "dictate as email|message|note|meeting|document|formal|informal|simple", "reply to this", "edit this" (select first, then speak).
+- **Undo and redo:** "scratch dictation", "redo as <mode>", "redo raw", and the context-aware "scratch that".
+- **Models:** "model parakeet|norwegian|whisper small...", "model picker", "language model local|cloud".
+- **Meetings:** "transcribe latest meeting|recording" (add "with speakers"), and in Explorer "transcribe meeting [norwegian|english]".
+- **Terminal:** "learn this repo"; say "terminal help" for the rest.
 
 ## Command line
 
