@@ -348,6 +348,17 @@ Hermes with Telegram configured. If the build libraries are missing the script s
 Nothing reaches `dev/hotkeys-build` without you merging the pull request. After merging, tag a build (`git tag build-N && git push <repo> build-N`)
 and try dictation: the sync proves the code compiles and the unit tests pass, not that the app works.
 
+**Answering from Telegram ("merge it").** Hermes' cron delivery sends the message but does not record it in your Telegram chat session, so the assistant
+would not know what "merge the PR" refers to (it asked "which PR?" the first time). So `fork/hermes/sync-upstream-job.sh` (the job's wrapper) also writes
+every pull-request or issue message into that session with `fork/hermes/mirror-context.sh` (Hermes' own `gateway.mirror.mirror_to_session`), together
+with a note for the assistant: which pull request it is and what to do on a reply. The skill `handy-upstream-sync` (`fork/hermes/SKILL.md`, installed
+in `~/.hermes/skills/devops/handy-upstream-sync/`) holds the procedure: "merge it" runs `fork/hermes/merge-and-build.sh <PR>`, which refuses anything but
+an open `upstream-sync-*` pull request into `dev/hotkeys-build`, waits for CI (a failing check stops it unless `--ignore-checks`), merges with a
+merge commit, deletes the branch, tags the next `build-N` and pushes it (this starts the CI build), and `watch-build.sh` sends a Telegram message
+with the download links when the build is done. For a CAREFUL verdict, or when Claude resolved conflicts, the assistant asks for an explicit
+confirmation first; "skip" closes the pull request; a question gets answered from the review at the top of the pull request. The files on the
+server are symlinks into the repository clone (`~/.hermes/scripts/handy/*`, the skill), so a pull of the repository updates them.
+
 **Watching a run.** `tail -f ~/.cache/hv/upstream-sync.log` shows the script's steps (and the Claude session id). `fork/scripts/sync-upstream.sh --watch`
 shows what Claude is doing live (its tool calls and text, from `~/.cache/hv/upstream-sync.log.claude.jsonl`). Afterwards `claude --resume <session id>`
 opens the same session, from the worktree directory, to ask questions or continue. **There is no remote connection into a running job:** Claude
