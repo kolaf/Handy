@@ -13,6 +13,8 @@
 # Watch a run:   tail -f ~/.cache/hv/upstream-sync.log           the steps of the script
 #                fork/scripts/sync-upstream.sh --watch            what Claude is doing (tool calls and text), live
 # Afterwards:    claude --resume <session id from the log>        opens Claude's session (in the worktree directory)
+# Output: everything goes to the log; on a terminal (or VERBOSE=1) it is shown as well. When it is not run from a terminal (cron, Hermes) the only
+# thing printed is one result line (pull request, issue or failure), and nothing at all when there was nothing to do.
 # Settings through the environment (defaults in the block below). DRY=1 prints what it would push or open and does not do it.
 set -uo pipefail
 
@@ -56,8 +58,12 @@ DEFAULT_CHECKS='bun install && bun run build && (cd src-tauri && cargo test --li
 CHECKS=${SYNC_CHECKS:-$DEFAULT_CHECKS}
 
 mkdir -p "$(dirname "$LOG")"
-exec > >(tee -a "$LOG") 2>&1
+exec 3>&1
+QUIET=1
+if [ -t 1 ] || [ "${VERBOSE:-0}" = 1 ]; then QUIET=0; exec > >(tee -a "$LOG") 2>&1; else exec >>"$LOG" 2>&1; fi
 say() { printf '[%s] %s\n' "$(date '+%F %T')" "$*"; }
+out() { [ "$QUIET" = 1 ] && printf '%s\n' "$*" >&3; return 0; }       # the one line a scheduler delivers
+fail() { say "$*"; out "Upstream sync failed: $*"; exit 1; }
 
 # Tools a scheduled (non-login) shell may not have on PATH.
 [ -s "$HOME/.nvm/nvm.sh" ] && . "$HOME/.nvm/nvm.sh" >/dev/null 2>&1
@@ -71,10 +77,13 @@ flock -n 9 || { say "another sync is running; stopping"; exit 0; }
 gitpush() { git -c credential.helper= -c credential.helper='!gh auth git-credential' push "$PUSH_URL" "$@"; }
 run() { if [ "$DRY" = 1 ]; then say "DRY: $*"; else "$@"; fi; }
 
-cd "$REPO" || { say "no repository at $REPO"; exit 1; }
-git fetch -q "$UPSTREAM" "$UP_BRANCH" || { say "cannot fetch $UPSTREAM"; exit 1; }
+cd "$REPO" || fail "no repository at $REPO"
+git fetch -q "$UPSTREAM" "$UP_BRANCH" || fail "cannot fetch $UPSTREAM"
 UP_REF="$UPSTREAM/$UP_BRANCH"
-COUNT=$(git rev-list --count "$BASE..$UP_REF")
+# Compare with the fork's branch as it is on GitHub (not with a local branch that may be stale or hold unpushed work).
+BASE_REF=refs/sync/base
+git fetch -q "$PUSH_URL" "+$BASE:$BASE_REF" || fail "cannot fetch $BASE from $PUSH_URL"
+COUNT=$(git rev-list --count "$BASE_REF..$UP_REF")
 if [ "$COUNT" = 0 ]; then say "up to date with $UP_REF"; exit 0; fi
 UP_SHA=$(git rev-parse --short "$UP_REF")
 BRANCH="upstream-sync-$UP_SHA"
@@ -84,10 +93,10 @@ if git ls-remote --exit-code --heads "$PUSH_URL" "$BRANCH" >/dev/null 2>&1; then
   say "branch $BRANCH already exists on GitHub; a sync for this upstream commit was already made"; exit 0
 fi
 
-COMMITS=$(git log --oneline "$BASE..$UP_REF" | head -40)
+COMMITS=$(git log --oneline "$BASE_REF..$UP_REF" | head -40)
 git worktree remove --force "$WORK" 2>/dev/null; rm -rf "$WORK"; git worktree prune
 git branch -D "$BRANCH" >/dev/null 2>&1
-git worktree add -q -b "$BRANCH" "$WORK" "$BASE" || { say "cannot create the worktree"; exit 1; }
+git worktree add -q -b "$BRANCH" "$WORK" "$BASE_REF" || fail "cannot create the worktree"
 cd "$WORK" || exit 1
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$REPO/src-tauri/target}"   # reuse the compiled dependencies
 
@@ -165,19 +174,25 @@ fi
 
 if [ "$STATE" = ok ]; then
   say "ready: pushing $BRANCH and opening a pull request"
-  run gitpush "$BRANCH" || { say "push failed"; exit 1; }
+  run gitpush "$BRANCH" || fail "could not push $BRANCH"
   BODY=$(printf 'Upstream %s: %s new commit(s) merged into %s.\n\nChecks (frontend build, Rust unit tests, lint, type check) pass.%s\n\nNew upstream commits:\n\n```\n%s\n```\n\nNot run: the app itself. Merge, then tag a build (`git tag build-N && git push <repo> build-N`) and try dictation.\n' "$UP_SHA" "$COUNT" "$BASE" "$SUMMARY_BLOCK" "$COMMITS")
-  run gh pr create --repo "$GH_REPO" --base "$BASE" --head "$BRANCH" --title "Merge upstream $UP_BRANCH ($UP_SHA, $COUNT commits)" --body "$BODY"
+  PR_URL=$(run gh pr create --repo "$GH_REPO" --base "$BASE" --head "$BRANCH" --title "Merge upstream $UP_BRANCH ($UP_SHA, $COUNT commits)" --body "$BODY" 2>>"$LOG" | tail -1)
+  [ "$DRY" = 1 ] && PR_URL="(dry run)"
+  say "pull request: $PR_URL"
+  out "Upstream sync: $COUNT new commit(s) from $UP_BRANCH merged into a pull request$([ "$ASSISTED" = 1 ] && echo ", conflicts or failures resolved by Claude, please review closely"): $PR_URL"
 else
   say "NOT ready: $STATE"
   git merge --abort 2>/dev/null
   BODY=$(printf 'The automatic upstream sync for %s (%s new commit(s)) did not finish: **%s**.%s\n\nNew upstream commits:\n\n```\n%s\n```\n\nEnd of the checks log:\n\n```\n%s\n```\n\nThe work so far is on branch `%s` if it could be pushed; the log is %s on the machine that ran it.\n' "$UP_SHA" "$COUNT" "$STATE" "$SUMMARY_BLOCK" "$COMMITS" "$(tail -40 /tmp/sync-checks.out 2>/dev/null)" "$BRANCH" "$LOG")
   PUSHED_NOTE="Nothing was pushed (the merge could not be completed)."
-  if [ "$(git rev-list --count "$BASE..HEAD")" -gt 0 ]; then
+  if [ "$(git rev-list --count "$BASE_REF..HEAD")" -gt 0 ]; then
     if run gitpush "$BRANCH"; then PUSHED_NOTE="The work so far is on branch \`$BRANCH\`."; else say "could not push the branch"; fi
   fi
   BODY=${BODY//"The work so far is on branch \`$BRANCH\` if it could be pushed;"/$PUSHED_NOTE}
-  run gh issue create --repo "$GH_REPO" --title "Upstream sync $UP_SHA needs attention: $STATE" --body "$BODY"
+  ISSUE_URL=$(run gh issue create --repo "$GH_REPO" --title "Upstream sync $UP_SHA needs attention: $STATE" --body "$BODY" 2>>"$LOG" | tail -1)
+  [ "$DRY" = 1 ] && ISSUE_URL="(dry run)"
+  say "issue: $ISSUE_URL"
+  out "Upstream sync $UP_SHA needs attention ($STATE): $ISSUE_URL"
 fi
 
 cd "$REPO" && git worktree remove --force "$WORK" 2>/dev/null
