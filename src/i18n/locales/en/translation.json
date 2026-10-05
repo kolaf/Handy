@@ -466,6 +466,15 @@
       "pasteFocusGuard": {
         "label": "Keep dictation out of the wrong window",
         "description": "Windows, and Linux with X11 (not Wayland). If you switch to another window or app while a dictation is being prepared, it is not pasted there: it is put on the clipboard and a notice says so (also in History and Activity). The window you were in when you started speaking is what counts."
+      },
+      "chineseScript": {
+        "title": "Chinese Script",
+        "description": "Writes Mandarin and Cantonese transcriptions in Simplified or Traditional characters. Other languages are left unchanged.",
+        "options": {
+          "asTranscribed": "As Transcribed",
+          "simplified": "Simplified",
+          "traditional": "Traditional"
+        }
       }
     },
     "postProcessing": {

@@ -1,6 +1,6 @@
 # What's new in this build
 
-This build (`0.9.7-hotkeys.1`) adds features on top of Handy. Details for every item are in `FORK.md` in the repository; this page is the short version. Shortcuts are the defaults; change them on the General and Post-Processing pages. **Dictation is only post-processed with the post-processing shortcut** (or `handy --toggle-post-process`); the plain Transcribe shortcut skips the language model.
+This build (`0.9.8-hotkeys.1`) adds features on top of Handy. Details for every item are in `FORK.md` in the repository; this page is the short version. Shortcuts are the defaults; change them on the General and Post-Processing pages. **Dictation is only post-processed with the post-processing shortcut** (or `handy --toggle-post-process`); the plain Transcribe shortcut skips the language model.
 
 ## Switching quickly
 

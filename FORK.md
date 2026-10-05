@@ -4,8 +4,8 @@ This is a fork of [cjpais/Handy](https://github.com/cjpais/Handy) that has delib
 (see `LICENSE`). Upstream changes are merged in by hand; patches may go back upstream later if they open up.
 
 - Product branch: `dev/hotkeys-build` (the older `feature/*` branches are stale; ignore or delete them).
-- Version label: `0.9.7-hotkeys.1` (set in `package.json`, `src-tauri/Cargo.toml`/`Cargo.lock`, `src-tauri/tauri.conf.json`).
-  It sorts below the stock `0.9.7`, so **turn off "Update checks" in the app**, or it will offer to replace this build.
+- Version label: `0.9.8-hotkeys.1` (set in `package.json`, `src-tauri/Cargo.toml`/`Cargo.lock`, `src-tauri/tauri.conf.json`).
+  It sorts below the stock `0.9.8`, so **turn off "Update checks" in the app**, or it will offer to replace this build.
 - Everything below is **unverified against a real language model unless it says otherwise**; run the prompt bench (see
   [Prompts](#prompts-and-the-test-bench)).
 

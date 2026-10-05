@@ -16,7 +16,7 @@ Remove-Item $out -Recurse -Force -ErrorAction SilentlyContinue; New-Item -ItemTy
 Copy-Item "$rel\handy.exe" $out; Copy-Item "$rel\*.dll" $out; Copy-Item "$rel\resources" "$out\resources" -Recurse
 foreach ($d in 'msvcp140*.dll','vcruntime140*.dll','vcomp140.dll','onnxruntime.dll') { Copy-Item "$env:LOCALAPPDATA\Handy\$d" $out -ErrorAction SilentlyContinue }
 Set-Content -Path "$out\portable" -Value 'Handy Portable Mode' -NoNewline
-$zip = "C:\dev\Handy-0.9.7-hotkeys.1-$sha-portable.zip"
+$zip = "C:\dev\Handy-0.9.8-hotkeys.1-$sha-portable.zip"
 Compress-Archive -Path "$out\*" -DestinationPath $zip -Force
 Get-Item $zip | Select Name,Length,LastWriteTime | Format-List
 (Get-FileHash $zip -Algorithm SHA256).Hash
