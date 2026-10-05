@@ -35,10 +35,26 @@ This is a fork of [cjpais/Handy](https://github.com/cjpais/Handy) that has delib
 | **Offline fallback** | Automatic when the language model call fails | n/a |
 | **Skip the model for short dictations** | Number of words below which the model is skipped | Post-processing page (0 = off) |
 | **Edit by voice** | Copy text, press the post-processing key, say the change ("make it shorter", "translate to English"); the `edit` prompt pastes the result | `edit` prompt |
-| **Eleven default prompts** | Baked in for fresh and portable installs | `fork/prompts/` |
+| **Scratch and redo** | `handy --scratch-last`, `--redo-with ID` (Talon: "scratch dictation", "redo as email", "redo raw") | n/a |
+| **Paste guard** | Automatic: a dictation is not pasted into another window than where you started; it goes to the clipboard | Advanced: Keep dictation out of the wrong window |
+| **Format commands** | End a dictation with "format as email" / "som punktliste" | the `super` prompt only |
+| **Speech model switching** | `ctrl+alt+m`, `handy --model-picker`, `handy --set-model NAME` (Talon: "model parakeet") | General page |
+| **Model per language** | Changing the language also switches the model | General: Model per language |
+| **Language model switching** | `handy --set-llm local\|cloud\|NAME` (Talon: "language model local") | Post-Processing: provider "Local (llama-server)" |
+| **Meeting minutes** | Meetings page, `handy --meeting-minutes FILES`, Talon "transcribe meeting" | Meetings page |
+| **Latest recording** | "Use the latest recording", `handy --meeting-latest`, Talon "transcribe latest meeting" | Meetings page: recorder folder |
+| **Cut silence** | Automatic before local meeting transcription | Meetings page checkbox |
+| **Speakers** | Checkbox, `--meeting-speakers`, Talon "... with speakers"; names when the conversation says them | Meetings page |
+| **Activity page** | Sidebar, next to History: every notice with its details | n/a |
+| **Downloadable builds** | Tag `build-N` runs the GitHub workflow: Windows portable zip and Ubuntu `.deb` | `.github/workflows/fork-build.yml` |
+| **Setup guide** | `fork/SETUP.md`: the whole voice setup on a new Windows + WSL machine | n/a |
+| **23 default prompts** | Baked in for fresh and portable installs: the dictation prompts, the `t_*` transforms and the two meeting-minutes prompts | `fork/prompts/` |
 | **Guide page** | Sidebar > Guide: what is new in this build and a quick reference | `src/content/fork-guide.md` (keep it in step with this file) |
 
-Default shortcuts are `ctrl+alt+l`, `ctrl+alt+p` (prompt picker), `ctrl+alt+r`, `ctrl+alt+v`; rebind them in Settings. On Wayland, desktops
+Default shortcuts are `ctrl+alt+l` (swap language), `ctrl+alt+p` (prompt picker), `ctrl+alt+m` (model picker), `ctrl+alt+r` (re-run),
+`ctrl+alt+v` (paste last), `ctrl+alt+f` (reformat selection) and `ctrl+alt+k` (learn from correction); rebind them in Settings. Dictation is
+post-processed only with the **post-processing** shortcut (`handy --toggle-post-process`); the plain Transcribe shortcut skips the language model
+(a common reason for "post-processing is ignored"). On Wayland, desktops
 own global shortcuts, so bind the command-line flags instead (see below).
 
 ### Details
@@ -60,6 +76,14 @@ snippet names. `${clipboard}` is the clipboard text (read **only** when the prom
 characters; never stored in history). `${examples}` is the prompt's examples. If a prompt has examples but does not place
 `${examples}`, they are appended after the instructions. Substituted text is never scanned for variables again.
 There is no native `${selection}`: copy the text first (a Talon command can do this: the `hermes`/`grab files` commands in the community fork, `kolaf/`).
+
+**Format commands.** The `super` prompt (only that one) looks at the end of a dictation: an explicit command such as "format as email",
+"as a list", "make it formal", "som e-post", "som punktliste" or "gjør det formelt" is applied to the whole text and left out, and it beats
+the prompt's own guess about what kind of text it is. Without a command the prompt chooses from the content (a message to a person ->
+informal, something for a colleague or institution -> email, things to remember -> bullet list, a recap -> meeting notes, code -> kept
+literal). The other prompts do not look for commands. It is a prompt rule, so it depends on the model following it; the bench cases
+`format_command` and `format_command_no` check it. To use another prompt for one dictation whatever is selected, use Talon "dictate as ..." or
+`--use-prompt-once ID`.
 
 **Examples field.** For fixed structures: put the structure with `[placeholders]` in the prompt, then give one or two
 `Dictation: ... / Result: ...` pairs separated by `---`. The *Document template* prompt is a working sample.
@@ -120,7 +144,9 @@ the `x11rb` crate (no extra system libraries). Everything that depends on the ac
 program names are the process names, e.g. `slack`, `firefox`, `gnome-terminal-server`), `${app}` / `${title}`, the paste
 guard, and terminal-aware copying (Ctrl+Shift+C in terminals). Under Wayland applications cannot ask which window is active, so
 there the app is unknown: rules do not match, and the paste guard and the terminal check do nothing. The Talon files in
-`kolaf/` are written for Windows Terminal; Linux Talon needs the terminal contexts adjusted.
+`kolaf/` are written for Windows Terminal; Linux copies of the terminal, yazi and Explorer-style commands exist (`terminal_linux.talon`,
+`yazi_linux.talon`, `handy/explorer_linux.talon`, matching the community `tag: terminal` and `tag: user.file_manager`). They are untested:
+there is no Linux machine with Talon to try them on.
 
 **More prompt variables.** `${app}`, `${title}` (program and window title where you started speaking; the title is bounded and
 defused because it is untrusted text), `${language}` (the dictation language setting), `${date}` (2026-10-03), `${time}`
@@ -209,6 +235,18 @@ the Post-Processing page. `handy --set-llm local|cloud|NAME` (Talon: "language m
 provider in use without opening the page; `cloud` means the `custom` provider, where the LiteLLM address is. Setup and benchmark
 results are in `fork/SETUP.md`. Speaker identification uses the `custom` provider when "local" is selected.
 
+**Azure AI Foundry (Azure OpenAI) as the language model.** Use the Custom provider with the v1 address
+`https://<resource>.openai.azure.com/openai/v1` (a resource shown under `cognitiveservices.azure.com` accepts the same path), the resource key
+as API key, and the **deployment name** as model. Handy appends `/chat/completions`, so the address must end in `/v1`: without it Azure answers
+404. The old form with `/openai/deployments/<name>/...?api-version=` does not fit. Tested with the bench on 2026-10-04 (41 of 41 cases). Speaker
+identification on this endpoint needs a diarizing transcription deployment on the same resource.
+
+**Overlay.** The floating bar shows the state (recording, transcribing, processing) and short notices (language, prompt, model switched, learned,
+synced ...; the caption under the bar names the language and prompt). A notice never takes over a bar that is recording. The overlay's show
+counter is bumped when a show is requested (not when the main thread runs it), and the delayed hide re-checks it on the main thread: this
+closes a race where the bar could vanish right after it appeared, most likely at the first dictation after startup. Not confirmed on a
+machine after the fix.
+
 **More than lists in the sync file.** `handy --sync-lists FILE` now also carries your own prompts (ids `prompt_...`; the built-in ones
 come with the program), the per-app and per-language rules, and four switches ("prompt per app" on, "model per language" on, the
 meeting language, speakers on). It still only adds: an entry that exists on both sides with different content stays as it is on
@@ -260,8 +298,9 @@ with a JSON file, both ways, and rewrites the file in a stable sorted order so i
 private repo (it holds your snippet texts) and run the command on each machine after pulling, then commit the result. It only
 adds: deleting an entry on one machine does not delete it elsewhere (it would come back), so remove it everywhere or edit the
 file. If both sides have a snippet or correction with the same key but different content, this machine's version wins and the
-conflict is logged. Invalid entries in the file are skipped. Prompts are not in the file (they come from the repo:
-`fork/scripts/install-prompts.py`), and neither are keys or other settings.
+conflict is logged. Invalid entries in the file are skipped. The built-in prompts are not in the file (they come from the repo:
+`fork/scripts/install-prompts.py`); your own prompts, the rules and four switches are (see "More than lists in the sync file"). Keys and other
+settings are not.
 
 **Re-run with next prompt.** Takes the raw transcript of your most recent dictation from the history, advances to the next
 prompt, processes it and pastes the result. Select the earlier pasted text first to replace it; otherwise the result is
@@ -280,15 +319,21 @@ Sent to the running instance (a second `handy` process forwards them and exits).
 
 ```
 handy --toggle-transcription | --toggle-post-process | --cancel      (upstream)
-handy --swap-language          handy --prompt-picker
-handy --rerun                  handy --paste-last
-handy --learn                  handy --sync-lists FILE
-handy --set-language CODE      handy --set-prompt ID                  (combinable, also with a toggle)
+handy --swap-language          handy --prompt-picker        handy --model-picker
+handy --rerun                  handy --paste-last           handy --learn
+handy --reformat               handy --transform ID         handy --use-prompt-once ID
+handy --scratch-last           handy --redo-with ID         (ID `raw` = the transcript without formatting)
+handy --set-language CODE      handy --set-prompt ID        (combinable, also with a toggle)
+handy --set-model NAME         handy --set-llm local|cloud|NAME
+handy --learn-repo FOLDER      handy --import-words FILE    handy --sync-lists FILE
+handy --meeting-minutes "a.m4a;b.m4a" [--meeting-language no] [--meeting-model NAME] [--meeting-speakers]
+handy --meeting-latest [--meeting-single] [--meeting-folder DIR] [--meeting-speakers] [--meeting-language no] [--meeting-model NAME]
 handy --set-language no --set-prompt email --toggle-post-process
 ```
 
 Prompt ids: `simple`, `informal_message`, `email`, `note`, `meeting`, `super`, `reply`, `document`, `informal_text`,
-`formal_text`, `edit`, plus any you create.
+`formal_text`, `edit`, the transforms `t_formal`, `t_informal`, `t_shorter`, `t_longer`, `t_clear`, `t_fix`, `t_to_no`, `t_to_en`,
+`t_bullets`, `t_summary`, the meeting prompts `t_meeting_minutes_en` / `t_meeting_minutes_no`, plus any you create.
 
 ## Prompts and the test bench
 
@@ -301,18 +346,26 @@ All in `fork/prompts/`.
 - `dev_prompts.json` is compiled into the app: **fresh settings and portable installs start with these prompts** and `super`
   selected. Existing installs keep what they have stored; update them with
   `python3 fork/scripts/install-prompts.py` (close Handy first; it makes a backup).
-- `bench.py` runs `bench_cases.json` (24 cases) the way Handy sends a request and checks the result:
+- `bench.py` runs `bench_cases.json` (41 cases) the way Handy sends a request and checks the result:
   `python3 bench.py --from-handy` (endpoint, model and key from your Handy settings), `--prompt email`,
   `--case spell_exe -v`, `--dry` (print assembled prompts), `--mock` (check the checker without a model).
-  On 2 October 2026 all 29 cases passed against the real model (GPT 5.4 via the hosted gateway; one run, simple
-  checks, so treat it as strong evidence and not a guarantee). Rerun it after changing a prompt or the model.
+  All 41 cases passed against the real model (GPT 5.4 via the hosted gateway on 2 October 2026, and again on an Azure Foundry deployment
+  on 4 October; single runs with simple checks, so treat it as strong evidence and not a guarantee). Local models on an RTX 3080
+  (llama.cpp, Q4_K_M): Qwen2.5-7B 34, Qwen3-4B 33, Gemma-3-12B 31, Gemma-3-4B 27 of 41, weakest on Norwegian punctuation and format
+  commands and on ignoring instructions inside dictated text (see `fork/SETUP.md`). Rerun it after changing a prompt or the model.
 
 ## Talon
 
-The Talon files live in the community fork `kolaf/community`, folder `kolaf/` (not in this repo), so a clone of the fork
-carries them: a Talon bridge for Handy (disabled until you enable it), personal overrides (wake key `Ctrl+PageUp`,
-spoken wake commands disabled, `drowse`, `shock`), and the voice shell commands. Its `kolaf/README.md` has the setup for a
-new machine and how to merge upstream. **The spoken behaviour has not been tried; Talon loads the files without errors.**
+The Talon files live in the community fork `kolaf/community`, folder `kolaf/` (not in this repo), so a clone of the fork carries them.
+`kolaf/README.md` has the setup for a new machine and how to merge upstream; `kolaf/terminal/README.md` lists every terminal and Handy
+command (say "terminal help"). Folders: `personal/` (wake key `Ctrl+PageUp`, spoken wake commands disabled, `drowse`, `shock`), `hv/`
+(voice shell), `terminal/` (shell navigation from the state file the shell hook writes, yazi, zoxide/fzf/atuin; Linux copies), `handy/`
+(Handy commands, below) and `handy-bridge/` (the old bridge, disabled). Handy commands: "make that formal|informal|shorter|fuller|clearer",
+"fix that up", "translate that to norwegian|english", "bullet that", "summarize that", "dictate as <prompt>", "redo as <prompt>", "redo raw",
+"scratch dictation", context-aware "scratch that", "model <name>", "model picker", "language model local|cloud", "transcribe latest meeting|recording"
+(also "... with speakers"), "transcribe meeting [norwegian|english] [with speakers]" in Explorer, "edit this", "reply to this", "learn this repo".
+Talon starts asleep (`Ctrl+PageUp` wakes it); an utterance said while it sleeps is rejected and nothing happens. **The spoken behaviour
+has been tried only in part; Talon loads the files without errors.**
 
 ## Voice shell
 
@@ -361,8 +414,19 @@ while another is open just hands over to the first and exits. So pick one copy t
 Linux (Ubuntu 24.04): `sudo apt install build-essential clang libclang-dev libevdev-dev libasound2-dev pkg-config libssl-dev
 libvulkan-dev vulkan-tools glslc spirv-headers glslang-tools libgtk-3-dev libwebkit2gtk-4.1-dev
 libayatana-appindicator3-dev librsvg2-dev libgtk-layer-shell0 libgtk-layer-shell-dev patchelf cmake file xdg-utils rpm`, then
-`bun run tauri build --bundles deb --config <file with {"bundle":{"createUpdaterArtifacts":false}}>`. Install with
+`bun run tauri build --bundles deb --config src-tauri/tauri.fork.conf.json` (that file only turns off updater artefacts, which need a signing key). Install with
 `sudo apt install ./Handy_*_amd64.deb` and `xdotool` (X11). Unverified on a real desktop and on Ubuntu 26.04.
+
+### Downloadable builds (GitHub Actions)
+
+`.github/workflows/fork-build.yml` builds the Windows portable zip (tests, `tauri build --no-bundle`, packaging with the VC++ runtime and
+ONNX Runtime DLLs; the job checks that the key files are in the zip) and the Ubuntu 22.04 `.deb` (through upstream's `build.yml`, unsigned).
+Start it by pushing a tag: `git tag build-N && git push git@github.com:kolaf/Handy.git build-N` (about 25 minutes). A tag build publishes a
+release `fork-<commit>` marked latest, so these addresses always serve the newest build:
+`https://github.com/kolaf/Handy/releases/latest/download/Handy_amd64.deb` and `.../Handy-portable.zip` (the versioned names are attached
+too, with a `.sha256`). Without a tag, a push to `dev/hotkeys-build` that touches the workflow file builds and keeps the files as workflow
+artefacts for 30 days; the manual "Run workflow" button works only once the file is on the default branch. Nothing is signed. The zip is
+smaller than a local build and the `.deb` has not been installed on a machine yet.
 
 **Unsigned builds are blocked** by Defender SmartScreen on machines whose policy forbids bypassing it, and signing would not
 help quickly (reputation builds with usage, per file). See the discussion in the project history; options are an IT-approved
@@ -377,11 +441,12 @@ folder, the official signed Handy with our prompts and `fork/scripts/handy-profi
 | Other Talon packages (Cursorless, Rango) | their own upstream repos (old checkouts) | listed in `kolaf/README.md`; not synced from here |
 | Hermes custom skills (15, private project notes) | `kolaf/hermes-skills` (**private**) | `hermes-skills-sync` (per-file three-way sync, conflicts reported, deletions opt-in) |
 | Hermes memories | the Hindsight server (`hermes-hindsight-api.kolaf.net` (the API; `hermes-hindsight.kolaf.net` is only the web UI), bank `hermes`) | nothing to sync: point `~/.hermes/hindsight/config.json` at the same server |
-| Handy settings (endpoint, key, prompts in use, custom words, snippets, language) | each machine's own `settings_store.json` | prompts: `fork/scripts/install-prompts.py`; the rest by hand (no export tool yet) |
+| Handy settings | each machine's own `settings_store.json` | built-in prompts: `fork/scripts/install-prompts.py` (Handy closed); words, snippets, corrections, own prompts, per-app and per-language rules and four switches: `handy --sync-lists` with `handy-lists.json` in the private dotfiles repo; endpoint, key, shortcuts, paths and models by hand |
 | Secrets: Handy API key, Hindsight key, Hermes auth | never in git | 1Password (`op` is installed on the home WSL); not automated yet |
 | `user/settings.talon` (speech timeout) | the machine only | recreate by hand |
 
-Not decided yet: whether `kolaf/dotfiles` (public Ansible setup for WSL) becomes the provisioning hub. It must not hold anything private.
+`kolaf/dotfiles` (Ansible; now **private**) provisions WSL: terminal tools, Hermes with `hv` and the Hindsight config, the Talon shell hook,
+and optionally Handy, Talon and `op` on a native Linux desktop. It holds no secrets (keys come from 1Password). The whole-machine order is in `fork/SETUP.md`.
 Dropped on purpose: `talon-ai-tools`, replaced by the Handy `edit` prompt, so the GPT key is no longer in Talon at all. The old
 copy and its key file were moved (not deleted) to `%APPDATA%\talon\disabled\`.
 
@@ -400,14 +465,23 @@ git remote add upstream https://github.com/cjpais/Handy.git     # once
 git fetch upstream && git merge upstream/main
 ```
 
-Our logic is in `src-tauri/src/extras.rs`; the hooks into upstream files that may conflict are:
+Our logic is in `src-tauri/src/` (`extras.rs`, `learn.rs`, `context.rs`, `picker.rs`, `model_switch.rs`, `meeting.rs`, `activity.rs`,
+`listsync.rs`, `repo_words.rs`); new dependencies are symphonia (audio decoding), base64, x11rb (Linux) and reqwest's `multipart`. The hooks into upstream files that may conflict are:
 `actions.rs` (`process_transcription_output`, `SwitchAction`/`announce_setting_change`, vocabulary parsing, `ACTION_MAP`),
 `settings.rs` (`Snippet`, `LLMPrompt.examples`, new fields and bindings, `default_post_process_prompts`),
 `shortcut/mod.rs` (prompt commands take `examples`; a few new commands), `lib.rs` (CLI handling, command registration),
-`cli.rs`, `signal_handle.rs`, `overlay.rs` (notice, caption, window heights; the Windows geometry tests encode them), and
+`cli.rs`, `signal_handle.rs`, `overlay.rs` (notice, caption, show/hide counter, window heights; the Windows geometry tests encode them), and
 frontend: `LanguageSelector.tsx`, `ModelSettingsCard.tsx`, `PostProcessingSettings.tsx`, `RecordingOverlay.tsx/.css`,
 `Snippets.tsx`, `PostProcessMinWords.tsx`, `settingsStore.ts`, `bindings.ts` (edited by hand here), `en/translation.json`
 (other languages fall back to English for the new strings). Run `cargo test --release --lib` after a merge: it covers these.
+
+## What has been tried
+
+Verified: the unit tests (367), the prompt bench (41 of 41 on two real endpoints), local-model benchmarks, meeting decoding on a generated
+file, the CI builds (they run), Talon files loading without errors, the Ansible `--check` runs that were done. **Not tried on real data or by
+voice:** meeting transcription of a real recording (silence cutting, OBS grouping, local speed), speaker identification and speaker names
+against a real endpoint, `--set-llm`, most spoken Talon commands, scratch and redo in VS Code and terminals, the paste guard in daily use, the
+overlay fix, the Linux builds and Linux Talon files, the CI-built portable zip and `.deb` on a machine, the Ansible roles on a fresh machine.
 
 ## Known limits
 
