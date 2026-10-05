@@ -37,7 +37,7 @@ while :; do
   sleep 30
 done
 if [ -n "$failed" ] && [ "$IGNORE" != 1 ]; then echo "Refusing: failing check(s): $(echo $failed). Nothing was merged. (--ignore-checks overrides.)"; exit 2; fi
-echo "Checks: ${failed:+failing ($(echo $failed)), ignored; }${pending:+still running ($(echo $pending)); }${failed:-${pending:-all passed}}" | sed 's/  */ /g'
+if [ -z "$failed$pending" ]; then echo "Checks: all passed"; else echo "Checks:${failed:+ failing ($(echo $failed)), ignored;}${pending:+ still running ($(echo $pending));}"; fi
 
 LAST=$(git ls-remote --tags "https://github.com/$SLUG.git" 'refs/tags/build-*' 2>/dev/null | sed 's|.*refs/tags/build-||; s|\^{}||' | grep -E '^[0-9]+$' | sort -n | tail -1)
 TAG="build-$(( ${LAST:-0} + 1 ))"
