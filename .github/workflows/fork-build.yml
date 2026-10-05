@@ -5,11 +5,12 @@ name: "Fork build (portable + deb)"
 #   - handy_<version>_amd64.deb              (Ubuntu 22.04 build, installs on 22.04 and newer)
 #
 # How to start it:
-#   - push a tag:  git tag build-1 && git push git@github.com:kolaf/Handy.git build-1   (also makes a pre-release, see below)
+#   - push a tag:  git tag build-1 && git push git@github.com:kolaf/Handy.git build-1   (also makes a release, see below)
 #   - or, once this file is on the repository's default branch: Actions > Run workflow (or `gh workflow run fork-build.yml`)
 #   - or edit this file on dev/hotkeys-build: a push that touches it builds too (this is how it is tested)
 # The files are kept as workflow artefacts for 30 days. A tag build (or "release" ticked in the manual run) also attaches
-# them to a GitHub pre-release (fork-<commit>), which does not expire. Nothing is signed: Windows SmartScreen / AppLocker
+# them to a GitHub release (fork-<commit>, marked latest), which does not expire. The newest build is always at
+# https://github.com/kolaf/Handy/releases/latest/download/Handy_amd64.deb and .../Handy-portable.zip. Nothing is signed: Windows SmartScreen / AppLocker
 # may refuse the unsigned exe.
 
 on:
@@ -20,7 +21,7 @@ on:
   workflow_dispatch:
     inputs:
       release:
-        description: "Also attach the files to a GitHub pre-release (fork-<commit>)"
+        description: "Also attach the files to a GitHub release (fork-<commit>)"
         type: boolean
         default: false
 
@@ -182,14 +183,23 @@ jobs:
         with:
           path: dist
 
-      - name: Create the pre-release
+      - name: Create the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           TAG="fork-$(echo "${GITHUB_SHA}" | cut -c1-7)"
+          # Fixed file names next to the versioned ones, so that
+          #   https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/Handy_amd64.deb
+          #   https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/Handy-portable.zip
+          # always give the newest build.
+          DEB=$(find dist -type f -name '*.deb' | head -1)
+          ZIP=$(find dist -type f -name '*-portable.zip' | head -1)
+          cp "$DEB" Handy_amd64.deb
+          cp "$ZIP" Handy-portable.zip
           mapfile -t FILES < <(find dist -type f \( -name '*.deb' -o -name '*-portable.zip' -o -name '*.sha256' \))
+          FILES+=(Handy_amd64.deb Handy-portable.zip)
           printf 'Attaching: %s\n' "${FILES[@]}"
           gh release create "$TAG" "${FILES[@]}" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --prerelease --title "Fork build $TAG" \
-            --notes "Unsigned fork build of commit ${GITHUB_SHA}: Windows portable zip and Ubuntu .deb. Windows SmartScreen or AppLocker may refuse the unsigned exe."
+            --latest --title "Fork build $TAG" \
+            --notes "Unsigned fork build of commit ${GITHUB_SHA}: Windows portable zip and Ubuntu .deb (Handy-portable.zip and Handy_amd64.deb are the same files under fixed names). Windows SmartScreen or AppLocker may refuse the unsigned exe."
