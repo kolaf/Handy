@@ -65,7 +65,7 @@ places() {  # the user's own aliases and habits, comments stripped
 
 # A private Hermes home for voice requests: a copy of the normal config with a lower reasoning effort (the model's
 # thinking tokens are most of the wait) and a short approval timeout (a command that needs approval cannot be approved
-# by voice, so waiting the default 60 s only delays the refusal). Sign-in, memories, skills and the Hindsight setup are
+# by voice, so waiting the default 60 s only delays the refusal). Sign-in, memories, skills and the memory-plugin setup are
 # shared with the normal home through symlinks. The config copy is refreshed whenever the normal one changes.
 voice_home() {
   local real="${HERMES_HOME:-$HOME/.hermes}" home="$CONFIG_DIR/hermes-home"

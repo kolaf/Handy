@@ -1,7 +1,7 @@
 # Setting up a Windows + WSL machine (for example the work computer)
 
 The whole voice setup in the order it should be installed. The parts are independent, so you can stop after any step.
-Nothing here contains secrets; keys come from 1Password. Items marked **untested** have not been run on a fresh machine.
+Nothing here contains secrets; keys come from your password manager. Items marked **untested** have not been run on a fresh machine.
 
 | Part | Where it runs | Needs |
 |---|---|---|
@@ -25,20 +25,13 @@ git pull --rebase
 ansible-playbook -i inventory playbook.yml -K
 ```
 
-New in the playbook since an old install: the `hermes` role (installs Hermes if missing, clones the private
-`hermes-skills` repository, creates the Hindsight config, links `hv`), the Talon terminal hook (`~/.config/talon-terminal.bash`,
+New in the playbook since an old install: the `hermes` role (installs Hermes if missing, links `hv`), the Talon terminal hook (`~/.config/talon-terminal.bash`,
 sourced from `.bashrc`), and `yazi`. Handy and Talon are not installed on WSL by the playbook (`-e install_handy=true` is for a
 native Linux desktop). Then do the manual steps in `~/dotfiles/MANUAL-STEPS.md`. For this machine in particular:
 
 1. **GitHub SSH access** must work in WSL (`ssh -T git@github.com`): the playbook clones private repositories.
-2. **1Password `op` in WSL.** An earlier change removed the Linux `op` in favour of the Windows one. The Hindsight step calls
-   `op read`. Either leave `hindsight_api_key_op_ref` empty in `group_vars/all.yml` and put the key into
-   `~/.hermes/hindsight/config.json` by hand, or make `op` available in WSL, for example
-   `ln -s "$(command -v op.exe)" ~/.local/bin/op` (**untested**).
-3. **Hindsight address** is `https://hermes-hindsight-api.kolaf.net` (the API). The address without `-api` is only the web UI.
-4. Run `hermes` once to sign in. The playbook links `hermes-skills-sync` into `~/.local/bin` and runs it when Hermes is
-   installed; run the playbook again after signing in, or run it by hand: `hermes-skills-sync --dry-run`, then `hermes-skills-sync`.
-5. Open a **new** terminal (or `source ~/.bashrc`) so the shell hook and `z`/`zi`/`y` exist.
+2. Run `hermes` once to sign in, then run the playbook again if it skipped a step that needs the sign-in.
+3. Open a **new** terminal (or `source ~/.bashrc`) so the shell hook and `z`/`zi`/`y` exist.
 
 Check it:
 
@@ -46,7 +39,6 @@ Check it:
 type z y                          # z, zi and y are shell functions
 echo "$PROMPT_COMMAND" | grep -c __tt_update   # 1 or more
 hv --dry "list the files"         # prints the prompt, calls nothing
-hermes-skills-sync --dry-run
 ```
 
 ## B. Windows: Handy
@@ -62,8 +54,8 @@ Handy has no download page for this fork (no releases): the portable zip is buil
 3. **Speech model.** The Norwegian model is a single file:
    `https://huggingface.co/NbAiLab/nb-whisper-medium/resolve/main/ggml-model-q5_0.bin` (540 MB), saved as
    `Data\models\nb_ggml-model-q5_0.bin`. For English dictation also download Parakeet on Handy's Models page.
-4. **Start Handy once**, then set (all on its pages): post-processing on, provider "custom" with the LiteLLM address
-   (`https://hermes-litellm.kolaf.net/`), model `gpt-5.4`, and the key from 1Password; the speech model; language and
+4. **Start Handy once**, then set (all on its pages): post-processing on, provider "custom" with the address of your
+   gateway or model endpoint (for Azure AI Foundry see `FORK.md`), the model or deployment name, and your key; the speech model; language and
    alternate language.
 5. **Install the prompts** with Handy closed. From WSL, with the repository cloned (`git clone git@github.com:kolaf/Handy.git ~/dev/Handy`,
    branch `dev/hotkeys-build`):
@@ -96,7 +88,7 @@ fallback is Linux (`FORK.md`, Linux build).
 
 ## Optional: a local language model for post-processing
 
-Nothing here is required. Handy's post-processing can use any OpenAI-compatible server instead of LiteLLM, and `llama-server`
+Nothing here is required. Handy's post-processing can use any OpenAI-compatible server instead of a hosted gateway, and `llama-server`
 (llama.cpp) is the simplest one: no other service, it reads model files directly. It needs a **GGUF** file (the old GGML `.bin`
 format is not read, and Whisper's `.bin` files are speech models, a different thing). Benchmarked on the RTX 3080 home machine with
 `fork/prompts/bench.py` (41 cases; gpt-5.4 passes all): Qwen2.5-7B 34, Qwen3-4B 33, Gemma-3-12B 31, Gemma-3-4B 27. Local models are
@@ -115,7 +107,7 @@ fallback. Not tried on the work laptop.
 3. Start it (leave the window open, or make a shortcut):
    `llama-server.exe -m C:\llm\models\Qwen3-4B-Instruct-2507-Q4_K_M.gguf -ngl 99 -c 4096 --host 127.0.0.1 --port 8081`
 4. In Handy (Post-Processing): choose the provider "Local (llama-server)" (address `http://127.0.0.1:8081/v1`, change it there if
-   you use another port), any API key (for example `x`), any model name. Your LiteLLM settings stay under "Custom". Switch with
+   you use another port), any API key (for example `x`), any model name. Your hosted-gateway settings stay under "Custom". Switch with
    `handy --set-llm local` and `handy --set-llm cloud` (Talon: "language model local" / "language model cloud"). Speaker
    identification in meetings always uses the cloud (custom) endpoint, also while "local" is selected.
 5. Check quality yourself before trusting it:
@@ -131,5 +123,5 @@ fallback. Not tried on the work laptop.
 
 ## What is not automated
 
-Handy's endpoint/key/language settings (typed once), Hermes sign-in, the 1Password references, the speech model download, the
+Handy's endpoint/key/language settings (typed once), Hermes sign-in, the password-manager references, the speech model download, the
 Rango and Cursorless browser/editor extensions, `places.md` for `hv`, and anything the machine's policy has to approve.

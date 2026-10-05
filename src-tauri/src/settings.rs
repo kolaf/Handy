@@ -786,7 +786,7 @@ fn default_show_tray_icon() -> bool {
 
 /// The provider for a language model running on this computer.
 pub const LOCAL_PROVIDER_ID: &str = "local";
-/// What `--set-llm cloud` switches to: the provider the work LiteLLM is entered under.
+/// What `--set-llm cloud` switches to: the provider a hosted gateway is entered under.
 pub const CLOUD_PROVIDER_ID: &str = "custom";
 
 fn default_post_process_provider_id() -> String {

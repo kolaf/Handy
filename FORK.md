@@ -220,7 +220,7 @@ with the post-processing API key, model `diarize_model` (default `gpt-4o-transcr
 speaker are joined) and the minutes prompts attribute views, decisions and actions to the labels without guessing names. Labels from the API
 ("A", "B") only hold within one request, so for the following pieces Handy sends an 8 s voice sample of up to 4 known speakers
 (`known_speaker_names[]` / `known_speaker_references[]`) to keep "Speaker 1" the same person. Names are not looked up; say them in the
-minutes by editing. If the endpoint (LiteLLM, for instance) drops the segments, the transcript is plain text and the Activity entry says so.
+minutes by editing. If the endpoint (a gateway in front of the model, for instance) drops the segments, the transcript is plain text and the Activity entry says so.
 Privacy: unlike plain transcription, the recording leaves the computer.
 
 **Speaker names.** With the sub-option "Use names that are said in the conversation" (on by default when speakers are on) the
@@ -232,7 +232,7 @@ name is possible (a name that is mentioned but belongs to a third person); check
 
 **Local language model.** The provider "Local (llama-server)" (default address `http://127.0.0.1:8081/v1`) sits next to the others on
 the Post-Processing page. `handy --set-llm local|cloud|NAME` (Talon: "language model local" / "language model cloud") switches the
-provider in use without opening the page; `cloud` means the `custom` provider, where the LiteLLM address is. Setup and benchmark
+provider in use without opening the page; `cloud` means the `custom` provider, where a hosted gateway or model address is entered. Setup and benchmark
 results are in `fork/SETUP.md`. Speaker identification uses the `custom` provider when "local" is selected.
 
 **Azure AI Foundry (Azure OpenAI) as the language model.** Use the Custom provider with the v1 address
@@ -495,14 +495,12 @@ folder, the official signed Handy with our prompts and `fork/scripts/handy-profi
 | Handy code, prompts, `hv`, docs, build scripts | `kolaf/Handy`, branch `dev/hotkeys-build` (public) | `git clone`; deploy a build with `fork/scripts/deploy-portable.ps1`, or install the `.deb` |
 | Talon user files: wake key, `shock`/`drowse`, `sleep.py`, voice shell commands, disabled Handy bridge | `kolaf/community` (public), folder `kolaf/` | clone the fork into Talon's `user/` folder; see `kolaf/README.md` there |
 | Other Talon packages (Cursorless, Rango) | their own upstream repos (old checkouts) | listed in `kolaf/README.md`; not synced from here |
-| Hermes custom skills (15, private project notes) | `kolaf/hermes-skills` (**private**) | `hermes-skills-sync` (per-file three-way sync, conflicts reported, deletions opt-in) |
-| Hermes memories | the Hindsight server (`hermes-hindsight-api.kolaf.net` (the API; `hermes-hindsight.kolaf.net` is only the web UI), bank `hermes`) | nothing to sync: point `~/.hermes/hindsight/config.json` at the same server |
 | Handy settings | each machine's own `settings_store.json` | built-in prompts: `fork/scripts/install-prompts.py` (Handy closed); words, snippets, corrections, own prompts, per-app and per-language rules and four switches: `handy --sync-lists` with `handy-lists.json` in the private dotfiles repo; endpoint, key, shortcuts, paths and models by hand |
-| Secrets: Handy API key, Hindsight key, Hermes auth | never in git | 1Password (`op` is installed on the home WSL); not automated yet |
+| Secrets: Handy API key, Hermes auth | never in git | a password manager; not automated |
 | `user/settings.talon` (speech timeout) | the machine only | recreate by hand |
 
-`kolaf/dotfiles` (Ansible; now **private**) provisions WSL: terminal tools, Hermes with `hv` and the Hindsight config, the Talon shell hook,
-and optionally Handy, Talon and `op` on a native Linux desktop. It holds no secrets (keys come from 1Password). The whole-machine order is in `fork/SETUP.md`.
+`kolaf/dotfiles` (Ansible; now **private**) provisions WSL: terminal tools, Hermes with `hv`, the Talon shell hook,
+and optionally Handy, Talon and `op` on a native Linux desktop. It holds no secrets (keys come from a password manager). The whole-machine order is in `fork/SETUP.md`.
 Dropped on purpose: `talon-ai-tools`, replaced by the Handy `edit` prompt, so the GPT key is no longer in Talon at all. The old
 copy and its key file were moved (not deleted) to `%APPDATA%\talon\disabled\`.
 

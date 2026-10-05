@@ -42,7 +42,7 @@ number of tokens the model writes). What `hv` does about it:
 - **Private voice home** (`~/.config/hv/hermes-home`): a copy of your Hermes config with `reasoning_effort: low` and a 5 s
   approval timeout, refreshed whenever your real `config.yaml` changes. A command that needs approval cannot be approved by
   voice, so waiting the default 60 s only delayed the refusal (this was the cause of 60-90 s runs). Sign-in, memories, skills
-  and the Hindsight setup are shared with the normal home through symlinks; your own config is never changed.
+  and the memory-plugin setup are shared with the normal home through symlinks; your own config is never changed.
   `HV_FAST=0` turns it off; `HV_REASONING` and `HV_APPROVAL_TIMEOUT` tune it.
 - **The folder listing is in the context** ("Files here"), so "list the files" needs no tool call (one model call, ~6 s).
 - Toolsets are `terminal,file,memory` (no `skills`: that leaves out the skills index and tools, ~10 % of the prompt).

@@ -231,7 +231,7 @@ pub fn run_set(app: &AppHandle, query: String) {
     });
 }
 
-/// Picks a post-processing provider by `local`, `cloud` (the custom provider, where the LiteLLM address is entered), or by
+/// Picks a post-processing provider by `local`, `cloud` (the custom provider, where a hosted gateway address is entered), or by
 /// (part of) its id or label.
 pub fn resolve_provider(
     providers: &[crate::settings::PostProcessProvider],
