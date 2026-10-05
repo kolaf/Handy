@@ -320,7 +320,8 @@ review. It runs unattended on the always-on Linux server: a Hermes cron job `han
 no-agent mode, delivery to Telegram) runs `~/.hermes/scripts/handy/sync-upstream.sh`, a wrapper that pulls the repository clone `~/dev/Handy`, sets
 the PATH, runs the script and prints exactly one line, which Hermes sends to Telegram: "no new commits", the pull request link (with "please review
 closely" when Claude resolved conflicts), or the issue link when it did not finish. Requirements on that machine: the clone with `upstream` pointing
-at `cjpais/Handy`, Rust, Bun, the Linux build libraries (the list under "Building and installing"), a signed-in Claude Code, `gh` logged in, and
+at `cjpais/Handy`, a GitHub token with write access to **this repository only** (fine-grained: Contents, Pull requests and Issues read and write)
+in `~/.config/handy-sync/token` (mode 600; the wrapper exports it as `GH_TOKEN`, so the general `gh` login is not used), Rust, Bun, the Linux build libraries (the list under "Building and installing"), a signed-in Claude Code, `gh` logged in, and
 Hermes with Telegram configured. If the build libraries are missing the script says so and stops before starting Claude.
 
 1. Fetch upstream. Nothing new, or a branch `upstream-sync-<sha>` already on GitHub for that commit: stop.
