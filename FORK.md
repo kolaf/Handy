@@ -313,6 +313,37 @@ period/full stop/punktum, colon/kolon, semicolon/semikolon, new line/ny linje, n
 symbol, and sentences are capitalized. It is deliberately simple: a literal "the period of time" is converted too. The
 overlay says "Offline: basic cleanup only" after a failure.
 
+## Weekly upstream sync (local, with Claude Code)
+
+`fork/scripts/sync-upstream.sh` brings `cjpais/Handy` main into the fork without touching your working copy, and leaves a pull request for you to
+review. It runs unattended every Monday 07:30 through a Windows scheduled task named "Handy upstream sync" (`wsl.exe` starts the script in the
+Ubuntu distro; "run when available" is on, so a missed start runs at the next opportunity; the computer must be on and logged in).
+
+1. Fetch upstream. Nothing new, or a branch `upstream-sync-<sha>` already on GitHub for that commit: stop.
+2. In a separate worktree (`~/dev/Handy-sync`) make `upstream-sync-<sha>` from `dev/hotkeys-build` and merge upstream into it.
+3. Run the checks: `bun install`, `bun run build`, `cargo test --lib`, `bun run lint`, `npx tsc --noEmit`.
+4. **Clean merge and checks pass:** no AI involved. Push the branch and open a pull request into `dev/hotkeys-build`.
+5. **Conflicts or failing checks:** start Claude Code headless (`claude -p`, budget `CLAUDE_BUDGET_USD`, default 10) in the worktree with instructions to
+   follow this file ("Merging upstream"), keep the fork's features, adopt upstream's design where it replaced code, fix what the merge breaks and run
+   the checks. It can read, edit, commit and run git (not push), cargo, bun and npx; `git push`, `gh`, `curl` and `rm -rf` are denied.
+6. **The script does not trust Claude's report:** it checks that the merge is finished, nothing is uncommitted, upstream is in the branch, and runs the
+   checks itself again. Pass: pull request whose body says Claude resolved it, lists the conflicted files and includes Claude's summary. Fail: an
+   issue with the end of the checks log (and the branch, if it has commits).
+
+Nothing reaches `dev/hotkeys-build` without you merging the pull request. After merging, tag a build (`git tag build-N && git push <repo> build-N`)
+and try dictation: the sync proves the code compiles and the unit tests pass, not that the app works.
+
+**Watching a run.** `tail -f ~/.cache/hv/upstream-sync.log` shows the script's steps (and the Claude session id). `fork/scripts/sync-upstream.sh --watch`
+shows what Claude is doing live (its tool calls and text, from `~/.cache/hv/upstream-sync.log.claude.jsonl`). Afterwards `claude --resume <session id>`
+opens the same session, from the worktree directory, to ask questions or continue. **There is no remote connection into a running job:** Claude
+Code's Remote Control (`claude --remote-control`) is for interactive sessions, not for a headless `-p` run. Watching from another machine
+means running the `tail`/`--watch` commands over SSH; the pull request or issue on GitHub is the result you get notified about.
+
+Run it by hand any time: `fork/scripts/sync-upstream.sh` (`DRY=1` prints the push and the pull request instead of doing them). Tested against
+throwaway repositories (clean merge, a conflict resolved by a stub, a conflict nobody resolves, and a conflict resolved by the real `claude`);
+**not yet run against the real upstream with a real conflict.** Change the weekday or time with Task Scheduler (`taskschd.msc`) or by re-registering
+the task; remove it with `Unregister-ScheduledTask "Handy upstream sync"`.
+
 ## Command-line flags
 
 Sent to the running instance (a second `handy` process forwards them and exits). If Handy is not running they just start it.
