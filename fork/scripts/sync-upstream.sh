@@ -93,6 +93,11 @@ if git ls-remote --exit-code --heads "$PUSH_URL" "$BRANCH" >/dev/null 2>&1; then
   say "branch $BRANCH already exists on GitHub; a sync for this upstream commit was already made"; exit 0
 fi
 
+# Without the native build libraries the checks can only fail, and Claude would be asked to "fix" a missing system package.
+if [ -z "${SYNC_CHECKS:-}" ] && [ "$(uname -s)" = Linux ] && ! pkg-config --exists webkit2gtk-4.1 2>/dev/null; then
+  fail "the Linux build libraries are missing on this machine (see the Linux section in FORK.md), so the checks cannot run; $COUNT new upstream commit(s) are waiting"
+fi
+
 COMMITS=$(git log --oneline "$BASE_REF..$UP_REF" | head -40)
 git worktree remove --force "$WORK" 2>/dev/null; rm -rf "$WORK"; git worktree prune
 git branch -D "$BRANCH" >/dev/null 2>&1
