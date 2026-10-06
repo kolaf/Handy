@@ -356,8 +356,11 @@ in `~/.hermes/skills/devops/handy-upstream-sync/`) holds the procedure: "merge i
 an open `upstream-sync-*` pull request into `dev/hotkeys-build`, waits for CI (a failing check stops it unless `--ignore-checks`), merges with a
 merge commit, deletes the branch, tags the next `build-N` and pushes it (this starts the CI build), and `watch-build.sh` sends a Telegram message
 with the download links when the build is done. For a CAREFUL verdict, or when Claude resolved conflicts, the assistant asks for an explicit
-confirmation first; "skip" closes the pull request; a question gets answered from the review at the top of the pull request. The files on the
-server are symlinks into the repository clone (`~/.hermes/scripts/handy/*`, the skill), so a pull of the repository updates them.
+confirmation first; "skip" closes the pull request; a question gets answered from the review at the top of the pull request. On the
+server the helper scripts and the skill are symlinks into the repository clone, so a pull updates them. **The cron job's own script must be a real file**:
+Hermes refuses a script whose path resolves outside `~/.hermes/scripts` ("Blocked: script path resolves outside the scripts directory"; the job failed
+that way on 2026-10-06 07:30 after it had been made a symlink). So `~/.hermes/scripts/handy/sync-upstream.sh` is a two-line stub that `exec`s
+`~/dev/Handy/fork/hermes/sync-upstream-job.sh`; the job's logic stays in the repository.
 
 **Watching a run.** `tail -f ~/.cache/hv/upstream-sync.log` shows the script's steps (and the Claude session id). `fork/scripts/sync-upstream.sh --watch`
 shows what Claude is doing live (its tool calls and text, from `~/.cache/hv/upstream-sync.log.claude.jsonl`). Afterwards `claude --resume <session id>`
