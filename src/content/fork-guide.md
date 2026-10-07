@@ -30,7 +30,7 @@ This build (`0.9.8-hotkeys.1`) adds features on top of Handy. Details for every 
 
 ## Journal (SilverBullet)
 
-- **Update journal** (Talon "update journal", or the button on the Meetings page): dictate what you did and what should happen tomorrow, stop with your Handy key, and it is added to today's journal page in SilverBullet, in the style of the page. What you say about existing projects, pages, people and tags becomes correct `[[links]]` and `#tags`; names that do not exist stay plain text. Only lines are added; existing text is never changed, and if the page changed meanwhile nothing is written.
+- **Update journal** (Talon "update journal", or the button on the Meetings page): dictate what you did and what should happen tomorrow, or ask for a change ("move the vendor call to Thursday"), and stop with your Handy key. Today's journal page in SilverBullet is rewritten in its own style with your words added; what you say about existing projects, pages, people and tags becomes correct `[[links]]` and `#tags`, and names that do not exist stay plain text. The old page is backed up first, and if the page changed meanwhile nothing is written.
 
 ## Teaching Handy your words
 

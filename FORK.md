@@ -260,26 +260,31 @@ tried: a full run from a real recording, and the Windows build talking to the sp
 **Dictating into today's SilverBullet journal ("update journal").** The same SilverBullet settings (address, token) plus a journal folder (default
 `Journal`, pages named `YYYY-MM-DD`, SilverBullet's own default; a missing page is created with `tags: journal` and `date`). Start it with Talon
 "update journal" (`handy --update-journal --toggle-post-process`) or the button "Dictate into today's journal" on the Meetings page: an ordinary
-post-processed dictation starts, you ramble about what you did and what should be done tomorrow, and you stop with your Handy key. Nothing is
-pasted. Instead:
+post-processed dictation starts, you ramble about what you did and what should be done tomorrow (or ask for a change: "move the vendor call to
+Thursday", "I finished that task"), and you stop with your Handy key. Nothing is pasted. Instead:
 1. Today's page is read from SilverBullet together with its version (`ETag`).
-2. The language model gets the page, the dictation, today's and tomorrow's date and the lists of what exists in your space (projects, pages,
-   tags in use; read from the space and kept for ten minutes; the journal and meeting folders are left out), and answers only with *where to
-   insert which lines* (`{"insertions": [{"after": "<exact existing line or null>", "lines": [...]}]}`), in the style of the page: bullet character,
-   indentation, time prefixes, `* [ ]` tasks, `[due: ...]` attributes, links.
-3. **The model never rewrites the page.** The code inserts the lines after the named existing line (or at the end if the line is not on the page;
-   never inside the frontmatter), so every existing line stays, in order. At most 60 lines.
-4. Each inserted line is checked: control characters removed, `${`, `<!--` and code fences neutralised, and **references verified**: a `[[link]]`
-   must name a page that exists (it is written with the page's real name, `[[Page|words]]` and `[[Page#heading]]` keep their alias and heading,
-   anything else becomes plain text), and a `#tag` must be a tag in use (otherwise the `#` is dropped). So what you say about an existing project,
-   page, person or tag comes out as a correct link or tag, and a name that does not exist never becomes a phantom page or a new tag.
-5. A copy of the page as it was goes to `<meeting notes folder>/journal_backups/` and the page is written with `If-Match`: if the page changed
+2. The language model gets the page body, the dictation, today's and tomorrow's date and the lists of what exists in your space (projects, pages,
+   tags in use; read from the space and kept for ten minutes; the journal and meeting folders are left out), and returns **the complete updated
+   page body**. A journal page is short and a new one is made every day, and the pages are backed up, so rewriting the whole entry is the design:
+   it can add, regroup, merge duplicates and apply what you asked for. The prompt tells it to keep everything else exactly (same words, order and
+   format), to match the page's style (bullet character, indentation, time prefixes, `* [ ]` tasks, `[due: ...]` attributes), to mark a task done
+   only if you say it is done, and never to delete something unless you said so or it is an exact duplicate.
+3. What the code does with the answer: the **frontmatter is always the old one** (the model's is ignored); **lines the model left unchanged are
+   kept byte for byte** (matched one to one), so your own `${...}` expressions survive; every **new or changed line** is cleaned (control
+   characters removed, `${`, `<!--` and code fences neutralised, at most 400 characters) and its **references are verified**: a `[[link]]` must
+   name a page that exists (written with the page's real name; `[[Page|words]]` and `[[Page#heading]]` keep alias and heading; anything else becomes
+   plain text), and a `#tag` must be a tag in use (otherwise the `#` is dropped). So what you say about an existing project, page, person or tag comes
+   out as a correct link or tag, and a name that does not exist never becomes a phantom page or a new tag. An answer is refused (nothing is written)
+   when it is empty, longer than 400 lines, changes nothing, or drops more than half of a page of six or more lines.
+4. A copy of the page as it was goes to `<meeting notes folder>/journal_backups/` and the page is written with `If-Match`: if the page changed
    while you were dictating (you edited it in the browser), nothing is written and the dictation is put on the clipboard (and is in History).
    This is the only place where Handy changes an existing SilverBullet page.
-6. The Activity page lists the lines that were added and the page address; a notice says "Journal: N line(s) added" or "Journal not updated".
-Tested against your real space on a throwaway page in `Handy test (delete me)/` (links corrected, unknown page and tag made plain, a stale write
-refused with the page unchanged) and with a stand-in model on a rambling dictation with a self-correction and an injected instruction. Not yet tried:
-a full dictation through the real model, and an entry in your own journal style beyond the sample.
+5. The Activity page lists the new or changed lines, the old lines that are gone or changed, and the page address; a notice says "Journal: N added,
+   M changed or removed" or "Journal not updated".
+Tested against your real space on a throwaway page in `Handy test (delete me)/` (links corrected, unknown page and tag made plain, `${...}` defused,
+a replaced line reported as changed, a stale write refused with the page unchanged) and with a stand-in model on a rambling dictation with a
+self-correction, an edit request and an injected instruction (the page style, links and tags were right and the injected text became a harmless
+reminder line). Not yet tried: a full dictation through the real model, and an entry in your own journal style beyond the sample.
 
 **Speaker names.** With the sub-option "Use names that are said in the conversation" (on by default when speakers are on) the
 language model reads the labelled transcript once and returns a name only for a speaker whose name the conversation makes certain
