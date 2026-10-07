@@ -243,7 +243,13 @@ lists the pages tagged project. With a project chosen (page dropdown, `--meeting
    [[Saga]] (not added to the project page)"; a link to the transcript) and `... transcript`. The page that opens afterwards is the SilverBullet one.
    Existing pages and tasks are never edited, ticked or deleted; a failure in SilverBullet does not fail the job (the local files are complete, and
    the Activity entry says what went wrong). Without a project nothing is sent to SilverBullet.
-5. **Safety.** A page of a space can run code (`${...}` expressions, `<!-- #lua -->` directives, space-lua code blocks) in the browser of whoever opens
+5. **The same layout as your own minutes.** `fork/silverbullet/Meeting Minutes.md` is a SilverBullet page template (tagged `meta/template/page`,
+   command "Meeting: New Minutes", suggested name `Meeting Notes/<date> Meeting`; created in the space as `Templates/Meeting Minutes`; after creating
+   it run "System: Reload" once). It has the frontmatter Handy writes (`tags: meeting`, `project`, `date`) and the sections Summary, Attendees,
+   Decisions, Discussion, Action items (as real `* [ ]` tasks when you write them yourself) and Open questions and risks. The automatic minutes are
+   told to use exactly these sections (Norwegian headings for Norwegian meetings: Sammendrag, Deltakere, Beslutninger, Diskusjon, Oppfølgingspunkter,
+   Åpne spørsmål og risikoer), with the action items as plain bullets: the checkable tasks of an automatic page are the proposed ones further down.
+6. **Safety.** A page of a space can run code (`${...}` expressions, `<!-- #lua -->` directives, space-lua code blocks) in the browser of whoever opens
    it, and the minutes come from a language model reading speech, so every piece of text is neutralised before it is written (`${` becomes `$ {`,
    `<!--` and code fences are broken up); page titles follow SilverBullet's name rules. Privacy: the project text goes to the post-processing model
    like the transcript does.
