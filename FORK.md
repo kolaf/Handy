@@ -488,8 +488,12 @@ All in `fork/prompts/`.
   words are marked `[word?]`), (4) vocabulary and snippet tags, (5) the style. `python3 build_prompts.py` writes
   `handy-prompts.json` and `src-tauri/src/dev_prompts.json`.
 - `dev_prompts.json` is compiled into the app: **fresh settings and portable installs start with these prompts** and `super`
-  selected. Existing installs keep what they have stored; update them with
-  `python3 fork/scripts/install-prompts.py` (close Handy first; it makes a backup).
+  selected. Existing installs keep what they have stored (a portable update never touches `Data\`); update the built-in prompts with
+  `python3 fork/scripts/install-prompts.py` (close Handy first; it makes a backup). **Exception:** at start Handy adds the prompts that features
+  depend on if they are missing from the stored list: `edit` ("edit this"), `reply` ("reply to this") and the transforms `t_*` ("make that
+  formal" ...). A prompt that exists is never changed, so your edits stay, and an ordinary built-in prompt that you deleted stays deleted.
+  (Before this, an old `Data\` without `edit` gave "Prompt not found" for "edit this".) Changed *text* of built-in prompts still needs
+  `install-prompts.py`.
 - `bench.py` runs `bench_cases.json` (41 cases) the way Handy sends a request and checks the result:
   `python3 bench.py --from-handy` (endpoint, model and key from your Handy settings), `--prompt email`,
   `--case spell_exe -v`, `--dry` (print assembled prompts), `--mock` (check the checker without a model).

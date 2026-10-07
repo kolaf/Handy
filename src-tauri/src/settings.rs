@@ -1,5 +1,5 @@
 use crate::utils;
-use log::{debug, warn};
+use log::{debug, info, warn};
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize};
 use specta::Type;
@@ -1022,6 +1022,30 @@ fn default_typing_tool() -> TypingTool {
     TypingTool::Auto
 }
 
+/// Prompts that features depend on: `edit` ("edit this"), `reply` ("reply to this") and the transforms `t_*` ("make that formal" ...). A settings file
+/// whose prompt list is older than these (the portable updates never touch `Data\`, and built-in prompts only go into a settings file when it is
+/// created) gets them added. A prompt that exists is never touched, since it may have been edited.
+fn ensure_feature_prompts(settings: &mut AppSettings) -> bool {
+    let mut changed = false;
+    for prompt in default_post_process_prompts() {
+        let needed = prompt.id == "edit" || prompt.id == "reply" || prompt.id.starts_with("t_");
+        if needed
+            && !settings
+                .post_process_prompts
+                .iter()
+                .any(|p| p.id == prompt.id)
+        {
+            info!(
+                "Adding the built-in prompt '{}' that a feature depends on",
+                prompt.id
+            );
+            settings.post_process_prompts.push(prompt);
+            changed = true;
+        }
+    }
+    changed
+}
+
 fn ensure_post_process_defaults(settings: &mut AppSettings) -> bool {
     let mut changed = false;
     for provider in default_post_process_providers() {
@@ -1365,7 +1389,9 @@ pub fn get_settings(app: &AppHandle) -> AppSettings {
         default_settings
     };
 
-    if ensure_post_process_defaults(&mut settings) {
+    let providers_changed = ensure_post_process_defaults(&mut settings);
+    let prompts_changed = ensure_feature_prompts(&mut settings);
+    if providers_changed || prompts_changed {
         store.set("settings", serde_json::to_value(&settings).unwrap());
     }
 
@@ -1574,6 +1600,45 @@ pub fn get_recording_retention_period(app: &AppHandle) -> RecordingRetentionPeri
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn feature_prompts_missing_from_an_old_settings_file_are_added_and_nothing_else_is_touched() {
+        let mut settings = get_default_settings();
+        settings
+            .post_process_prompts
+            .retain(|p| p.id != "edit" && p.id != "t_formal");
+        if let Some(reply) = settings
+            .post_process_prompts
+            .iter_mut()
+            .find(|p| p.id == "reply")
+        {
+            reply.prompt = "my own reply prompt".to_string();
+        }
+        let before = settings.post_process_prompts.len();
+        assert!(ensure_feature_prompts(&mut settings));
+        assert_eq!(settings.post_process_prompts.len(), before + 2);
+        assert!(settings
+            .post_process_prompts
+            .iter()
+            .any(|p| p.id == "edit" && p.prompt.contains("${clipboard}")));
+        assert!(settings
+            .post_process_prompts
+            .iter()
+            .any(|p| p.id == "t_formal"));
+        // an edited prompt keeps the user's text, and a second run changes nothing
+        assert!(settings
+            .post_process_prompts
+            .iter()
+            .any(|p| p.id == "reply" && p.prompt == "my own reply prompt"));
+        assert!(!ensure_feature_prompts(&mut settings));
+        // an ordinary built-in prompt that the user deleted stays deleted
+        settings.post_process_prompts.retain(|p| p.id != "email");
+        assert!(!ensure_feature_prompts(&mut settings));
+        assert!(!settings
+            .post_process_prompts
+            .iter()
+            .any(|p| p.id == "email"));
+    }
+
     use super::*;
 
     #[test]
