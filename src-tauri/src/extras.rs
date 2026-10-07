@@ -310,6 +310,21 @@ pub(crate) fn is_short_utterance(settings: &AppSettings, text: &str) -> bool {
     min > 0 && text.split_whitespace().count() < min
 }
 
+/// Does the selected prompt work on the clipboard text (`${clipboard}`, as the edit and reply prompts do)?
+pub(crate) fn prompt_uses_clipboard(settings: &AppSettings) -> bool {
+    settings
+        .post_process_selected_prompt_id
+        .as_ref()
+        .and_then(|id| settings.post_process_prompts.iter().find(|p| &p.id == id))
+        .is_some_and(|p| p.prompt.contains("${clipboard}"))
+}
+
+/// Skip the model for this dictation? Only when it is short, and never for a prompt that works on the clipboard: its dictation is an
+/// instruction ("translate to Norwegian") and is short by nature.
+pub(crate) fn skips_model(settings: &AppSettings, text: &str) -> bool {
+    is_short_utterance(settings, text) && !prompt_uses_clipboard(settings)
+}
+
 /// Spoken punctuation words (English and Norwegian) and the text they stand for.
 const SPOKEN_PUNCTUATION: &[(&str, &str)] = &[
     ("question mark", "?"),
@@ -942,5 +957,26 @@ mod tests {
         assert!(
             validate_snippets(&[snippet("a", &"x".repeat(MAX_SNIPPET_TEXT_CHARS + 1))]).is_err()
         );
+    }
+
+    #[test]
+    fn a_short_instruction_still_reaches_the_model_when_the_prompt_works_on_the_clipboard() {
+        let mut settings = crate::settings::get_default_settings();
+        settings.post_process_min_words = 5;
+        // an ordinary prompt: a short dictation skips the model
+        settings.post_process_selected_prompt_id = Some("simple".to_string());
+        assert!(!prompt_uses_clipboard(&settings));
+        assert!(skips_model(&settings, "hello there"));
+        // the edit prompt works on the copied text, so "translate to norwegian" must not be skipped
+        settings.post_process_selected_prompt_id = Some("edit".to_string());
+        assert!(prompt_uses_clipboard(&settings));
+        assert!(is_short_utterance(&settings, "translate to norwegian"));
+        assert!(!skips_model(&settings, "translate to norwegian"));
+        // the reply prompt also works on the clipboard
+        settings.post_process_selected_prompt_id = Some("reply".to_string());
+        assert!(!skips_model(&settings, "yes"));
+        // nothing selected: not a clipboard prompt
+        settings.post_process_selected_prompt_id = None;
+        assert!(!prompt_uses_clipboard(&settings));
     }
 }

@@ -14,7 +14,7 @@ use crate::utils::{
     self, show_processing_overlay, show_recording_overlay, show_transcribing_overlay,
 };
 use crate::TranscriptionCoordinator;
-use log::{debug, error, warn};
+use log::{debug, error, info, warn};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::collections::HashMap;
@@ -447,7 +447,38 @@ pub(crate) async fn process_transcription_output_in(
     let mut settings = get_settings(app);
     if post_process {
         // A one-shot prompt ("reply to this") or a per-app rule may replace the selected prompt for this dictation.
-        crate::context::apply_prompt_choice(&mut settings, started_in);
+        if let Some(missing) = crate::context::apply_prompt_choice(&mut settings, started_in) {
+            crate::learn::announce_with(
+                app,
+                "prompt-missing",
+                missing.clone(),
+                format!(
+                    "The prompt '{missing}' is not in your prompt list, so the selected prompt was used instead. Install the built-in prompts (fork/scripts/install-prompts.py, with Handy closed) or add a prompt with that id."
+                ),
+            );
+        }
+        // An edit-style prompt works on the copied text: with nothing on the clipboard there is nothing to edit.
+        if crate::extras::prompt_uses_clipboard(&settings) {
+            use tauri_plugin_clipboard_manager::ClipboardExt;
+            let copied = app.clipboard().read_text().unwrap_or_default();
+            info!(
+                "The prompt works on the clipboard: {} characters copied",
+                copied.chars().count()
+            );
+            if copied.trim().is_empty() {
+                crate::learn::announce_with(
+                    app,
+                    "edit-none",
+                    String::new(),
+                    "The selected prompt works on the text you copied, but the clipboard is empty. Select the text first (for \"edit this\" it is copied for you), then speak the change.".to_string(),
+                );
+                return ProcessedTranscription {
+                    final_text: String::new(),
+                    post_processed_text: None,
+                    post_process_prompt: None,
+                };
+            }
+        }
     }
     // Learned corrections (see learn.rs) fix known mishearings before anything else sees the text.
     let heard = crate::learn::apply_corrections(transcription, &settings.corrections);
@@ -455,7 +486,7 @@ pub(crate) async fn process_transcription_output_in(
     let mut post_processed_text: Option<String> = None;
     let mut post_process_prompt: Option<String> = None;
 
-    if post_process && crate::extras::is_short_utterance(&settings, &final_text) {
+    if post_process && crate::extras::skips_model(&settings, &final_text) {
         // Too short to be worth a model call: basic local cleanup only.
         final_text = crate::extras::local_cleanup(&final_text);
         if final_text != transcription {

@@ -342,7 +342,14 @@ a rule with a title part wins over a rule for the whole app; no match means the 
 foreground window). The log shows the decision ("Prompt for this dictation: ... (app rule for slack.exe ...)"), which is also
 the easiest way to find a program's name. A prompt set with `--use-prompt-once` (below) wins over a rule.
 
-**Edit by instruction.** Talon's "edit this" copies the selected text and runs `handy --use-prompt-once edit --toggle-post-process`: you then speak the change you want, stop with your Handy key, and the `edit` prompt (selected text from the clipboard, your words as the instruction) pastes the result over the still-selected text.
+**Edit by instruction.** Talon's "edit this" copies the selected text and runs `handy --use-prompt-once edit --toggle-post-process`: you then speak the change you want, stop with your Handy key, and the `edit` prompt (selected text from the clipboard, your words as the instruction) pastes the result over the still-selected text. **When it does nothing useful**, the places to look: (1) Talon copies with `edit.selected_text()` and says "Handy: N characters copied" or "nothing was copied" (the
+editor did not have focus, or nothing was selected); (2) the one-shot prompt `edit` must be in the prompt list: if it is not, the selected prompt is used
+and the Activity page shows "Prompt not found" (install the built-in prompts with `fork/scripts/install-prompts.py`, Handy closed); (3) the clipboard is
+read when you stop the dictation, so do not copy anything else in between; if it is empty, nothing is sent to the model and the Activity page says "Nothing to
+edit"; the Handy log has the line "The prompt works on the clipboard: N characters copied"; (4) a prompt that works on the clipboard is never skipped by the
+setting "Skip the model for short dictations" (an instruction such as "translate to Norwegian" is short by nature; before this was fixed, such an instruction was
+only cleaned up and pasted as text). The result goes to the cursor where you are when you stop the dictation, so you can select on one page, speak the change
+and click into another page before stopping.
 
 **One-shot prompt.** `handy --use-prompt-once ID` makes the next dictation that uses post-processing use prompt `ID` and then
 forgets it (it expires after 3 minutes). Talon's "reply to this" copies the selected message, sets `reply` this way and starts

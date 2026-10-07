@@ -352,21 +352,29 @@ fn prompt_exists(settings: &AppSettings, id: &str) -> bool {
 
 /// Picks the prompt for the dictation that is being post-processed now: a one-shot prompt first, then a per-app rule,
 /// else whatever is selected. Changes only the given copy of the settings.
-pub fn apply_prompt_choice(settings: &mut AppSettings, started_in: Option<&AppContext>) {
+///
+/// Returns the id of a one-shot prompt that was asked for but is not in the prompt list (the selected prompt is used instead, and the
+/// caller says so).
+pub fn apply_prompt_choice(
+    settings: &mut AppSettings,
+    started_in: Option<&AppContext>,
+) -> Option<String> {
+    let mut missing = None;
     if let Some(id) = take_one_shot() {
         if prompt_exists(settings, &id) {
             info!("Prompt for this dictation: '{id}' (one-shot)");
             settings.post_process_selected_prompt_id = Some(id);
-            return;
+            return None;
         }
         warn!("One-shot prompt '{id}' does not exist; ignored");
+        missing = Some(id);
     }
     if !settings.app_prompts_enabled || settings.app_prompts.is_empty() {
-        return;
+        return missing;
     }
     // The app where the dictation started; for actions that do not record (re-run) the app that has focus now.
     let Some(ctx) = started_in.cloned().or_else(foreground) else {
-        return;
+        return missing;
     };
     match matching_rule(&settings.app_prompts, &ctx) {
         Some(rule) if prompt_exists(settings, &rule.prompt_id) => {
@@ -385,6 +393,7 @@ pub fn apply_prompt_choice(settings: &mut AppSettings, started_in: Option<&AppCo
             ctx.exe, ctx.title
         ),
     }
+    missing
 }
 
 fn clean_field(s: &str) -> bool {
@@ -776,6 +785,24 @@ mod tests {
         assert!(is_terminal_exe("pwsh.exe"));
         assert!(!is_terminal_exe("code.exe"));
         assert!(!is_terminal_exe("slack.exe"));
+    }
+
+    #[test]
+    fn a_one_shot_prompt_that_does_not_exist_is_reported() {
+        let mut settings = crate::settings::get_default_settings();
+        let selected = settings.post_process_selected_prompt_id.clone();
+        set_one_shot("no-such-prompt");
+        assert_eq!(
+            apply_prompt_choice(&mut settings, None).as_deref(),
+            Some("no-such-prompt")
+        );
+        assert_eq!(settings.post_process_selected_prompt_id, selected);
+        set_one_shot("edit");
+        assert_eq!(apply_prompt_choice(&mut settings, None), None);
+        assert_eq!(
+            settings.post_process_selected_prompt_id.as_deref(),
+            Some("edit")
+        );
     }
 
     #[test]
