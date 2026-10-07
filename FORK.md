@@ -257,6 +257,11 @@ Tested against the real space with the page `Saga` and two throwaway pages (the 
 the language-model steps were tried with a stand-in model on a transcript that contained an injection attempt (it produced nothing from it). Not yet
 tried: a full run from a real recording, and the Windows build talking to the space over Tailscale.
 
+**Testing the SilverBullet features.** Never against a real notes space: `fork/silverbullet/dev-instance.sh start` runs a throwaway SilverBullet
+(the server release, in multi-space mode like the real one: space `notes` under `/notes`, a per-account API token, invented notes including a project
+`Saga`) on `http://127.0.0.1:3010/notes`; `stop` and `reset` do what they say. The opt-in tests that talk to a space (`live_space`, `live_journal`,
+and `SB_WRITE=1` for the meeting pages) take `SB_URL` and `SB_TOKEN` from the environment (see the script's header).
+
 **Dictating into today's SilverBullet journal ("update journal").** The same SilverBullet settings (address, token) plus a journal folder (default
 `Journal`, pages named `YYYY-MM-DD`, SilverBullet's own default; a missing page is created with `tags: journal` and `date`). Start it with Talon
 "update journal" (`handy --update-journal --toggle-post-process`) or the button "Dictate into today's journal" on the Meetings page: an ordinary
