@@ -14,6 +14,7 @@ mod context;
 mod extras;
 mod helpers;
 mod input;
+mod journal;
 mod learn;
 mod listsync;
 mod llm_client;
@@ -705,6 +706,7 @@ pub fn run(cli_args: CliArgs) {
             activity::clear_activity,
             meeting::start_meeting,
             meeting::list_silverbullet_projects,
+            journal::start_journal_dictation,
             meeting::cancel_meeting,
             meeting::find_latest_recordings,
             meeting::open_meeting_file,
@@ -922,6 +924,10 @@ pub fn run(cli_args: CliArgs) {
                     args.iter().any(|a| a == "--meeting-speakers"),
                     signal_handle::flag_value(&args, "--meeting-project"),
                 );
+                handled_setting = true;
+            }
+            if args.iter().any(|a| a == "--update-journal") {
+                journal::arm_if_configured(app);
                 handled_setting = true;
             }
             if let Some(name) = signal_handle::flag_value(&args, "--set-llm") {

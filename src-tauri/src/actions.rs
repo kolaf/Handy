@@ -435,6 +435,15 @@ pub(crate) async fn process_transcription_output_in(
     post_process: bool,
     started_in: Option<&crate::context::AppContext>,
 ) -> ProcessedTranscription {
+    // "update journal": this dictation goes into today's SilverBullet journal page instead of being pasted.
+    if post_process && crate::journal::take_armed() {
+        crate::journal::handle_dictation(app, transcription).await;
+        return ProcessedTranscription {
+            final_text: String::new(),
+            post_processed_text: None,
+            post_process_prompt: None,
+        };
+    }
     let mut settings = get_settings(app);
     if post_process {
         // A one-shot prompt ("reply to this") or a per-app rule may replace the selected prompt for this dictation.

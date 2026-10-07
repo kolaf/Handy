@@ -257,6 +257,30 @@ Tested against the real space with the page `Saga` and two throwaway pages (the 
 the language-model steps were tried with a stand-in model on a transcript that contained an injection attempt (it produced nothing from it). Not yet
 tried: a full run from a real recording, and the Windows build talking to the space over Tailscale.
 
+**Dictating into today's SilverBullet journal ("update journal").** The same SilverBullet settings (address, token) plus a journal folder (default
+`Journal`, pages named `YYYY-MM-DD`, SilverBullet's own default; a missing page is created with `tags: journal` and `date`). Start it with Talon
+"update journal" (`handy --update-journal --toggle-post-process`) or the button "Dictate into today's journal" on the Meetings page: an ordinary
+post-processed dictation starts, you ramble about what you did and what should be done tomorrow, and you stop with your Handy key. Nothing is
+pasted. Instead:
+1. Today's page is read from SilverBullet together with its version (`ETag`).
+2. The language model gets the page, the dictation, today's and tomorrow's date and the lists of what exists in your space (projects, pages,
+   tags in use; read from the space and kept for ten minutes; the journal and meeting folders are left out), and answers only with *where to
+   insert which lines* (`{"insertions": [{"after": "<exact existing line or null>", "lines": [...]}]}`), in the style of the page: bullet character,
+   indentation, time prefixes, `* [ ]` tasks, `[due: ...]` attributes, links.
+3. **The model never rewrites the page.** The code inserts the lines after the named existing line (or at the end if the line is not on the page;
+   never inside the frontmatter), so every existing line stays, in order. At most 60 lines.
+4. Each inserted line is checked: control characters removed, `${`, `<!--` and code fences neutralised, and **references verified**: a `[[link]]`
+   must name a page that exists (it is written with the page's real name, `[[Page|words]]` and `[[Page#heading]]` keep their alias and heading,
+   anything else becomes plain text), and a `#tag` must be a tag in use (otherwise the `#` is dropped). So what you say about an existing project,
+   page, person or tag comes out as a correct link or tag, and a name that does not exist never becomes a phantom page or a new tag.
+5. A copy of the page as it was goes to `<meeting notes folder>/journal_backups/` and the page is written with `If-Match`: if the page changed
+   while you were dictating (you edited it in the browser), nothing is written and the dictation is put on the clipboard (and is in History).
+   This is the only place where Handy changes an existing SilverBullet page.
+6. The Activity page lists the lines that were added and the page address; a notice says "Journal: N line(s) added" or "Journal not updated".
+Tested against your real space on a throwaway page in `Handy test (delete me)/` (links corrected, unknown page and tag made plain, a stale write
+refused with the page unchanged) and with a stand-in model on a rambling dictation with a self-correction and an injected instruction. Not yet tried:
+a full dictation through the real model, and an entry in your own journal style beyond the sample.
+
 **Speaker names.** With the sub-option "Use names that are said in the conversation" (on by default when speakers are on) the
 language model reads the labelled transcript once and returns a name only for a speaker whose name the conversation makes certain
 (an introduction, or being addressed by name and answering). Anything else stays "Speaker N". The reply is checked in code: only
@@ -418,6 +442,7 @@ handy --toggle-transcription | --toggle-post-process | --cancel      (upstream)
 handy --swap-language          handy --prompt-picker        handy --model-picker
 handy --rerun                  handy --paste-last           handy --learn
 handy --reformat               handy --transform ID         handy --use-prompt-once ID
+handy --update-journal --toggle-post-process      (the dictation goes into today's SilverBullet journal)
 handy --scratch-last           handy --redo-with ID         (ID `raw` = the transcript without formatting)
 handy --set-language CODE      handy --set-prompt ID        (combinable, also with a toggle)
 handy --set-model NAME         handy --set-llm local|cloud|NAME
@@ -484,6 +509,7 @@ receives it) through `kolaf/handy/handy_integration.py`. Phrases in `<angle brac
 | `transcribe latest meeting with speakers` | the same with speaker labels (the audio goes to the post-processing endpoint) | adds `--meeting-speakers` |
 | `transcribe meeting` / `norwegian` / `english` *(in Explorer)* | minutes from the audio files or folder selected in Explorer; the language defaults to the Meetings page | `--meeting-minutes FILES [--meeting-language no]` |
 | `transcribe meeting [norwegian\|english] with speakers` *(in Explorer)* | the same with speaker labels | adds `--meeting-speakers` |
+| `update journal` | starts a dictation that is added to today's SilverBullet journal page, in its style and with links to your pages and tags; stop with your Handy key | `--update-journal --toggle-post-process` |
 | `transcribe latest meeting for <project>` / `... with speakers for <project>` | the same in the context of a SilverBullet project (a spoken name; it only has to be unambiguous) | adds `--meeting-project NAME` |
 | `transcribe meeting for <project>` *(in Explorer)* | the same for the selected files | adds `--meeting-project NAME` |
 | `learn this repo` *(in a terminal, `terminal/`)* | adds the project's names and terms to Custom Words | `--learn-repo FOLDER` |

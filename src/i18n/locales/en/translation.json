@@ -755,6 +755,8 @@
         "scratched": "Dictation removed",
         "model": "Speech model switched",
         "model-failed": "Speech model not switched",
+        "journal": "Journal updated",
+        "journal-failed": "Journal not updated",
         "llm": "Language model switched",
         "llm-failed": "Language model not switched",
         "meeting": "Meeting minutes",
@@ -796,6 +798,10 @@
         "folderPlaceholder": "Folder for the meeting pages (default Meeting Notes)",
         "tagPlaceholder": "Tag on proposed tasks, without # (default fromMeeting)",
         "noProject": "No project (local files only)",
+        "journalFolderPlaceholder": "Journal folder (default Journal; pages are named YYYY-MM-DD)",
+        "journalButton": "Dictate into today's journal",
+        "journalHint": "Starts a dictation; stop it with your Handy key. What you say is added to today's journal page, in its style, with links to your pages and tags. Nothing is pasted.",
+        "journalStarted": "Recording. Say what you did and what should happen next, then stop with your Handy key.",
         "refresh": "Load projects"
       },
       "skipSilence": "Cut silence before transcribing",
@@ -888,6 +894,8 @@
     "noticeScratched": "Last dictation removed",
     "noticeModel": "Speech model: {{value}}",
     "noticeModelFailed": "Could not switch model (see Activity)",
+    "noticeJournal": "Journal: {{value}}",
+    "noticeJournalFailed": "Journal not updated (see Activity)",
     "noticeLlm": "Language model: {{value}}",
     "noticeLlmFailed": "Could not switch language model (see Activity)",
     "noticeMeeting": "Meeting minutes saved: {{value}}"

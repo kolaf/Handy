@@ -47,6 +47,10 @@ export const MeetingsSettings: React.FC = () => {
     saved.silverbullet_folder ?? "Meeting Notes",
   );
   const [sbTag, setSbTag] = useState(saved.silverbullet_tag ?? "fromMeeting");
+  const [sbJournal, setSbJournal] = useState(
+    saved.silverbullet_journal_folder ?? "Journal",
+  );
+  const [journalMessage, setJournalMessage] = useState<string | null>(null);
   const [project, setProject] = useState("");
   const [projects, setProjects] = useState<string[]>([]);
   const [projectsError, setProjectsError] = useState<string | null>(null);
@@ -124,7 +128,24 @@ export const MeetingsSettings: React.FC = () => {
     silverbullet_token: sbToken.trim(),
     silverbullet_folder: sbFolder.trim() || "Meeting Notes",
     silverbullet_tag: sbTag.trim() || "fromMeeting",
+    silverbullet_journal_folder: sbJournal.trim() || "Journal",
   });
+
+  // Starts an ordinary dictation whose result is added to today's journal page instead of being pasted.
+  const dictateJournal = async () => {
+    setJournalMessage(null);
+    const saveResult = await commands.updateMeetingSettings(settingsToSave());
+    if (saveResult.status !== "ok") {
+      setJournalMessage(saveResult.error);
+      return;
+    }
+    const result = await commands.startJournalDictation();
+    setJournalMessage(
+      result.status === "ok"
+        ? t("settings.meetings.silverbullet.journalStarted")
+        : result.error,
+    );
+  };
 
   // The settings are saved first: the projects are read with the saved address and token.
   const refreshProjects = async () => {
@@ -361,6 +382,34 @@ export const MeetingsSettings: React.FC = () => {
               variant="compact"
               disabled={running}
             />
+            <Input
+              type="text"
+              value={sbJournal}
+              onChange={(e) => setSbJournal(e.target.value)}
+              placeholder={t(
+                "settings.meetings.silverbullet.journalFolderPlaceholder",
+              )}
+              variant="compact"
+              disabled={running}
+            />
+            <div className="flex gap-2 items-center">
+              <Button
+                onClick={dictateJournal}
+                variant="secondary"
+                size="sm"
+                disabled={running || sbUrl.trim() === ""}
+              >
+                {t("settings.meetings.silverbullet.journalButton")}
+              </Button>
+              <span className="text-xs text-mid-gray">
+                {t("settings.meetings.silverbullet.journalHint")}
+              </span>
+            </div>
+            {journalMessage ? (
+              <div className="text-xs text-mid-gray break-words">
+                {journalMessage}
+              </div>
+            ) : null}
             <div className="flex gap-2 items-center">
               <Dropdown
                 options={[

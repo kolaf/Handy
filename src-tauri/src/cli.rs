@@ -61,6 +61,11 @@ pub struct CliArgs {
     #[arg(long, value_name = "NAME")]
     pub meeting_project: Option<String>,
 
+    /// The next dictation (use with --toggle-post-process) goes into today's SilverBullet journal page: the model adds the dictated
+    /// items in the style of the page (sent to running instance)
+    #[arg(long)]
+    pub update_journal: bool,
+
     /// Identify the speakers in the minutes (with --meeting-minutes or --meeting-latest): the audio is sent to the
     /// post-processing endpoint's diarizing model instead of being transcribed locally
     #[arg(long)]

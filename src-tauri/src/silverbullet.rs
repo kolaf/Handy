@@ -22,6 +22,9 @@ const MAX_CONTEXT_CHARS: usize = 12_000;
 const MAX_TASKS: usize = 80;
 const MAX_LINE_CHARS: usize = 300;
 const MAX_ITEMS: usize = 25;
+const MAX_INDEX_PAGES: usize = 2000;
+const MAX_PROMPT_PAGES: usize = 400;
+const MAX_PROMPT_TAGS: usize = 150;
 
 pub struct Space {
     base: String,
@@ -114,6 +117,104 @@ impl Space {
         response.text().await.map_err(|e| e.to_string())
     }
 
+    /// The page and its version (`ETag`), or `None` if there is no such page.
+    pub async fn read_with_etag(&self, file: &str) -> Result<Option<(String, String)>, String> {
+        let response = self
+            .http
+            .get(self.file_url(file))
+            .bearer_auth(&self.token)
+            .header("X-Sync-Mode", "true")
+            .send()
+            .await
+            .map_err(|e| format!("Cannot reach SilverBullet: {e}"))?;
+        if response.status() == StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+        if !response.status().is_success() {
+            return Err(format!("{file}: {}", Self::explain(response.status())));
+        }
+        let etag = response
+            .headers()
+            .get("etag")
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_string)
+            .ok_or(
+                "SilverBullet sent no version (ETag) for the page, so it cannot be changed safely",
+            )?;
+        let text = response.text().await.map_err(|e| e.to_string())?;
+        Ok(Some((text, etag)))
+    }
+
+    /// Overwrites `file` only if it is still the version `etag` (from `read_with_etag`); if the page changed in the meantime nothing is
+    /// written and the caller is told.
+    pub async fn write_if_match(
+        &self,
+        file: &str,
+        content: &str,
+        etag: &str,
+    ) -> Result<(), String> {
+        let response = self
+            .http
+            .put(self.file_url(file))
+            .bearer_auth(&self.token)
+            .header("X-Sync-Mode", "true")
+            .header("If-Match", etag)
+            .header("Content-Type", "text/markdown")
+            .body(content.to_string())
+            .send()
+            .await
+            .map_err(|e| format!("Cannot reach SilverBullet: {e}"))?;
+        match response.status() {
+            s if s.is_success() => Ok(()),
+            StatusCode::PRECONDITION_FAILED => Err("The page changed while you were dictating, so nothing was written (the page is as you left it)".into()),
+            s => Err(Self::explain(s)),
+        }
+    }
+
+    /// The pages, projects and tags of the space, for linking what is dictated to what exists. Journal and meeting folders are left out of
+    /// the page list (there are too many, and they are not what one links to).
+    pub async fn page_index(&self, skip_folders: &[&str]) -> Result<PageIndex, String> {
+        let files = self.list().await?;
+        let skip: Vec<String> = skip_folders
+            .iter()
+            .map(|f| format!("{}/", f.trim_matches('/')))
+            .collect();
+        let mut pages: Vec<String> = files
+            .iter()
+            .filter(|f| {
+                f.name.ends_with(".md")
+                    && !f.name.starts_with("Library/")
+                    && !f.name.starts_with('_')
+                    && !skip.iter().any(|s| f.name.starts_with(s.as_str()))
+            })
+            .map(|f| page_name(&f.name))
+            .take(MAX_INDEX_PAGES)
+            .collect();
+        pages.sort();
+        let texts = self.read_many(Self::candidates(&files, skip_folders)).await;
+        let mut projects = Vec::new();
+        let mut tags: Vec<String> = Vec::new();
+        for (name, text) in &texts {
+            let page_tag_list = page_tags(text);
+            if page_tag_list
+                .iter()
+                .any(|t| t.eq_ignore_ascii_case("project"))
+            {
+                projects.push(name.clone());
+            }
+            tags.extend(page_tag_list);
+            tags.extend(hashtags(text));
+        }
+        tags.sort_by_key(|t| t.to_lowercase());
+        tags.dedup_by(|a, b| a.eq_ignore_ascii_case(b));
+        projects.sort();
+        Ok(PageIndex {
+            pages,
+            projects,
+            tags,
+        })
+    }
+
     /// Creates `file` (for example `Meeting Notes/2026-10-07 Title.md`) only if it does not exist.
     pub async fn create(&self, file: &str, content: &str) -> Result<(), CreateError> {
         let response = self
@@ -152,8 +253,11 @@ impl Space {
     }
 
     /// Pages of the space that may hold project or task text: not the library, not system pages, not the meeting folder.
-    fn candidates(files: &[FileMeta], skip_folder: &str) -> Vec<String> {
-        let skip = format!("{}/", skip_folder.trim_matches('/'));
+    fn candidates(files: &[FileMeta], skip_folders: &[&str]) -> Vec<String> {
+        let skip: Vec<String> = skip_folders
+            .iter()
+            .map(|f| format!("{}/", f.trim_matches('/')))
+            .collect();
         files
             .iter()
             .filter(|f| {
@@ -161,7 +265,7 @@ impl Space {
                     && f.size <= MAX_PAGE_BYTES
                     && !f.name.starts_with("Library/")
                     && !f.name.starts_with('_')
-                    && !f.name.starts_with(&skip)
+                    && !skip.iter().any(|s| f.name.starts_with(s.as_str()))
             })
             .map(|f| f.name.clone())
             .take(MAX_PAGES_SCANNED)
@@ -183,7 +287,9 @@ impl Space {
     /// The projects of the space: pages whose frontmatter tags include `project`.
     pub async fn projects(&self, skip_folder: &str) -> Result<Vec<String>, String> {
         let files = self.list().await?;
-        let pages = self.read_many(Self::candidates(&files, skip_folder)).await;
+        let pages = self
+            .read_many(Self::candidates(&files, &[skip_folder]))
+            .await;
         let mut names: Vec<String> = pages
             .into_iter()
             .filter(|(_, text)| {
@@ -213,7 +319,7 @@ impl Space {
             })
             .collect();
         let files = self.list().await?;
-        let others: Vec<String> = Self::candidates(&files, skip_folder)
+        let others: Vec<String> = Self::candidates(&files, &[skip_folder])
             .into_iter()
             .filter(|f| page_name(f) != project)
             .collect();
@@ -382,6 +488,143 @@ pub fn links_to(line: &str, page: &str) -> bool {
         }
     }
     false
+}
+
+// ---- linking what is said to what exists ---------------------------------------------------------------------------------------
+
+fn hashtag_regex() -> &'static regex::Regex {
+    static RE: once_cell::sync::Lazy<regex::Regex> = once_cell::sync::Lazy::new(|| {
+        regex::Regex::new(r"(^|\s)#([A-Za-z0-9_][A-Za-z0-9_/\-]*)").unwrap()
+    });
+    &RE
+}
+
+/// The `#hashtags` in the body of a page (code blocks and the frontmatter are skipped; headings are not tags).
+pub fn hashtags(text: &str) -> Vec<String> {
+    let body = match frontmatter(text) {
+        Some(front) => text.splitn(2, front).nth(1).unwrap_or(text),
+        None => text,
+    };
+    let mut in_code = false;
+    let mut out = Vec::new();
+    for line in body.lines() {
+        if line.trim_start().starts_with("```") {
+            in_code = !in_code;
+            continue;
+        }
+        if in_code {
+            continue;
+        }
+        for capture in hashtag_regex().captures_iter(line) {
+            out.push(capture[2].to_string());
+        }
+    }
+    out
+}
+
+/// What exists in the space, so that a link or a tag written for a dictation can be checked.
+#[derive(Debug, Clone, Default)]
+pub struct PageIndex {
+    pub pages: Vec<String>,
+    pub projects: Vec<String>,
+    pub tags: Vec<String>,
+}
+
+impl PageIndex {
+    /// The page's real name: an exact match, else one that differs only in case.
+    pub fn canonical_page(&self, name: &str) -> Option<&str> {
+        let name = name.trim();
+        self.pages
+            .iter()
+            .find(|p| p.as_str() == name)
+            .or_else(|| self.pages.iter().find(|p| p.eq_ignore_ascii_case(name)))
+            .map(String::as_str)
+    }
+
+    pub fn canonical_tag(&self, tag: &str) -> Option<&str> {
+        self.tags
+            .iter()
+            .find(|t| t.eq_ignore_ascii_case(tag))
+            .map(String::as_str)
+    }
+
+    /// Checks the links and hashtags of a line that a model wrote: a `[[link]]` must point at a page that exists (it is written with the
+    /// page's real name; `[[Page|text]]` and `[[Page#heading]]` keep their alias and heading), otherwise only its text stays; a `#tag` must be
+    /// a tag that is in use, otherwise the `#` is dropped.
+    pub fn fix_references(&self, line: &str) -> String {
+        let mut out = String::new();
+        let mut rest = line;
+        while let Some(start) = rest.find("[[") {
+            out.push_str(&rest[..start]);
+            let after = &rest[start + 2..];
+            let Some(end) = after.find("]]") else {
+                out.push_str(after);
+                rest = "";
+                break;
+            };
+            let inner = &after[..end];
+            let (target_part, alias) = match inner.split_once('|') {
+                Some((t, a)) => (t, Some(a.trim())),
+                None => (inner, None),
+            };
+            let (target, heading) = match target_part.split_once('#') {
+                Some((t, h)) => (t.trim(), Some(h.trim())),
+                None => (target_part.trim(), None),
+            };
+            match self.canonical_page(target) {
+                Some(real) => {
+                    out.push_str("[[");
+                    out.push_str(real);
+                    if let Some(h) = heading.filter(|h| !h.is_empty()) {
+                        out.push('#');
+                        out.push_str(h);
+                    }
+                    if let Some(a) = alias.filter(|a| !a.is_empty()) {
+                        out.push('|');
+                        out.push_str(a);
+                    }
+                    out.push_str("]]");
+                }
+                None => out.push_str(alias.filter(|a| !a.is_empty()).unwrap_or(target)),
+            }
+            rest = &after[end + 2..];
+        }
+        out.push_str(rest);
+        hashtag_regex()
+            .replace_all(&out, |c: &regex::Captures| {
+                match self.canonical_tag(&c[2]) {
+                    Some(real) => format!("{}#{}", &c[1], real),
+                    None => format!("{}{}", &c[1], &c[2]),
+                }
+            })
+            .into_owned()
+    }
+
+    /// The lists for a prompt: projects first, then the other pages, then the tags in use.
+    pub fn for_prompt(&self) -> String {
+        let mut pages: Vec<&String> = self.projects.iter().collect();
+        pages.extend(self.pages.iter().filter(|p| !self.projects.contains(p)));
+        pages.truncate(MAX_PROMPT_PAGES);
+        format!(
+            "Projects: {}\nPages: {}\nTags in use: {}",
+            if self.projects.is_empty() {
+                "(none)".to_string()
+            } else {
+                self.projects.join("; ")
+            },
+            pages
+                .iter()
+                .map(|p| p.as_str())
+                .collect::<Vec<_>>()
+                .join("; "),
+            self.tags
+                .iter()
+                .take(MAX_PROMPT_TAGS)
+                .map(|t| format!("#{t}"))
+                .collect::<Vec<_>>()
+                .join(" ")
+        )
+    }
 }
 
 // ---- what a language model may add -------------------------------------------------------------------------------------------
@@ -921,5 +1164,82 @@ mod tests {
         );
         let back = space.read(&format!("{used}.md")).await.unwrap();
         assert!(back.contains("#fromMeeting"));
+    }
+
+    fn index() -> PageIndex {
+        PageIndex {
+            pages: vec![
+                "Saga".into(),
+                "Website Redesign".into(),
+                "People/Kari Nordmann".into(),
+            ],
+            projects: vec!["Saga".into()],
+            tags: vec!["project".into(), "waiting".into(), "fromMeeting".into()],
+        }
+    }
+
+    #[test]
+    fn links_are_written_with_the_real_page_name_and_unknown_ones_become_text() {
+        let i = index();
+        assert_eq!(
+            i.fix_references("Met [[saga]] about the plan"),
+            "Met [[Saga]] about the plan"
+        );
+        assert_eq!(
+            i.fix_references("See [[website redesign#Scope|the redesign]]"),
+            "See [[Website Redesign#Scope|the redesign]]"
+        );
+        assert_eq!(
+            i.fix_references("Talked to [[People/kari nordmann]]"),
+            "Talked to [[People/Kari Nordmann]]"
+        );
+        // a page that does not exist is not linked (no phantom pages)
+        assert_eq!(
+            i.fix_references("Read [[Invisible Cities]] and [[Nope|the book]]"),
+            "Read Invisible Cities and the book"
+        );
+        assert_eq!(i.fix_references("broken [[Saga"), "broken Saga");
+        assert_eq!(
+            i.fix_references("* [ ] plain task [due: \"2026-10-08\"]"),
+            "* [ ] plain task [due: \"2026-10-08\"]"
+        );
+    }
+
+    #[test]
+    fn hashtags_must_be_tags_that_are_in_use() {
+        let i = index();
+        assert_eq!(
+            i.fix_references("* [ ] Call back #waiting"),
+            "* [ ] Call back #waiting"
+        );
+        assert_eq!(
+            i.fix_references("* [ ] Call back #Waiting"),
+            "* [ ] Call back #waiting"
+        );
+        assert_eq!(
+            i.fix_references("* idea #brandnew and #project"),
+            "* idea brandnew and #project"
+        );
+        // headings and URLs are not tags
+        assert_eq!(i.fix_references("## Done"), "## Done");
+        assert_eq!(
+            i.fix_references("see http://x/#anchor"),
+            "see http://x/#anchor"
+        );
+    }
+
+    #[test]
+    fn hashtags_are_found_in_the_body_but_not_in_code_or_headings() {
+        let page = "---\ntags: project\n---\n# Heading\nText #one and #two/sub\n```\n#incode\n```\n* [ ] task #three";
+        assert_eq!(hashtags(page), vec!["one", "two/sub", "three"]);
+    }
+
+    #[test]
+    fn the_index_prompt_lists_projects_pages_and_tags() {
+        let text = index().for_prompt();
+        assert!(
+            text.starts_with("Projects: Saga\nPages: Saga; Website Redesign; People/Kari Nordmann")
+        );
+        assert!(text.contains("#waiting") && text.contains("#fromMeeting"));
     }
 }

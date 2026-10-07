@@ -28,6 +28,10 @@ This build (`0.9.8-hotkeys.1`) adds features on top of Handy. Details for every 
 - **In a SilverBullet project** (optional; address, token and "Load projects" on the page, `--meeting-project NAME`, Talon "transcribe latest meeting for saga"): the project's notes and open tasks inform the minutes, and the minutes become a new page in your space with proposed tasks linked to the project, tasks that look finished (quoted, never ticked) and proposed news. Existing pages and tasks are never changed. The page layout is the same as the SilverBullet template `Templates/Meeting Minutes` ("Meeting: New Minutes"), so your own minutes look alike.
 - **Identify the speakers** (checkbox, `--meeting-speakers`, Talon "... with speakers"): the audio goes to the post-processing endpoint's diarizing model, the transcript gets `Speaker 1:` labels, and the minutes attribute views to them. A name is used only if the conversation makes it certain. **The recording leaves the computer.**
 
+## Journal (SilverBullet)
+
+- **Update journal** (Talon "update journal", or the button on the Meetings page): dictate what you did and what should happen tomorrow, stop with your Handy key, and it is added to today's journal page in SilverBullet, in the style of the page. What you say about existing projects, pages, people and tags becomes correct `[[links]]` and `#tags`; names that do not exist stay plain text. Only lines are added; existing text is never changed, and if the page changed meanwhile nothing is written.
+
 ## Teaching Handy your words
 
 - **By dictation**: spell a word after saying it, or say "add to vocabulary X".
@@ -58,6 +62,7 @@ Handy is driven by voice through the community fork (`kolaf/handy/`); Talon swit
 - **Undo and redo:** "scratch dictation", "redo as <mode>", "redo raw", and the context-aware "scratch that".
 - **Models:** "model parakeet|norwegian|whisper small...", "model picker", "language model local|cloud".
 - **Meetings:** "transcribe latest meeting|recording" (add "with speakers", or "for <project>"), and in Explorer "transcribe meeting [norwegian|english]".
+- **Journal:** "update journal".
 - **Terminal:** "learn this repo"; say "terminal help" for the rest.
 
 ## Command line

@@ -369,7 +369,7 @@ fn title_prompt(language: &str, minutes: &str) -> String {
     }
 }
 
-fn output_dir(cfg: &MeetingSettings) -> PathBuf {
+pub(crate) fn output_dir(cfg: &MeetingSettings) -> PathBuf {
     if !cfg.output_dir.trim().is_empty() {
         return PathBuf::from(cfg.output_dir.trim());
     }

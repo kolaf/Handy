@@ -160,6 +160,9 @@ pub struct MeetingSettings {
     /// Hashtag on the proposed tasks (without #), so they can be found and reviewed.
     #[serde(default = "default_silverbullet_tag")]
     pub silverbullet_tag: String,
+    /// Folder of the daily journal pages (`<folder>/YYYY-MM-DD`); SilverBullet's own default is `Journal`.
+    #[serde(default = "default_silverbullet_journal_folder")]
+    pub silverbullet_journal_folder: String,
 }
 
 fn default_diarize_model() -> String {
@@ -168,6 +171,10 @@ fn default_diarize_model() -> String {
 
 fn default_silverbullet_folder() -> String {
     "Meeting Notes".to_string()
+}
+
+fn default_silverbullet_journal_folder() -> String {
+    "Journal".to_string()
 }
 
 fn default_silverbullet_tag() -> String {
@@ -198,6 +205,7 @@ impl Default for MeetingSettings {
             silverbullet_token: SecretString::default(),
             silverbullet_folder: default_silverbullet_folder(),
             silverbullet_tag: default_silverbullet_tag(),
+            silverbullet_journal_folder: default_silverbullet_journal_folder(),
         }
     }
 }
