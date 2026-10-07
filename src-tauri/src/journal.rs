@@ -18,12 +18,16 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use tauri::AppHandle;
 
-const ARMED_TTL: Duration = Duration::from_secs(600);
 const MAX_LINE_CHARS: usize = 400;
 const MAX_BODY_LINES: usize = 400;
 const MAX_BODY_CHARS: usize = 30_000;
 
+/// The start of the dictation must follow the arming within this time (Talon and the button arm and start in the same moment).
+const ARMED_TTL: Duration = Duration::from_secs(15);
+
 static ARMED: Mutex<Option<Instant>> = Mutex::new(None);
+/// The recording that is running (or being transcribed) is a journal dictation.
+static SESSION: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 pub fn arm() {
     if let Ok(mut slot) = ARMED.lock() {
@@ -31,18 +35,31 @@ pub fn arm() {
     }
 }
 
+/// Forgets journal mode: armed, and a recording already running. Called when the operation is cancelled.
 pub fn disarm() {
     if let Ok(mut slot) = ARMED.lock() {
         *slot = None;
     }
+    SESSION.store(false, std::sync::atomic::Ordering::SeqCst);
 }
 
-/// True once if journal mode was armed recently enough (the dictation that follows belongs to it).
-pub fn take_armed() -> bool {
+fn take_armed() -> bool {
     let Ok(mut slot) = ARMED.lock() else {
         return false;
     };
     slot.take().is_some_and(|at| at.elapsed() <= ARMED_TTL)
+}
+
+/// A recording starts: if journal mode was armed a moment ago and this is a post-processed dictation, this recording is the journal dictation.
+/// Any other recording is an ordinary one, so a forgotten arming can never divert a later dictation.
+pub fn begin_session(binding_id: &str) {
+    let is_journal = binding_id == "transcribe_with_post_process" && take_armed();
+    SESSION.store(is_journal, std::sync::atomic::Ordering::SeqCst);
+}
+
+/// True once if the dictation that was just transcribed is the journal dictation.
+pub fn take_session() -> bool {
+    SESSION.swap(false, std::sync::atomic::Ordering::SeqCst)
 }
 
 // ---- rewriting the page --------------------------------------------------------------------------------------------------------
@@ -489,12 +506,36 @@ mod tests {
     }
 
     #[test]
-    fn armed_mode_is_used_once() {
+    fn journal_mode_belongs_to_the_next_post_processed_recording_only() {
+        // not armed: an ordinary dictation
         disarm();
-        assert!(!take_armed());
+        begin_session("transcribe_with_post_process");
+        assert!(!take_session());
+        // armed, then the journal recording starts and is transcribed once
         arm();
-        assert!(take_armed());
-        assert!(!take_armed());
+        begin_session("transcribe_with_post_process");
+        assert!(take_session());
+        assert!(!take_session());
+        // a plain (not post-processed) recording does not use up the arming and is not a journal dictation
+        arm();
+        begin_session("transcribe");
+        assert!(!take_session());
+        begin_session("transcribe_with_post_process");
+        assert!(take_session());
+        // cancelling forgets both the arming and a running session
+        arm();
+        disarm();
+        begin_session("transcribe_with_post_process");
+        assert!(!take_session());
+        arm();
+        begin_session("transcribe_with_post_process");
+        disarm();
+        assert!(!take_session());
+        // a recording that starts without arming clears an old session
+        arm();
+        begin_session("transcribe_with_post_process");
+        begin_session("transcribe_with_post_process");
+        assert!(!take_session());
     }
 
     #[test]

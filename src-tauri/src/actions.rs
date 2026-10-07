@@ -436,7 +436,7 @@ pub(crate) async fn process_transcription_output_in(
     started_in: Option<&crate::context::AppContext>,
 ) -> ProcessedTranscription {
     // "update journal": this dictation goes into today's SilverBullet journal page instead of being pasted.
-    if post_process && crate::journal::take_armed() {
+    if post_process && crate::journal::take_session() {
         crate::journal::handle_dictation(app, transcription).await;
         return ProcessedTranscription {
             final_text: String::new(),
@@ -509,6 +509,8 @@ impl ShortcutAction for TranscribeAction {
         debug!("TranscribeAction::start called for binding: {}", binding_id);
         // Where the user is when they start speaking; see `context::begin_recording_context`.
         crate::context::begin_recording_context();
+        // "update journal": is this recording the journal dictation?
+        crate::journal::begin_session(binding_id);
 
         // Load model in the background
         let tm = app.state::<Arc<TranscriptionManager>>();

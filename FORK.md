@@ -279,7 +279,12 @@ Thursday", "I finished that task"), and you stop with your Handy key. Nothing is
 4. A copy of the page as it was goes to `<meeting notes folder>/journal_backups/` and the page is written with `If-Match`: if the page changed
    while you were dictating (you edited it in the browser), nothing is written and the dictation is put on the clipboard (and is in History).
    This is the only place where Handy changes an existing SilverBullet page.
-5. The Activity page lists the new or changed lines, the old lines that are gone or changed, and the page address; a notice says "Journal: N added,
+5. **Controls.** Talon "update journal", `handy --update-journal --toggle-post-process`, or the button "Dictate into today's journal" on the Meetings page
+   (sidebar, in the SilverBullet block, which also holds the address, token and the journal folder) arm journal mode and start the dictation; you
+   stop with your normal Handy key, and the shortcut for cancelling (Escape) cancels it and switches journal mode off. Arming lasts 15 seconds and
+   is used up by the next *post-processed* recording that starts; every other recording is an ordinary dictation, so a forgotten arming cannot
+   divert a later one.
+6. The Activity page lists the new or changed lines, the old lines that are gone or changed, and the page address; a notice says "Journal: N added,
    M changed or removed" or "Journal not updated".
 Tested against your real space on a throwaway page in `Handy test (delete me)/` (links corrected, unknown page and tag made plain, `${...}` defused,
 a replaced line reported as changed, a stale write refused with the page unchanged) and with a stand-in model on a rambling dictation with a
