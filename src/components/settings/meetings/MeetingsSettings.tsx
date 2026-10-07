@@ -41,6 +41,15 @@ export const MeetingsSettings: React.FC = () => {
   const [diarizeModel, setDiarizeModel] = useState(
     saved.diarize_model ?? "gpt-4o-transcribe-diarize",
   );
+  const [sbUrl, setSbUrl] = useState(saved.silverbullet_url ?? "");
+  const [sbToken, setSbToken] = useState(saved.silverbullet_token ?? "");
+  const [sbFolder, setSbFolder] = useState(
+    saved.silverbullet_folder ?? "Meeting Notes",
+  );
+  const [sbTag, setSbTag] = useState(saved.silverbullet_tag ?? "fromMeeting");
+  const [project, setProject] = useState("");
+  const [projects, setProjects] = useState<string[]>([]);
+  const [projectsError, setProjectsError] = useState<string | null>(null);
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [dragging, setDragging] = useState(false);
   const [files, setFiles] = useState<string[]>([]);
@@ -111,7 +120,28 @@ export const MeetingsSettings: React.FC = () => {
     speakers,
     name_speakers: nameSpeakers,
     diarize_model: diarizeModel.trim() || "gpt-4o-transcribe-diarize",
+    silverbullet_url: sbUrl.trim(),
+    silverbullet_token: sbToken.trim(),
+    silverbullet_folder: sbFolder.trim() || "Meeting Notes",
+    silverbullet_tag: sbTag.trim() || "fromMeeting",
   });
+
+  // The settings are saved first: the projects are read with the saved address and token.
+  const refreshProjects = async () => {
+    setProjectsError(null);
+    const saveResult = await commands.updateMeetingSettings(settingsToSave());
+    if (saveResult.status !== "ok") {
+      setProjectsError(saveResult.error);
+      return;
+    }
+    const result = await commands.listSilverbulletProjects();
+    if (result.status === "ok") {
+      setProjects(result.data);
+      if (!result.data.includes(project)) setProject("");
+    } else {
+      setProjectsError(result.error);
+    }
+  };
 
   // Fills the list with the latest recording from the recorder's folder (the files that belong together).
   const useLatest = async () => {
@@ -133,7 +163,11 @@ export const MeetingsSettings: React.FC = () => {
       setError(saveResult.error);
       return;
     }
-    const result = await commands.startMeeting(files, language);
+    const result = await commands.startMeeting(
+      files,
+      language,
+      project || null,
+    );
     if (result.status !== "ok") setError(result.error);
   };
 
@@ -286,6 +320,75 @@ export const MeetingsSettings: React.FC = () => {
               disabled={running}
             />
           ) : null}
+          <div className="flex flex-col gap-2 rounded-lg border border-mid-gray/20 p-3">
+            <div className="font-semibold">
+              {t("settings.meetings.silverbullet.title")}
+            </div>
+            <p className="text-xs text-mid-gray">
+              {t("settings.meetings.silverbullet.description")}
+            </p>
+            <Input
+              type="text"
+              value={sbUrl}
+              onChange={(e) => setSbUrl(e.target.value)}
+              placeholder={t("settings.meetings.silverbullet.urlPlaceholder")}
+              variant="compact"
+              disabled={running}
+            />
+            <Input
+              type="password"
+              value={sbToken}
+              onChange={(e) => setSbToken(e.target.value)}
+              placeholder={t("settings.meetings.silverbullet.tokenPlaceholder")}
+              variant="compact"
+              disabled={running}
+            />
+            <Input
+              type="text"
+              value={sbFolder}
+              onChange={(e) => setSbFolder(e.target.value)}
+              placeholder={t(
+                "settings.meetings.silverbullet.folderPlaceholder",
+              )}
+              variant="compact"
+              disabled={running}
+            />
+            <Input
+              type="text"
+              value={sbTag}
+              onChange={(e) => setSbTag(e.target.value)}
+              placeholder={t("settings.meetings.silverbullet.tagPlaceholder")}
+              variant="compact"
+              disabled={running}
+            />
+            <div className="flex gap-2 items-center">
+              <Dropdown
+                options={[
+                  {
+                    value: "",
+                    label: t("settings.meetings.silverbullet.noProject"),
+                  },
+                  ...projects.map((name) => ({ value: name, label: name })),
+                ]}
+                selectedValue={project}
+                onSelect={setProject}
+                disabled={running}
+              />
+              <Button
+                onClick={refreshProjects}
+                variant="secondary"
+                size="sm"
+                disabled={running || sbUrl.trim() === ""}
+              >
+                {t("settings.meetings.silverbullet.refresh")}
+              </Button>
+            </div>
+            {projectsError ? (
+              <div className="text-xs text-red-500 break-words">
+                {projectsError}
+              </div>
+            ) : null}
+          </div>
           <Input
             type="text"
             value={outputDir}

@@ -374,9 +374,17 @@ async changeLanguageModelsEnabledSetting(enabled: boolean) : Promise<Result<null
     else return { status: "error", error: e  as any };
 }
 },
-async startMeeting(files: string[], language: string) : Promise<Result<null, string>> {
+async startMeeting(files: string[], language: string, project: string | null) : Promise<Result<null, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("start_meeting", { files, language }) };
+    return { status: "ok", data: await TAURI_INVOKE("start_meeting", { files, language, project }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async listSilverbulletProjects() : Promise<Result<string[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_silverbullet_projects") };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -1172,7 +1180,7 @@ key_down: number; key_up: number; flags_changed: number; mouse: number; duration
 export type KeyboardImplementation = "tauri" | "handy_keys"
 export type LLMPrompt = { id: string; name: string; prompt: string; examples: string }
 export type ActivityEntry = { timestamp: number; kind: string; title: string; details: string }
-export type MeetingSettings = { language?: string; output_dir?: string; model_id?: string; recordings_dir?: string; group_minutes?: number; skip_silence?: boolean; speakers?: boolean; name_speakers?: boolean; diarize_model?: string }
+export type MeetingSettings = { language?: string; output_dir?: string; model_id?: string; recordings_dir?: string; group_minutes?: number; skip_silence?: boolean; speakers?: boolean; name_speakers?: boolean; diarize_model?: string; silverbullet_url?: string; silverbullet_token?: SecretString; silverbullet_folder?: string; silverbullet_tag?: string }
 export type LanguageModel = { language: string; model_id: string }
 export type AppPrompt = { app: string; title?: string; prompt_id: string }
 export type Correction = { wrong: string; right: string; hint?: boolean }
@@ -1220,6 +1228,10 @@ export type PermissionAccess = "allowed" | "denied" | "unknown"
 export type PostProcessProvider = { id: string; label: string; base_url: string; allow_base_url_edit?: boolean; models_endpoint?: string | null; supports_structured_output?: boolean }
 export type RecordingRetentionPeriod = "never" | "preserve_limit" | "days_3" | "weeks_2" | "months_3"
 export type SecretMap = Partial<{ [key in string]: string }>
+/**
+ * A secret that must never reach the logs (the settings are logged with `{:?}`): it prints as `[REDACTED]`.
+ */
+export type SecretString = string
 export type SecureInputStatus = { 
 /**
  * Secure input is currently enabled (live check)

@@ -223,6 +223,34 @@ speaker are joined) and the minutes prompts attribute views, decisions and actio
 minutes by editing. If the endpoint (a gateway in front of the model, for instance) drops the segments, the transcript is plain text and the Activity entry says so.
 Privacy: unlike plain transcription, the recording leaves the computer.
 
+**Meetings in a SilverBullet project (optional).** [SilverBullet](https://silverbullet.md) is a self-hosted note tool whose pages are plain Markdown
+files with an HTTP API (`GET|PUT /.fs/<page>.md` with `Authorization: Bearer <token>`; in multi-space mode the space name is part of the address,
+for example `http://host:3000/notes`). A **project** is a page with `tags: project` in its frontmatter; its tasks are `* [ ] ...` lines, and tasks on
+other pages that link to it (`[[Saga]]`) belong to it (SilverBullet's "Linked Tasks" widget shows them on the project page). Setup: Meetings page,
+"SilverBullet project": space address, API token (the account needs write access; keep the token like a password, because write access to a space
+can run code there), the folder for meeting pages (default `Meeting Notes`) and the hashtag for proposed tasks (default `fromMeeting`); "Load projects"
+lists the pages tagged project. With a project chosen (page dropdown, `--meeting-project NAME`, Talon "transcribe latest meeting for saga"):
+1. The project is read first (a wrong name or an unreachable server stops the job before the long transcription). Handy reads the project page,
+   its open tasks and the open tasks on other pages that link to it (up to 400 pages, none from `Library/`).
+2. The minutes prompt gets that text as context (as data: to spell names right and say which tasks came up).
+3. A second step asks the language model for a JSON object with `proposed_tasks`, `possibly_completed` and `new_information`. The reply is checked in
+   code: single bounded lines, no links or hashtags, and a "possibly completed" entry must match a task that really is open (the text on the page is
+   used, not the model's wording).
+4. The local files are saved as before. Then two **new** pages are created in the space, create-only (`If-None-Match: *`, a taken name gets "(2)"):
+   `Meeting Notes/<date> <title>` (frontmatter `tags: meeting`, `project`, `date`, `createdBy: Handy`; the minutes; "Proposed tasks (from the
+   meeting, not reviewed)" as `* [ ] ... [[Saga]] #fromMeeting`, which the project's Linked Tasks widget shows without the project page being edited;
+   "Possibly completed (existing tasks; nothing was changed, tick them yourself)", which only quotes the tasks; "Proposed new information for
+   [[Saga]] (not added to the project page)"; a link to the transcript) and `... transcript`. The page that opens afterwards is the SilverBullet one.
+   Existing pages and tasks are never edited, ticked or deleted; a failure in SilverBullet does not fail the job (the local files are complete, and
+   the Activity entry says what went wrong). Without a project nothing is sent to SilverBullet.
+5. **Safety.** A page of a space can run code (`${...}` expressions, `<!-- #lua -->` directives, space-lua code blocks) in the browser of whoever opens
+   it, and the minutes come from a language model reading speech, so every piece of text is neutralised before it is written (`${` becomes `$ {`,
+   `<!--` and code fences are broken up); page titles follow SilverBullet's name rules. Privacy: the project text goes to the post-processing model
+   like the transcript does.
+Tested against the real space with the page `Saga` and two throwaway pages (the pages were created, read back, and `Saga.md` kept the same hash);
+the language-model steps were tried with a stand-in model on a transcript that contained an injection attempt (it produced nothing from it). Not yet
+tried: a full run from a real recording, and the Windows build talking to the space over Tailscale.
+
 **Speaker names.** With the sub-option "Use names that are said in the conversation" (on by default when speakers are on) the
 language model reads the labelled transcript once and returns a name only for a speaker whose name the conversation makes certain
 (an introduction, or being addressed by name and answering). Anything else stays "Speaker N". The reply is checked in code: only
@@ -388,8 +416,8 @@ handy --scratch-last           handy --redo-with ID         (ID `raw` = the tran
 handy --set-language CODE      handy --set-prompt ID        (combinable, also with a toggle)
 handy --set-model NAME         handy --set-llm local|cloud|NAME
 handy --learn-repo FOLDER      handy --import-words FILE    handy --sync-lists FILE
-handy --meeting-minutes "a.m4a;b.m4a" [--meeting-language no] [--meeting-model NAME] [--meeting-speakers]
-handy --meeting-latest [--meeting-single] [--meeting-folder DIR] [--meeting-speakers] [--meeting-language no] [--meeting-model NAME]
+handy --meeting-minutes "a.m4a;b.m4a" [--meeting-language no] [--meeting-model NAME] [--meeting-speakers] [--meeting-project NAME]
+handy --meeting-latest [--meeting-single] [--meeting-folder DIR] [--meeting-speakers] [--meeting-project NAME] [--meeting-language no] [--meeting-model NAME]
 handy --set-language no --set-prompt email --toggle-post-process
 ```
 
@@ -450,6 +478,8 @@ receives it) through `kolaf/handy/handy_integration.py`. Phrases in `<angle brac
 | `transcribe latest meeting with speakers` | the same with speaker labels (the audio goes to the post-processing endpoint) | adds `--meeting-speakers` |
 | `transcribe meeting` / `norwegian` / `english` *(in Explorer)* | minutes from the audio files or folder selected in Explorer; the language defaults to the Meetings page | `--meeting-minutes FILES [--meeting-language no]` |
 | `transcribe meeting [norwegian\|english] with speakers` *(in Explorer)* | the same with speaker labels | adds `--meeting-speakers` |
+| `transcribe latest meeting for <project>` / `... with speakers for <project>` | the same in the context of a SilverBullet project (a spoken name; it only has to be unambiguous) | adds `--meeting-project NAME` |
+| `transcribe meeting for <project>` *(in Explorer)* | the same for the selected files | adds `--meeting-project NAME` |
 | `learn this repo` *(in a terminal, `terminal/`)* | adds the project's names and terms to Custom Words | `--learn-repo FOLDER` |
 
 The commands that copy the selection first (`reply to this`, `edit this`, the transforms with a selection) press Ctrl+C, or Ctrl+Shift+C in

@@ -30,6 +30,7 @@ mod secure_input;
 mod settings;
 mod shortcut;
 mod signal_handle;
+mod silverbullet;
 mod transcription_coordinator;
 mod tray;
 mod tray_i18n;
@@ -703,6 +704,7 @@ pub fn run(cli_args: CliArgs) {
             activity::get_activity,
             activity::clear_activity,
             meeting::start_meeting,
+            meeting::list_silverbullet_projects,
             meeting::cancel_meeting,
             meeting::find_latest_recordings,
             meeting::open_meeting_file,
@@ -906,6 +908,7 @@ pub fn run(cli_args: CliArgs) {
                     signal_handle::flag_value(&args, "--meeting-language"),
                     signal_handle::flag_value(&args, "--meeting-model"),
                     args.iter().any(|a| a == "--meeting-speakers"),
+                    signal_handle::flag_value(&args, "--meeting-project"),
                 );
                 handled_setting = true;
             }
@@ -917,6 +920,7 @@ pub fn run(cli_args: CliArgs) {
                     signal_handle::flag_value(&args, "--meeting-language"),
                     signal_handle::flag_value(&args, "--meeting-model"),
                     args.iter().any(|a| a == "--meeting-speakers"),
+                    signal_handle::flag_value(&args, "--meeting-project"),
                 );
                 handled_setting = true;
             }

@@ -788,6 +788,16 @@
       "browse": "Browse...",
       "recordingsPlaceholder": "Recorder folder, e.g. where OBS saves (empty: Videos in your home folder)",
       "groupPlaceholder": "Minutes between files that belong together (default 5)",
+      "silverbullet": {
+        "title": "SilverBullet project (optional)",
+        "description": "Choose a project (a SilverBullet page tagged project) to write the minutes with that project's notes and open tasks as context, and to create the minutes as a new page in the space, with proposed tasks linked to the project. Existing pages and tasks are never changed. The project text goes to the post-processing model like the transcript does. \"No project\" keeps everything local as before.",
+        "urlPlaceholder": "Space address, e.g. http://host:3000/notes",
+        "tokenPlaceholder": "API token of the SilverBullet account (needs write access)",
+        "folderPlaceholder": "Folder for the meeting pages (default Meeting Notes)",
+        "tagPlaceholder": "Tag on proposed tasks, without # (default fromMeeting)",
+        "noProject": "No project (local files only)",
+        "refresh": "Load projects"
+      },
       "skipSilence": "Cut silence before transcribing",
       "skipSilenceDescription": "Removes long pauses and noise with the same voice detector as dictation, so the speech model has nothing to invent text over. Very quiet speakers could be cut; turn it off for such recordings. Not used when speakers are identified.",
       "speakers": "Identify the speakers",

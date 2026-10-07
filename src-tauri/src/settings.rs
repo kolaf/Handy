@@ -147,10 +147,31 @@ pub struct MeetingSettings {
     /// the next) count as parts of the same recording.
     #[serde(default = "default_meeting_group_minutes")]
     pub group_minutes: u32,
+    /// SilverBullet space (https://silverbullet.md) for meeting notes with project context, including the space's path:
+    /// `http://host:3000/notes`. Empty = the feature is off.
+    #[serde(default)]
+    pub silverbullet_url: String,
+    /// API token of the SilverBullet account (Bearer). Needs write access to the space to create pages.
+    #[serde(default)]
+    pub silverbullet_token: SecretString,
+    /// Folder in the space where the meeting pages are created.
+    #[serde(default = "default_silverbullet_folder")]
+    pub silverbullet_folder: String,
+    /// Hashtag on the proposed tasks (without #), so they can be found and reviewed.
+    #[serde(default = "default_silverbullet_tag")]
+    pub silverbullet_tag: String,
 }
 
 fn default_diarize_model() -> String {
     "gpt-4o-transcribe-diarize".to_string()
+}
+
+fn default_silverbullet_folder() -> String {
+    "Meeting Notes".to_string()
+}
+
+fn default_silverbullet_tag() -> String {
+    "fromMeeting".to_string()
 }
 
 fn default_meeting_group_minutes() -> u32 {
@@ -173,6 +194,10 @@ impl Default for MeetingSettings {
             diarize_model: default_diarize_model(),
             recordings_dir: String::new(),
             group_minutes: default_meeting_group_minutes(),
+            silverbullet_url: String::new(),
+            silverbullet_token: SecretString::default(),
+            silverbullet_folder: default_silverbullet_folder(),
+            silverbullet_tag: default_silverbullet_tag(),
         }
     }
 }
@@ -444,6 +469,21 @@ pub enum VadBackend {
     #[default]
     Silero,
     Earshot,
+}
+
+/// A secret that must never reach the logs (the settings are logged with `{:?}`): it prints as `[REDACTED]`.
+#[derive(Clone, Default, PartialEq, Serialize, Deserialize, Type)]
+#[serde(transparent)]
+pub struct SecretString(pub String);
+
+impl fmt::Debug for SecretString {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(if self.0.is_empty() {
+            "\"\""
+        } else {
+            "[REDACTED]"
+        })
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Type)]

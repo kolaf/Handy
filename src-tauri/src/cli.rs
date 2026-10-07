@@ -56,6 +56,11 @@ pub struct CliArgs {
     #[arg(long, value_name = "NAME")]
     pub meeting_model: Option<String>,
 
+    /// Put the meeting in the context of a SilverBullet project (a page with tags: project): its notes and tasks inform the minutes, and
+    /// the minutes are written to a new page there with proposed tasks (with --meeting-minutes or --meeting-latest)
+    #[arg(long, value_name = "NAME")]
+    pub meeting_project: Option<String>,
+
     /// Identify the speakers in the minutes (with --meeting-minutes or --meeting-latest): the audio is sent to the
     /// post-processing endpoint's diarizing model instead of being transcribed locally
     #[arg(long)]

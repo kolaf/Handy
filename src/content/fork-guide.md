@@ -25,6 +25,7 @@ This build (`0.9.8-hotkeys.1`) adds features on top of Handy. Details for every 
 - Choose or drop audio files or a folder, pick the speech model and language; Handy writes minutes and saves them with the transcript. `handy --meeting-minutes FILES`, or Talon "transcribe meeting" in Explorer.
 - **Latest recording** (button, `--meeting-latest`, Talon "transcribe latest meeting"): the newest file in your recorder folder (OBS Studio...) with the files that belong to it.
 - **Long silences are cut** first so the speech model has nothing to invent text over (checkbox; local transcription only).
+- **In a SilverBullet project** (optional; address, token and "Load projects" on the page, `--meeting-project NAME`, Talon "transcribe latest meeting for saga"): the project's notes and open tasks inform the minutes, and the minutes become a new page in your space with proposed tasks linked to the project, tasks that look finished (quoted, never ticked) and proposed news. Existing pages and tasks are never changed.
 - **Identify the speakers** (checkbox, `--meeting-speakers`, Talon "... with speakers"): the audio goes to the post-processing endpoint's diarizing model, the transcript gets `Speaker 1:` labels, and the minutes attribute views to them. A name is used only if the conversation makes it certain. **The recording leaves the computer.**
 
 ## Teaching Handy your words
@@ -56,7 +57,7 @@ Handy is driven by voice through the community fork (`kolaf/handy/`); Talon swit
 - **Dictate in a mode:** "dictate as email|message|note|meeting|document|formal|informal|simple", "reply to this", "edit this" (select first, then speak).
 - **Undo and redo:** "scratch dictation", "redo as <mode>", "redo raw", and the context-aware "scratch that".
 - **Models:** "model parakeet|norwegian|whisper small...", "model picker", "language model local|cloud".
-- **Meetings:** "transcribe latest meeting|recording" (add "with speakers"), and in Explorer "transcribe meeting [norwegian|english]".
+- **Meetings:** "transcribe latest meeting|recording" (add "with speakers", or "for <project>"), and in Explorer "transcribe meeting [norwegian|english]".
 - **Terminal:** "learn this repo"; say "terminal help" for the rest.
 
 ## Command line
