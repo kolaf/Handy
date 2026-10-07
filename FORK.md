@@ -272,9 +272,15 @@ Thursday", "I finished that task"), and you stop with your Handy key. Nothing is
 2. The language model gets the page body, the dictation, today's and tomorrow's date and the lists of what exists in your space (projects, pages,
    tags in use; read from the space and kept for ten minutes; the journal and meeting folders are left out), and returns **the complete updated
    page body**. A journal page is short and a new one is made every day, and the pages are backed up, so rewriting the whole entry is the design:
-   it can add, regroup, merge duplicates and apply what you asked for. The prompt tells it to keep everything else exactly (same words, order and
-   format), to match the page's style (bullet character, indentation, time prefixes, `* [ ]` tasks, `[due: ...]` attributes), to mark a task done
-   only if you say it is done, and never to delete something unless you said so or it is an exact duplicate.
+   it can add, regroup, merge duplicates and apply what you asked for. **Every update organises the whole entry under second-level headings**: the
+   headings the page already has are kept and used (including ones like `## Tomorrow`), new headings are added only for items that fit none, and a
+   flat list is grouped for the first time. The default headings are `## Done` (what happened, in order), `## Notes` (observations, ideas) and
+   `## Tasks` (all checkbox tasks, open ones first and by due date, finished ones last); when two or more items concern the same project or person
+   that exists in your space, a heading with its link (`## [[Saga]]`) is used instead, and its tasks may stay under it. The order of the headings
+   stays stable and an empty heading is left out. Existing items keep their words, order within a heading, indentation and format (a nested bullet
+   stays under its parent): they move to the right heading and are not rewritten. The prompt also tells it to match the page's style (bullet
+   character, time prefixes, `* [ ]` tasks, `[due: ...]` attributes), to mark a task done only if you say it is done, and never to delete
+   something unless you said so or it is an exact duplicate.
 3. What the code does with the answer: the **frontmatter is always the old one** (the model's is ignored); **lines the model left unchanged are
    kept byte for byte** (matched one to one), so your own `${...}` expressions survive; every **new or changed line** is cleaned (control
    characters removed, `${`, `<!--` and code fences neutralised, at most 400 characters) and its **references are verified**: a `[[link]]` must
