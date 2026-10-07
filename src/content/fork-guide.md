@@ -63,6 +63,7 @@ Handy is driven by voice through the community fork (`kolaf/handy/`); Talon swit
 - **Models:** "model parakeet|norwegian|whisper small...", "model picker", "language model local|cloud".
 - **Meetings:** "transcribe latest meeting|recording" (add "with speakers", or "for <project>"), and in Explorer "transcribe meeting [norwegian|english]".
 - **Journal:** "update journal".
+- **SilverBullet in the browser:** commands that all start with "silver": "silver page", "silver open <page>", "silver commands", "silver journal today", "silver bold", "silver task" ... (list in `kolaf/silverbullet/README.md`).
 - **Terminal:** "learn this repo"; say "terminal help" for the rest.
 
 ## Command line

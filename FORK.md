@@ -553,6 +553,19 @@ The commands that copy the selection first (`reply to this`, `edit this`, the tr
 a terminal; see "How the selection is copied". `scratch dictation`, `redo` and a transform on the last dictation press no copy key, so they are
 safe in terminals.
 
+### SilverBullet in the browser (`kolaf/silverbullet/`)
+
+About 40 commands that all start with **"silver"** and send SilverBullet's default keyboard shortcuts (Windows and Linux; `Mod` = Ctrl; `kolaf/silverbullet/README.md`
+has the whole table with each key). They are active in every browser, because SilverBullet's tab titles are only page names, so Talon cannot tell its tab from another
+one; the prefix keeps them from colliding with anything else. Groups: finding and moving ("silver page", "silver open <text>", "silver commands", "silver run <text>",
+"silver home", "silver back", "silver tree", "silver graph", "silver tab" with Rango and the setting `user.kolaf_silverbullet_url`), journal ("silver journal today|previous|next",
+"silver quick note", "silver from template"), writing ("silver bold|italic|strike through|quote|make list|delete line|indent|outdent|comment|marker"), tasks and outline
+("silver task", "silver move up|down|left|right", "silver fold"), pages through the palette ("silver rename|delete|copy page") and system ("silver export", "silver reload").
+**Checked** against a real SilverBullet 2.12.0 in a headless Chrome (the throwaway instance, see "Testing the SilverBullet features"): the page picker, meta picker, tag picker, command palette,
+journal today and previous, quick note, bold, italic, strike through, delete line and indent. `Ctrl-g h` (home), which the documentation lists, did not work there, so "silver home" runs
+"Navigate: Home" through the palette, which did. **Not working or not seen working in the test:** "silver quote" (`Ctrl-Shift-.`) and "silver task" (`Ctrl-. t`); the rest come from
+SilverBullet's source and are untried. Not verified by voice at all, and the files could not be loaded into Talon on this machine.
+
 ### The lists you can edit
 
 - `kolaf/handy/prompts.talon-list` (what you can say after `dictate as` and `redo as`; the value is a prompt id): simple, plain -> `simple`;
