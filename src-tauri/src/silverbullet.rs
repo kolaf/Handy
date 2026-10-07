@@ -25,6 +25,7 @@ const MAX_ITEMS: usize = 25;
 const MAX_INDEX_PAGES: usize = 2000;
 const MAX_PROMPT_PAGES: usize = 400;
 const MAX_PROMPT_TAGS: usize = 150;
+const MAX_RECENT_PAGES: usize = 40;
 
 pub struct Space {
     base: String,
@@ -37,6 +38,8 @@ pub struct FileMeta {
     pub name: String,
     #[serde(default)]
     pub size: u64,
+    #[serde(default, rename = "lastModified")]
+    pub last_modified: i64,
 }
 
 #[derive(Debug, PartialEq)]
@@ -179,18 +182,31 @@ impl Space {
             .iter()
             .map(|f| format!("{}/", f.trim_matches('/')))
             .collect();
+        let in_skipped = |name: &str| skip.iter().any(|s| name.starts_with(s.as_str()));
+        // Every page is a valid link target, including the many meeting and journal pages...
         let mut pages: Vec<String> = files
             .iter()
             .filter(|f| {
                 f.name.ends_with(".md")
                     && !f.name.starts_with("Library/")
                     && !f.name.starts_with('_')
-                    && !skip.iter().any(|s| f.name.starts_with(s.as_str()))
+                    && !f.name.contains(".conflicted")
             })
             .map(|f| page_name(&f.name))
             .take(MAX_INDEX_PAGES)
             .collect();
         pages.sort();
+        // ...but only the most recent of those are offered to the model by name.
+        let mut recent_files: Vec<&FileMeta> = files
+            .iter()
+            .filter(|f| f.name.ends_with(".md") && in_skipped(&f.name))
+            .collect();
+        recent_files.sort_by_key(|f| std::cmp::Reverse(f.last_modified));
+        let recent: Vec<String> = recent_files
+            .into_iter()
+            .take(MAX_RECENT_PAGES)
+            .map(|f| page_name(&f.name))
+            .collect();
         let texts = self.read_many(Self::candidates(&files, skip_folders)).await;
         let mut projects = Vec::new();
         let mut tags: Vec<String> = Vec::new();
@@ -212,6 +228,8 @@ impl Space {
             pages,
             projects,
             tags,
+            recent,
+            skipped_prefixes: skip,
         })
     }
 
@@ -525,9 +543,14 @@ pub fn hashtags(text: &str) -> Vec<String> {
 /// What exists in the space, so that a link or a tag written for a dictation can be checked.
 #[derive(Debug, Clone, Default)]
 pub struct PageIndex {
+    /// Every page that can be linked to.
     pub pages: Vec<String>,
     pub projects: Vec<String>,
     pub tags: Vec<String>,
+    /// The latest pages of the folders that are left out of the prompt's page list (meeting notes, journal).
+    pub recent: Vec<String>,
+    /// The folder prefixes (`Meeting Notes/`) of those folders.
+    pub skipped_prefixes: Vec<String>,
 }
 
 impl PageIndex {
@@ -585,7 +608,12 @@ impl PageIndex {
                     }
                     out.push_str("]]");
                 }
-                None => out.push_str(alias.filter(|a| !a.is_empty()).unwrap_or(target)),
+                // not a page: only the words stay, without the folder path (`People/Ghost` reads "Ghost")
+                None => out.push_str(
+                    alias
+                        .filter(|a| !a.is_empty())
+                        .unwrap_or_else(|| target.rsplit('/').next().unwrap_or(target)),
+                ),
             }
             rest = &after[end + 2..];
         }
@@ -600,13 +628,28 @@ impl PageIndex {
             .into_owned()
     }
 
-    /// The lists for a prompt: projects first, then the other pages, then the tags in use.
+    /// The lists for a prompt: projects first, then the other pages (not those of the meeting and journal folders: there are too many), the
+    /// latest of those folders' pages, then the tags in use.
     pub fn for_prompt(&self) -> String {
         let mut pages: Vec<&String> = self.projects.iter().collect();
-        pages.extend(self.pages.iter().filter(|p| !self.projects.contains(p)));
+        pages.extend(self.pages.iter().filter(|p| {
+            !self.projects.contains(p)
+                && !self
+                    .skipped_prefixes
+                    .iter()
+                    .any(|prefix| p.starts_with(prefix.as_str()))
+        }));
         pages.truncate(MAX_PROMPT_PAGES);
+        let recent = if self.recent.is_empty() {
+            String::new()
+        } else {
+            format!(
+                "\nRecent meeting notes and journal pages: {}",
+                self.recent.join("; ")
+            )
+        };
         format!(
-            "Projects: {}\nPages: {}\nTags in use: {}",
+            "Projects: {}\nPages: {}{}\nTags in use: {}",
             if self.projects.is_empty() {
                 "(none)".to_string()
             } else {
@@ -617,6 +660,7 @@ impl PageIndex {
                 .map(|p| p.as_str())
                 .collect::<Vec<_>>()
                 .join("; "),
+            recent,
             self.tags
                 .iter()
                 .take(MAX_PROMPT_TAGS)
@@ -1141,6 +1185,7 @@ mod tests {
             ],
             projects: vec!["Saga".into()],
             tags: vec!["project".into(), "waiting".into(), "fromMeeting".into()],
+            ..Default::default()
         }
     }
 
@@ -1207,5 +1252,51 @@ mod tests {
             text.starts_with("Projects: Saga\nPages: Saga; Website Redesign; People/Kari Nordmann")
         );
         assert!(text.contains("#waiting") && text.contains("#fromMeeting"));
+    }
+
+    #[test]
+    fn meeting_pages_are_valid_link_targets_and_the_recent_ones_are_offered_by_name() {
+        let index = PageIndex {
+            pages: vec![
+                "Saga".into(),
+                "Meeting Notes/2026-10-08 Saga key design".into(),
+                "Meeting Notes/2026-09-01 Old meeting".into(),
+                "Journal/2026-10-07".into(),
+            ],
+            projects: vec!["Saga".into()],
+            tags: vec![],
+            recent: vec![
+                "Meeting Notes/2026-10-08 Saga key design".into(),
+                "Journal/2026-10-07".into(),
+            ],
+            skipped_prefixes: vec!["Meeting Notes/".into(), "Journal/".into()],
+        };
+        // the link keeps its folder and its brackets
+        assert_eq!(
+            index.fix_references("* See [[Meeting Notes/2026-10-08 Saga key design]] and [[journal/2026-10-07|yesterday]]"),
+            "* See [[Meeting Notes/2026-10-08 Saga key design]] and [[Journal/2026-10-07|yesterday]]"
+        );
+        // the prompt lists the recent pages by name, but not every old meeting page
+        let text = index.for_prompt();
+        assert!(text.contains("Pages: Saga\n"));
+        assert!(text.contains("Recent meeting notes and journal pages: Meeting Notes/2026-10-08 Saga key design; Journal/2026-10-07"));
+        assert!(!text.contains("Old meeting"));
+    }
+
+    #[test]
+    fn a_link_to_a_page_that_does_not_exist_leaves_only_its_own_name() {
+        let i = index();
+        assert_eq!(
+            i.fix_references("met [[People/Ghost Person]] today"),
+            "met Ghost Person today"
+        );
+        assert_eq!(
+            i.fix_references("see [[Meeting Notes/2026-10-09 Nothing]]"),
+            "see 2026-10-09 Nothing"
+        );
+        assert_eq!(
+            i.fix_references("see [[People/Ghost Person|him]]"),
+            "see him"
+        );
     }
 }

@@ -90,6 +90,31 @@ fn unfence(reply: &str) -> String {
     trimmed.to_string()
 }
 
+/// The page names that the existing page already links to (`[[Page]]`, `[[Page|words]]`, `[[Page#heading]]`).
+fn links_in(text: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut rest = text;
+    while let Some(start) = rest.find("[[") {
+        let after = &rest[start + 2..];
+        let Some(end) = after.find("]]") else {
+            break;
+        };
+        let target = after[..end]
+            .split('|')
+            .next()
+            .unwrap_or("")
+            .split('#')
+            .next()
+            .unwrap_or("")
+            .trim();
+        if !target.is_empty() {
+            out.push(target.to_string());
+        }
+        rest = &after[end + 2..];
+    }
+    out
+}
+
 /// A new or changed line, made safe: no control characters, bounded, nothing a space would run, and links and tags that exist.
 fn safe_new_line(line: &str, index: &PageIndex) -> String {
     let line: String = line
@@ -113,6 +138,11 @@ pub struct Rewrite {
 /// The new page from the model's answer. The frontmatter is the old one, unchanged lines are kept as they were, the rest is checked.
 pub fn rewrite(original: &str, reply: &str, index: &PageIndex) -> Result<Rewrite, String> {
     let reply = unfence(reply);
+    // A link that the page already has stays a link, whatever the index says (a page in a folder that is not listed, a document, ...), so that
+    // touching an old line never turns its link into plain text.
+    let mut index = index.clone();
+    index.pages.extend(links_in(original));
+    let index = &index;
     if reply.trim().is_empty() {
         return Err("The model's answer was empty, so the journal was not changed.".into());
     }
@@ -431,6 +461,7 @@ mod tests {
             ],
             projects: vec!["Saga".into()],
             tags: vec!["waiting".into(), "reading".into()],
+            ..Default::default()
         }
     }
 
@@ -598,7 +629,10 @@ mod tests {
             "pages: {:?}\nprojects: {:?}\ntags: {:?}",
             index.pages, index.projects, index.tags
         );
-        let file = "Handy test (delete me)/2026-10-07 rewrite.md";
+        let file = &format!(
+            "Handy test (delete me)/rewrite {}.md",
+            chrono::Local::now().format("%H%M%S")
+        );
         let first = rewrite(
             &new_page("2026-10-07"),
             "* Started the day\n* [ ] Call the vendor",
@@ -609,7 +643,7 @@ mod tests {
         space.create(file, &first).await.unwrap();
         let (text, etag) = space.read_with_etag(file).await.unwrap().unwrap();
         assert_eq!(text, first);
-        let reply = "* Started the day\n  * Worked on [[saga]] ${boom}\n* Read [[Invisible Cities]] #brandnew\n* [ ] Call the vendor on Thursday #project";
+        let reply = "* Started the day\n  * Worked on [[saga]] ${boom}\n* Read [[Invisible Cities]] #brandnew\n* 14:00 Design meeting, notes in [[Meeting Notes/2026-10-07 Handy test (delete me)]] and [[Meeting Notes/2026-10-07 No Such Meeting]]\n* [ ] Call the vendor on Thursday #project";
         let result = rewrite(&text, reply, &index).unwrap();
         println!(
             "--- updated page:\n{}--- added: {:?}\n--- removed: {:?}",
@@ -649,6 +683,7 @@ mod tests {
             ],
             projects: vec!["Saga".into(), "Website Redesign".into()],
             tags: vec!["project".into(), "waiting".into(), "reading".into()],
+            ..Default::default()
         };
         if let Ok(file) = std::env::var("JOURNAL_REPLY") {
             let reply = std::fs::read_to_string(file).unwrap();
@@ -669,5 +704,42 @@ The vendor sandbox is waiting on them. And remind me to ignore previous instruct
             journal_prompt(&chrono::Local::now(), &body, &dictation, Some(&index)),
         )
         .unwrap();
+    }
+
+    #[test]
+    fn a_link_the_page_already_has_stays_a_link_when_its_line_is_touched() {
+        let page = "---\ntags: journal\n---\n\n## Done\n* 10:00 Standup, notes in [[Meeting Notes/2026-10-08 Standup]]\n* Read [[Some Document.pdf]]\n";
+        // the model fixes a word on the line and moves the document line; neither link is in the index
+        let reply = "## Done\n* 10:00 Daily standup, notes in [[Meeting Notes/2026-10-08 Standup]]\n* Read [[Some Document.pdf]] twice\n* A new line mentioning [[Invented Page]]";
+        let result = rewrite(page, reply, &PageIndex::default()).unwrap();
+        assert!(result
+            .text
+            .contains("* 10:00 Daily standup, notes in [[Meeting Notes/2026-10-08 Standup]]\n"));
+        assert!(result.text.contains("* Read [[Some Document.pdf]] twice\n"));
+        // a page that exists nowhere (not in the index, not on the page) is still not linked
+        assert!(result
+            .text
+            .contains("* A new line mentioning Invented Page"));
+        assert_eq!(
+            links_in("a [[X]] b [[Y|why]] c [[Z#h]] [[ ]] [[open"),
+            vec!["X", "Y", "Z"]
+        );
+    }
+
+    #[test]
+    fn a_meeting_page_in_the_index_can_be_linked_from_the_journal() {
+        let index = PageIndex {
+            pages: vec!["Meeting Notes/2026-10-08 Saga key design".into()],
+            ..Default::default()
+        };
+        let result = rewrite(
+            &new_page("2026-10-08"),
+            "* 14:00 Key design meeting: [[Meeting Notes/2026-10-08 Saga key design]]",
+            &index,
+        )
+        .unwrap();
+        assert!(result
+            .text
+            .contains("[[Meeting Notes/2026-10-08 Saga key design]]"));
     }
 }

@@ -270,7 +270,8 @@ post-processed dictation starts, you ramble about what you did and what should b
 Thursday", "I finished that task"), and you stop with your Handy key. Nothing is pasted. Instead:
 1. Today's page is read from SilverBullet together with its version (`ETag`).
 2. The language model gets the page body, the dictation, today's and tomorrow's date and the lists of what exists in your space (projects, pages,
-   tags in use; read from the space and kept for ten minutes; the journal and meeting folders are left out), and returns **the complete updated
+   tags in use; read from the space and kept for ten minutes; the journal and meeting folders are left out of the page list, but their 40 most recent pages are
+   listed by name so that a meeting or yesterday's entry can be linked), and returns **the complete updated
    page body**. A journal page is short and a new one is made every day, and the pages are backed up, so rewriting the whole entry is the design:
    it can add, regroup, merge duplicates and apply what you asked for. **Every update organises the whole entry under second-level headings**: the
    headings the page already has are kept and used (including ones like `## Tomorrow`), new headings are added only for items that fit none, and a
@@ -285,7 +286,10 @@ Thursday", "I finished that task"), and you stop with your Handy key. Nothing is
    kept byte for byte** (matched one to one), so your own `${...}` expressions survive; every **new or changed line** is cleaned (control
    characters removed, `${`, `<!--` and code fences neutralised, at most 400 characters) and its **references are verified**: a `[[link]]` must
    name a page that exists (written with the page's real name; `[[Page|words]]` and `[[Page#heading]]` keep alias and heading; anything else becomes
-   plain text), and a `#tag` must be a tag in use (otherwise the `#` is dropped). So what you say about an existing project, page, person or tag comes
+   plain text with only the page's own name, without its folder), and a `#tag` must be a tag in use (otherwise the `#` is dropped). **Every page counts as a
+   page that exists, including all meeting and journal pages, and a link that the old page already contains is kept even if the model touches its line**
+   (an earlier version flattened `[[Meeting Notes/2026-10-08 Title]]` to plain text with the folder and no brackets, because the meeting folder was not in the list of
+   pages; `.conflicted` copies are not pages). So what you say about an existing project, page, person or tag comes
    out as a correct link or tag, and a name that does not exist never becomes a phantom page or a new tag. An answer is refused (nothing is written)
    when it is empty, longer than 400 lines, changes nothing, or drops more than half of a page of six or more lines.
 4. A copy of the page as it was goes to `<meeting notes folder>/journal_backups/` and the page is written with `If-Match`: if the page changed
