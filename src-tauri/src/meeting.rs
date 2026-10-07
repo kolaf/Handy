@@ -259,8 +259,8 @@ async fn open_project(
     Ok((space, context))
 }
 
-/// Creates the meeting page and its transcript page in the space (create-only; a name that is taken gets "(2)"). Returns the page address and
-/// a note about anything that went wrong after the meeting page was made.
+/// Creates the meeting page in the space (create-only; a name that is taken gets "(2)"). The transcript is NOT put into the space: it stays in
+/// the local file next to the local minutes. Returns the page address.
 #[allow(clippy::too_many_arguments)]
 async fn publish(
     cfg: &MeetingSettings,
@@ -268,11 +268,10 @@ async fn publish(
     project: &str,
     title: &str,
     minutes: &str,
-    transcript: &str,
     actions: &silverbullet::Actions,
     warning: Option<&str>,
     files: usize,
-) -> Result<(String, Option<String>), String> {
+) -> Result<String, String> {
     let title = silverbullet::safe_title(title);
     let now = chrono::Local::now();
     let date = now.format("%Y-%m-%d").to_string();
@@ -289,7 +288,6 @@ async fn publish(
         } else {
             format!("{folder}/{date} {title} ({n})")
         };
-        let transcript_name = format!("{base} transcript");
         let page = silverbullet::render_meeting_page(&silverbullet::MeetingPage {
             title: &title,
             date: &date,
@@ -297,21 +295,12 @@ async fn publish(
             project: Some(project),
             minutes,
             actions,
-            transcript_page: Some(&transcript_name),
             tag: &cfg.silverbullet_tag,
             files,
             warning,
         });
         match space.create(&format!("{base}.md"), &page).await {
-            Ok(()) => {
-                let transcript_page =
-                    silverbullet::render_transcript_page(&title, &date, &base, transcript);
-                let extra = match space.create(&format!("{transcript_name}.md"), &transcript_page).await {
-                    Ok(()) => None,
-                    Err(e) => Some(format!("The transcript page could not be created ({e:?}); the transcript is in the local file")),
-                };
-                return Ok((space.page_url(&base), extra));
-            }
+            Ok(()) => return Ok(space.page_url(&base)),
             Err(silverbullet::CreateError::Exists) => continue,
             Err(silverbullet::CreateError::Other(e)) => return Err(e),
         }
@@ -695,24 +684,22 @@ async fn run_job(
                         &context.name,
                         &title_for_page,
                         &text,
-                        &transcript,
                         &actions,
                         sb_warning.as_deref(),
                         files.len(),
                     )
                     .await
                     {
-                        Ok((url, extra)) => {
+                        Ok(url) => {
                             if let Ok(mut last) = LAST_PAGE_URL.lock() {
                                 *last = Some(url.clone());
                             }
                             format!(
-                                "SilverBullet: {url} (project {}; {} proposed task(s), {} possibly completed, {} news){}\n",
+                                "SilverBullet: {url} (project {}; {} proposed task(s), {} possibly completed, {} news; the transcript stays in the local file)\n",
                                 context.name,
                                 actions.tasks.len(),
                                 actions.completed.len(),
-                                actions.info.len(),
-                                extra.map(|e| format!(". {e}")).unwrap_or_default()
+                                actions.info.len()
                             )
                         }
                         Err(e) => {

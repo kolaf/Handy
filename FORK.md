@@ -236,13 +236,14 @@ lists the pages tagged project. With a project chosen (page dropdown, `--meeting
 3. A second step asks the language model for a JSON object with `proposed_tasks`, `possibly_completed` and `new_information`. The reply is checked in
    code: single bounded lines, no links or hashtags, and a "possibly completed" entry must match a task that really is open (the text on the page is
    used, not the model's wording).
-4. The local files are saved as before. Then two **new** pages are created in the space, create-only (`If-None-Match: *`, a taken name gets "(2)"):
+4. The local files are saved as before. Then one **new** page is created in the space, create-only (`If-None-Match: *`, a taken name gets "(2)"):
    `Meeting Notes/<date> <title>` (frontmatter `tags: meeting`, `project`, `date`, `createdBy: Handy`; the minutes; "Proposed tasks (from the
    meeting, not reviewed)" as `* [ ] ... [[Saga]] #fromMeeting`, which the project's Linked Tasks widget shows without the project page being edited;
    "Possibly completed (existing tasks; nothing was changed, tick them yourself)", which only quotes the tasks; "Proposed new information for
-   [[Saga]] (not added to the project page)"; a link to the transcript) and `... transcript`. The page that opens afterwards is the SilverBullet one.
-   Existing pages and tasks are never edited, ticked or deleted; a failure in SilverBullet does not fail the job (the local files are complete, and
-   the Activity entry says what went wrong). Without a project nothing is sent to SilverBullet.
+   [[Saga]] (not added to the project page)"). **The transcript is not put into the space**: it stays in the local `-transcript.txt` next to the
+   local minutes. The page that opens afterwards is the SilverBullet one. Existing pages and tasks are never edited, ticked or deleted; a failure
+   in SilverBullet does not fail the job (the local files are complete, and the Activity entry says what went wrong). Without a project nothing is
+   sent to SilverBullet.
 5. **The same layout as your own minutes.** `fork/silverbullet/Meeting Minutes.md` is a SilverBullet page template (tagged `meta/template/page`,
    command "Meeting: New Minutes", suggested name `Meeting Notes/<date> Meeting`; created in the space as `Templates/Meeting Minutes`; after creating
    it run "System: Reload" once). It has the frontmatter Handy writes (`tags: meeting`, `project`, `date`) and the sections Summary, Attendees,

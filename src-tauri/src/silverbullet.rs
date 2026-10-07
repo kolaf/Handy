@@ -770,7 +770,6 @@ pub struct MeetingPage<'a> {
     pub project: Option<&'a str>,
     pub minutes: &'a str,
     pub actions: &'a Actions,
-    pub transcript_page: Option<&'a str>,
     pub tag: &'a str,
     pub files: usize,
     /// A note about something that did not work (the project context could not be read, for example).
@@ -841,23 +840,7 @@ pub fn render_meeting_page(p: &MeetingPage) -> String {
         }
         out.push('\n');
     }
-    if let Some(transcript) = p.transcript_page {
-        out.push_str(&format!("## Transcript\n\n[[{transcript}]]\n"));
-    }
     out
-}
-
-pub fn render_transcript_page(
-    title: &str,
-    date: &str,
-    meeting_page: &str,
-    transcript: &str,
-) -> String {
-    format!(
-        "---\ntags: transcript\ndate: {date}\ncreatedBy: Handy\n---\n\n# Transcript: {title}\n\nPart of [[{meeting_page}]]. Written by Handy from the recording; \
-         it may contain mistakes.\n\n{}\n",
-        neutralize(transcript.trim())
-    )
 }
 
 #[cfg(test)]
@@ -1007,7 +990,6 @@ mod tests {
             project: Some("Saga"),
             minutes: "## Decisions\n- Use ${bad} keys",
             actions: &actions,
-            transcript_page: Some("Meeting Notes/2026-10-07 Key management transcript"),
             tag: "fromMeeting",
             files: 2,
             warning: None,
@@ -1021,7 +1003,8 @@ mod tests {
         assert!(
             page.contains("Proposed new information for [[Saga]] (not added to the project page)")
         );
-        assert!(page.contains("[[Meeting Notes/2026-10-07 Key management transcript]]"));
+        // the transcript is never put into the space
+        assert!(!page.contains("## Transcript") && !page.contains("transcript]]"));
         assert!(!page.contains("${bad}"));
         // an existing task is only ever quoted, never written as a task line
         assert!(!page.contains("* [ ] Review the SPI draft"));
@@ -1039,7 +1022,6 @@ mod tests {
                 tasks: vec!["Do x".into()],
                 ..Default::default()
             },
-            transcript_page: None,
             tag: "",
             files: 1,
             warning: Some("The project could not be read."),
@@ -1133,7 +1115,6 @@ mod tests {
             info: vec!["The deadline moved to March (test)".into()],
         };
         let name = "Meeting Notes/2026-10-07 Handy test (delete me)";
-        let transcript_name = format!("{name} transcript");
         let page = render_meeting_page(&MeetingPage {
             title: "Handy test (delete me)",
             date: "2026-10-07",
@@ -1141,27 +1122,12 @@ mod tests {
             project: Some(&project),
             minutes: "## Summary\nThis page was created by a Handy test. Delete it.\n\n## Decisions\n- Nothing real.",
             actions: &actions,
-            transcript_page: Some(&transcript_name),
             tag: "fromMeeting",
             files: 1,
             warning: None,
         });
         let used = space.create_unique(name, &page).await.unwrap();
-        let transcript = render_transcript_page(
-            "Handy test (delete me)",
-            "2026-10-07",
-            &used,
-            "[00:00] Speaker 1: This is a test transcript.",
-        );
-        let used_t = space
-            .create_unique(&transcript_name, &transcript)
-            .await
-            .unwrap();
-        println!(
-            "created: {} and {}",
-            space.page_url(&used),
-            space.page_url(&used_t)
-        );
+        println!("created: {}", space.page_url(&used));
         let back = space.read(&format!("{used}.md")).await.unwrap();
         assert!(back.contains("#fromMeeting"));
     }
