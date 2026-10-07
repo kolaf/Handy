@@ -489,7 +489,9 @@ All in `fork/prompts/`.
   `handy-prompts.json` and `src-tauri/src/dev_prompts.json`.
 - `dev_prompts.json` is compiled into the app: **fresh settings and portable installs start with these prompts** and `super`
   selected. Existing installs keep what they have stored (a portable update never touches `Data\`); update the built-in prompts with
-  `python3 fork/scripts/install-prompts.py` (close Handy first; it makes a backup). **Exception:** at start Handy adds the prompts that features
+  `python3 fork/scripts/install-prompts.py PATH` (close Handy first: the script checks and refuses while it runs; it makes a backup). **Give the path of the
+  settings file your Handy really uses**: a portable Handy keeps it in `<folder>/Data/settings_store.json`, an installed one in `%APPDATA%\com.pais.handy`. Without a path the
+  script lists the files it finds and stops if there is more than one. **Exception:** at start Handy adds the prompts that features
   depend on if they are missing from the stored list: `edit` ("edit this"), `reply` ("reply to this") and the transforms `t_*` ("make that
   formal" ...). A prompt that exists is never changed, so your edits stay, and an ordinary built-in prompt that you deleted stays deleted.
   (Before this, an old `Data\` without `edit` gave "Prompt not found" for "edit this".) Changed *text* of built-in prompts still needs
