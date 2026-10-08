@@ -283,6 +283,7 @@ Thursday", "I finished that task"), and you stop with your Handy key. Nothing is
    task done only if you say it is done, and never to delete something unless you said so or it is an exact duplicate. If the answer still leaves a
    flat list or a block of three or more bullet fragments, **a second, narrow request** asks only for the grouping into topics and paragraphs; it is
    used only if it keeps the words (see the guard below) and is better organised, otherwise the first answer stands.
+   **Language.** The prompt forbids translating: text already in the entry keeps its language, new text is written in the language of the dictation, and a heading follows the text under it, so one Norwegian paragraph no longer turns an English entry Norwegian (the earlier wording "keep the entry's language" made the model translate everything).
    **Tight text.** The prompt asks for short, plain sentences with the point first, no filler and nothing said twice, and for bullets where they read
    better (separate points, questions, steps, real lists) but never for fragments of one story; every fact, number, section number and the meaning of
    every question or opinion must stay (the guard refuses an answer that has lost more than half of the words of a page of 40 or more words).

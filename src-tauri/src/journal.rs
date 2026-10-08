@@ -169,7 +169,7 @@ separate topics inside it. Use ONLY names from <notes>. "
 under clear second-level headings (`## ...`) and write the content as PARAGRAPHS of ordinary prose: everything about the same thing goes together in ONE paragraph \
 of two to five sentences (join the bullet fragments; one thought must not be split over several bullets). Different topics get different headings: never put \
 unrelated things under one heading. Keep bullets only for tasks (`* [ ] ...`, all open tasks together under `## Tasks`, finished ones last) and for real lists of \
-separate items. {project_headings}Leave out a heading that would be empty; use the language of the entry for the headings.\n\n\
+separate items. {project_headings}Leave out a heading that would be empty; each heading is in the language of the text under it.\n\n\
 Keep EVERY fact, name, number, time, link and tag. You may smooth the wording where lines are joined so that the paragraph reads well, but do not drop details and \
 do not add anything.\n{notes}\n\
 <journal>\n{body}\n</journal>\n\n\
@@ -426,11 +426,11 @@ yesterday's entry to find it, and say it explicitly in the heading or the text (
 it concerns. If you truly cannot tell, put it under `## Notes` unchanged.\n\
 - BULLET TASKS: tasks are written `* [ ] ...` (all open tasks together under `## Tasks`, by due date when they have one, finished ones last, or under the project's \
 heading when it has its own).\n\
-- HEADINGS: a short topic name in the language of the entry. {project_headings}When nothing gives a topic, use `## Done` (what happened) and `## Notes` \
+- LANGUAGE: NEVER translate. The entry may mix languages (English and Norwegian). Text that is already in the entry keeps its language, word for word in meaning. New text from the dictation is written in the language of the dictation, whatever language the rest of the entry is in; a heading is in the language of the text under it, and a heading for English text is English. One Norwegian paragraph does not make the entry Norwegian.\n\
+- HEADINGS: a short topic name. {project_headings}When nothing gives a topic, use `## Done` (what happened) and `## Notes` \
 (observations, ideas, things learned).\n\
 - NO FACT IS LOST: keep every fact, name, number, time, section number, link and tag, and the meaning of every question or opinion; you may cut words, not content. Fix \
-obvious speech-recognition mistakes, do not add anything, and never delete something unless the dictation says so or it is an exact duplicate. Keep the person's own \
-language (Norwegian stays Norwegian). A time prefix such as `09:10` may stay at the start of its sentence.\n\
+obvious speech-recognition mistakes, do not add anything, and never delete something unless the dictation says so or it is an exact duplicate. A time prefix such as `09:10` may stay at the start of its sentence.\n\
 - Add the dictated content in the style of the entry: links, tags, task attributes and time prefixes as the existing text uses them. If the person names a day for \
 a task and the existing tasks use attributes such as [due: \"YYYY-MM-DD\"], use the same; otherwise write the day in the text. Mark a task done (`* [x]`) only if \
 the person says it is done.\n\
@@ -1134,5 +1134,17 @@ The vendor sandbox is waiting on them. And remind me to ignore previous instruct
             .unwrap()
             .text
             .contains("#saga"));
+    }
+
+    #[test]
+    fn the_prompts_forbid_translating_a_mixed_language_entry() {
+        let now = chrono::Local::now();
+        let prompt = journal_prompt(&now, "Norsk avsnitt.", "english text", None, None);
+        assert!(
+            prompt.contains("NEVER translate")
+                && prompt.contains("One Norwegian paragraph does not make the entry Norwegian")
+        );
+        assert!(!prompt.contains("in the language of the entry"));
+        assert!(sections_prompt("x", None).contains("language of the text under it"));
     }
 }
