@@ -273,25 +273,29 @@ Thursday", "I finished that task"), and you stop with your Handy key. Nothing is
    tags in use; read from the space and kept for ten minutes; the journal and meeting folders are left out of the page list, but their 40 most recent pages are
    listed by name so that a meeting or yesterday's entry can be linked), and returns **the complete updated
    page body**. A journal page is short and a new one is made every day, and the pages are backed up, so rewriting the whole entry is the design:
-   it can add, regroup, merge duplicates and apply what you asked for. **Every update organises the whole entry under second-level headings**: the
-   headings the page already has are kept and used (including ones like `## Tomorrow`), new headings are added only for items that fit none, and a
-   flat list is grouped for the first time. The default headings are `## Done` (what happened, in order), `## Notes` (observations, ideas) and
-   `## Tasks` (all checkbox tasks, open ones first and by due date, finished ones last); when two or more items concern the same project or person
-   that exists in your space, a heading with its link (`## [[Saga]]`) is used instead, and its tasks may stay under it. The order of the headings
-   stays stable and an empty heading is left out. Existing items keep their words, order within a heading, indentation and format (a nested bullet
-   stays under its parent): they move to the right heading and are not rewritten. The prompt also tells it to match the page's style (bullet
-   character, time prefixes, `* [ ]` tasks, `[due: ...]` attributes), to mark a task done only if you say it is done, and never to delete
-   something unless you said so or it is an exact duplicate.
+   it can add, regroup, merge duplicates and apply what you asked for. **Every update organises the whole entry by topic under clear headings, with ordinary paragraphs under each**: the
+   headings the page already has are kept, a new heading is added for a topic that fits none, and unrelated topics never share a heading (news about
+   colleagues leaving and a design review get their own). **Under a heading the text is prose, not bullets**: sentences that belong to one thought are
+   joined into one paragraph, not split over bullets, and a blank line separates paragraphs. Bullets are kept only for tasks (`* [ ]`, collected under
+   `## Tasks`, open ones first and by due date, finished ones last) and for real lists such as things to buy. When statements concern a project or
+   person that exists in your space, the heading is its link (`## [[Saga]]`) with `###` sub-headings for the separate topics inside it; otherwise
+   `## Done` and `## Notes` are the fallback headings. Existing paragraphs and tasks keep their words (fragments are joined, not reworded); the prompt also tells it to match the page's style (`[due: ...]` attributes), to mark a
+   task done only if you say it is done, and never to delete something unless you said so or it is an exact duplicate. If the answer still leaves a
+   flat list or a block of three or more bullet fragments, **a second, narrow request** asks only for the grouping into topics and paragraphs; it is
+   used only if it keeps the words (see the guard below) and is better organised, otherwise the first answer stands.
+   **Tags are yours**: the journal is a brain dump that you tag afterwards, so the model does not tag on its own beyond links to pages in your space. Say
+   "hashtag Saga", "hash reading" or "tag this review" and the paragraph gets `#saga` (one lowercase word, spelled as in your space if the tag exists);
+   a tag you ask for out loud passes the check even if it is new, while any other tag the model writes must already be in use.
 3. What the code does with the answer: the **frontmatter is always the old one** (the model's is ignored); **lines the model left unchanged are
    kept byte for byte** (matched one to one), so your own `${...}` expressions survive; every **new or changed line** is cleaned (control
-   characters removed, `${`, `<!--` and code fences neutralised, at most 400 characters) and its **references are verified**: a `[[link]]` must
+   characters removed, `${`, `<!--` and code fences neutralised, at most 2000 characters) and its **references are verified**: a `[[link]]` must
    name a page that exists (written with the page's real name; `[[Page|words]]` and `[[Page#heading]]` keep alias and heading; anything else becomes
    plain text with only the page's own name, without its folder), and a `#tag` must be a tag in use (otherwise the `#` is dropped). **Every page counts as a
    page that exists, including all meeting and journal pages, and a link that the old page already contains is kept even if the model touches its line**
    (an earlier version flattened `[[Meeting Notes/2026-10-08 Title]]` to plain text with the folder and no brackets, because the meeting folder was not in the list of
    pages; `.conflicted` copies are not pages). So what you say about an existing project, page, person or tag comes
    out as a correct link or tag, and a name that does not exist never becomes a phantom page or a new tag. An answer is refused (nothing is written)
-   when it is empty, longer than 400 lines, changes nothing, or drops more than half of a page of six or more lines.
+   when it is empty, longer than 400 lines, changes nothing, or drops more than 40 % of the words of a page of 40 or more words (lines may be joined, so words are counted, not lines).
 4. A copy of the page as it was goes to `<meeting notes folder>/journal_backups/` and the page is written with `If-Match`: if the page changed
    while you were dictating (you edited it in the browser), nothing is written and the dictation is put on the clipboard (and is in History).
    This is the only place where Handy changes an existing SilverBullet page.
