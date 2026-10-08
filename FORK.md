@@ -283,6 +283,14 @@ Thursday", "I finished that task"), and you stop with your Handy key. Nothing is
    task done only if you say it is done, and never to delete something unless you said so or it is an exact duplicate. If the answer still leaves a
    flat list or a block of three or more bullet fragments, **a second, narrow request** asks only for the grouping into topics and paragraphs; it is
    used only if it keeps the words (see the guard below) and is better organised, otherwise the first answer stands.
+   **Tight text.** The prompt asks for short, plain sentences with the point first, no filler and nothing said twice, and for bullets where they read
+   better (separate points, questions, steps, real lists) but never for fragments of one story; every fact, number, section number and the meaning of
+   every question or opinion must stay (the guard refuses an answer that has lost more than half of the words of a page of 40 or more words).
+   **Reviewing a document.** Comments about a document you are reading ("in the SSL system design document ...", dictated in several updates through the day)
+   are collected under ONE heading, `## Review: SSL system design document` (linked, with the project, when the document or project is a page in your space),
+   as concise bullets in the order of the document; a loose description such as "the design document" is matched against the headings already there, your
+   pages and yesterday's entry. **Context.** Yesterday's entry (first 6000 characters, read-only, never changed or copied) is sent as background, and the prompt
+   asks that every point sits under a heading saying what it concerns, with the subject named, not "it", since the raw dictation is not kept.
    **Tags are yours**: the journal is a brain dump that you tag afterwards, so the model does not tag on its own beyond links to pages in your space. Say
    "hashtag Saga", "hash reading" or "tag this review" and the paragraph gets `#saga` (one lowercase word, spelled as in your space if the tag exists);
    a tag you ask for out loud passes the check even if it is new, while any other tag the model writes must already be in use.
@@ -295,7 +303,7 @@ Thursday", "I finished that task"), and you stop with your Handy key. Nothing is
    (an earlier version flattened `[[Meeting Notes/2026-10-08 Title]]` to plain text with the folder and no brackets, because the meeting folder was not in the list of
    pages; `.conflicted` copies are not pages). So what you say about an existing project, page, person or tag comes
    out as a correct link or tag, and a name that does not exist never becomes a phantom page or a new tag. An answer is refused (nothing is written)
-   when it is empty, longer than 400 lines, changes nothing, or drops more than 40 % of the words of a page of 40 or more words (lines may be joined, so words are counted, not lines).
+   when it is empty, longer than 400 lines, changes nothing, or drops more than half of the words of a page of 40 or more words (lines may be joined, so words are counted, not lines).
 4. A copy of the page as it was goes to `<meeting notes folder>/journal_backups/` and the page is written with `If-Match`: if the page changed
    while you were dictating (you edited it in the browser), nothing is written and the dictation is put on the clipboard (and is in History).
    This is the only place where Handy changes an existing SilverBullet page.
