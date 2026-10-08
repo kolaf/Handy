@@ -902,7 +902,8 @@
     "noticeJournalFailed": "Journal not updated (see Activity)",
     "noticeLlm": "Language model: {{value}}",
     "noticeLlmFailed": "Could not switch language model (see Activity)",
-    "noticeMeeting": "Meeting minutes saved: {{value}}"
+    "noticeMeeting": "Meeting minutes saved: {{value}}",
+    "loadingModel": "Loading model..."
   },
   "secureInput": {
     "blockedWithCulprit_one": "{{name}} may be blocking 1 shortcut",
