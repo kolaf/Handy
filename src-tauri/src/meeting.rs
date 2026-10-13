@@ -6,7 +6,8 @@
 //! (`<folder>/<time>-<title>.md` and `...-transcript.txt`) and the minutes opened. Progress goes to the Meetings page and
 //! the result to the Activity page.
 
-use crate::audio_toolkit::audio::FrameResampler;
+use rubato::audioadapter_buffers::direct::InterleavedSlice;
+use rubato::{Fft, FixedSync, Resampler, WindowFunction};
 use crate::settings::{get_settings, write_settings, AppSettings, MeetingSettings};
 use crate::silverbullet::{self, ProjectContext, Space};
 use log::{info, warn};
@@ -138,15 +139,25 @@ pub fn resample_to_16k(samples: &[f32], in_hz: u32) -> Vec<f32> {
     if in_hz == TARGET_HZ {
         return samples.to_vec();
     }
-    let mut resampler = FrameResampler::new(
+    // Same settings as handy-recorder's live resampler (one FFT block of 1024, BlackmanHarris2).
+    let Ok(mut resampler) = Fft::<f32>::new_custom(
         in_hz as usize,
         TARGET_HZ as usize,
-        Duration::from_millis(30),
-    );
-    let mut out = Vec::with_capacity(samples.len() * TARGET_HZ as usize / in_hz as usize + 1024);
-    resampler.push(samples, |frame| out.extend_from_slice(frame));
-    resampler.finish(|frame| out.extend_from_slice(frame));
-    out
+        1024,
+        1,
+        1,
+        WindowFunction::BlackmanHarris2,
+        FixedSync::Input,
+    ) else {
+        return Vec::new();
+    };
+    let Ok(input) = InterleavedSlice::new(samples, 1, samples.len()) else {
+        return Vec::new();
+    };
+    match resampler.process_all(&input, samples.len(), None) {
+        Ok(out) => out.take_data(),
+        Err(_) => Vec::new(),
+    }
 }
 
 /// Cuts samples into pieces of `secs` seconds (the last one shorter).
