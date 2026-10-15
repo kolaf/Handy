@@ -19,3 +19,8 @@ src-tauri/src/catalog/catalog.json
 # Misc
 .DS_Store
 *.log
+
+# Fork-only files (prompts, skills, notes) keep their own formatting
+/FORK.md
+/fork/
+src-tauri/src/dev_prompts.json
