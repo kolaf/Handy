@@ -155,7 +155,7 @@ jobs:
           foreach ($need in 'handy.exe','onnxruntime.dll','msvcp140.dll','vcruntime140.dll','transcribe.dll') {
             if (-not (Test-Path "$out\$need")) { throw "$need is missing from the portable folder" }
           }
-          if (-not (Test-Path "$out\resources\models\silero_vad_v4.onnx")) { throw "the voice-detection model is missing from resources" }
+          if (-not (Test-Path "$out\resources\models\silero-vad-v6.2-F32.gguf")) { throw "the voice-detection model is missing from resources" }
           $zip = "Handy-${{ steps.meta.outputs.version }}-${{ steps.meta.outputs.sha }}-portable.zip"
           Compress-Archive -Path "$out\*" -DestinationPath $zip -Force
           Get-Item $zip | Select-Object Name,Length | Format-List
