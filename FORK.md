@@ -664,8 +664,8 @@ libayatana-appindicator3-dev librsvg2-dev libgtk-layer-shell0 libgtk-layer-shell
 
 ### Downloadable builds (GitHub Actions)
 
-`.github/workflows/fork-build.yml` builds the Windows portable zip (tests, `tauri build --no-bundle`, packaging with the VC++ runtime and
-ONNX Runtime DLLs; the job checks that the key files are in the zip) and the Ubuntu 22.04 `.deb` (through upstream's `build.yml`, unsigned).
+`.github/workflows/fork-build.yml` builds the Windows portable zip (tests, `tauri build --no-bundle`, packaging with the VC++ runtime
+DLLs; the job checks that the key files are in the zip) and the Ubuntu 22.04 `.deb` (through upstream's `build.yml`, unsigned).
 Start it by pushing a tag: `git tag build-N && git push git@github.com:kolaf/Handy.git build-N` (about 25 minutes). A tag build publishes a
 release `fork-<commit>` marked latest, so these addresses always serve the newest build:
 `https://github.com/kolaf/Handy/releases/latest/download/Handy_amd64.deb` and `.../Handy-portable.zip` (the versioned names are attached

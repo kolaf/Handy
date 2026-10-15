@@ -14,7 +14,7 @@ if ($LASTEXITCODE -ne 0) { "BUILD FAILED - not packaging"; "PORTABLE DONE (FAILE
 $rel = 'C:\dev\Handy\src-tauri\target\release'; $out = 'C:\dev\Handy-dev-portable'
 Remove-Item $out -Recurse -Force -ErrorAction SilentlyContinue; New-Item -ItemType Directory $out | Out-Null
 Copy-Item "$rel\handy.exe" $out; Copy-Item "$rel\*.dll" $out; Copy-Item "$rel\resources" "$out\resources" -Recurse
-foreach ($d in 'msvcp140*.dll','vcruntime140*.dll','vcomp140.dll','onnxruntime.dll') { Copy-Item "$env:LOCALAPPDATA\Handy\$d" $out -ErrorAction SilentlyContinue }
+foreach ($d in 'msvcp140*.dll','vcruntime140*.dll','vcomp140.dll') { Copy-Item "$env:LOCALAPPDATA\Handy\$d" $out -ErrorAction SilentlyContinue }
 Set-Content -Path "$out\portable" -Value 'Handy Portable Mode' -NoNewline
 $zip = "C:\dev\Handy-0.9.8-hotkeys.1-$sha-portable.zip"
 Compress-Archive -Path "$out\*" -DestinationPath $zip -Force
