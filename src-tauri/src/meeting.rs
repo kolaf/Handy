@@ -6,11 +6,11 @@
 //! (`<folder>/<time>-<title>.md` and `...-transcript.txt`) and the minutes opened. Progress goes to the Meetings page and
 //! the result to the Activity page.
 
-use rubato::audioadapter_buffers::direct::InterleavedSlice;
-use rubato::{Fft, FixedSync, Resampler, WindowFunction};
 use crate::settings::{get_settings, write_settings, AppSettings, MeetingSettings};
 use crate::silverbullet::{self, ProjectContext, Space};
 use log::{info, warn};
+use rubato::audioadapter_buffers::direct::InterleavedSlice;
+use rubato::{Fft, FixedSync, Resampler, WindowFunction};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
