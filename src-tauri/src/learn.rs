@@ -646,7 +646,7 @@ pub(crate) fn capture_selection(app: &AppHandle) -> Option<(String, bool)> {
     // A second try helps when the first one arrived while the user's hotkey was still being released.
     while attempts < 2 && selection.is_none() {
         attempts += 1;
-        let sent = crate::clipboard::with_enigo(app, |enigo| {
+        let sent = crate::clipboard::with_enigo(app, move |enigo| {
             if in_terminal {
                 crate::input::send_copy_ctrl_shift_c(enigo, 60)
             } else {
