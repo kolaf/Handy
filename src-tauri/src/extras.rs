@@ -515,7 +515,9 @@ pub(crate) struct ReformatAction;
 /// in terminals too. Runs on the main thread. Returns the text that was removed.
 fn take_back_last_paste(app: &AppHandle) -> Result<crate::context::LastPaste, String> {
     let (last, count) = crate::context::current_undo_plan()?;
-    crate::clipboard::with_enigo(app, |enigo| crate::input::send_backspaces(enigo, count))?;
+    crate::clipboard::with_enigo(app, move |enigo| {
+        crate::input::send_backspaces(enigo, count)
+    })?;
     crate::context::clear_last_paste();
     Ok(last)
 }
