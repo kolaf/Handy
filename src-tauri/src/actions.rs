@@ -18,6 +18,8 @@ use crate::TranscriptionCoordinator;
 use log::{debug, error, info, warn};
 use once_cell::sync::Lazy;
 use regex::Regex;
+use serde::{Deserialize, Serialize};
+use specta::Type;
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -25,12 +27,60 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tauri::Manager;
 use tauri::{AppHandle, Emitter};
+use tauri_specta::Event;
+
+/// How a dictation ended.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "lowercase")]
+pub enum TranscriptionOutcome {
+    /// The text was typed.
+    Typed,
+    /// Nothing was heard, so nothing was typed.
+    Empty,
+    /// The microphone sent only digital silence (e.g. muted).
+    Silent,
+    /// Transcribing or pasting failed.
+    Failed,
+}
+
+/// Emitted when a dictation finishes (not on cancel); onboarding uses it to measure speed.
+#[derive(Clone, Debug, Serialize, Deserialize, Type, tauri_specta::Event)]
+pub struct TranscriptionCompleteEvent {
+    pub outcome: TranscriptionOutcome,
+    pub audio_seconds: f64,
+    pub wait_seconds: f64,
+}
+
+fn emit_transcription_complete(
+    app: &AppHandle,
+    outcome: TranscriptionOutcome,
+    sample_count: usize,
+    stop_time: Instant,
+) {
+    let event = TranscriptionCompleteEvent {
+        outcome,
+        audio_seconds: sample_count as f64
+            / crate::audio_toolkit::constants::WHISPER_SAMPLE_RATE as f64,
+        wait_seconds: stop_time.elapsed().as_secs_f64(),
+    };
+    if let Err(e) = event.emit(app) {
+        warn!("Failed to emit transcription complete: {e}");
+    }
+}
+
+/// Nothing to type: `Silent` if the microphone sent only zeros, else `Empty`.
+fn empty_outcome(input_silent: bool) -> TranscriptionOutcome {
+    if input_silent {
+        TranscriptionOutcome::Silent
+    } else {
+        TranscriptionOutcome::Empty
+    }
+}
 
 const CANCELLATION_POLL_INTERVAL: Duration = Duration::from_millis(25);
 
-/// Bumped each time a recording session takes over the tray and overlay. A
-/// paste still finishing for an earlier session compares against it so its
-/// cleanup doesn't hide the new session's overlay or reset its tray icon.
+/// Bumped per recording session, so a late paste from an earlier session
+/// doesn't reset the tray or hide the overlay of a newer one.
 static RECORDING_SESSION: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Clone, serde::Serialize)]
@@ -776,6 +826,9 @@ impl ShortcutAction for TranscribeAction {
 
             let stop_recording_time = Instant::now();
             if let Some(samples) = rm.stop_recording(&binding_id, cancel_generation) {
+                // Read now: by the time transcribing ends, another take may
+                // have replaced it.
+                let input_silent = rm.last_input_silent();
                 debug!(
                     "Recording stopped and samples retrieved in {:?}, sample count: {}",
                     stop_recording_time.elapsed(),
@@ -797,6 +850,7 @@ impl ShortcutAction for TranscribeAction {
                     tm.cancel_stream();
                     utils::hide_recording_overlay(&ah);
                     set_tray_state(&ah, TrayIconState::Idle);
+                    emit_transcription_complete(&ah, empty_outcome(input_silent), 0, stop_time);
                 } else {
                     // Save WAV concurrently with transcription
                     let sample_count = samples.len();
@@ -901,6 +955,12 @@ impl ShortcutAction for TranscribeAction {
                             if processed.final_text.is_empty() {
                                 utils::hide_recording_overlay(&ah);
                                 set_tray_state(&ah, TrayIconState::Idle);
+                                emit_transcription_complete(
+                                    &ah,
+                                    empty_outcome(input_silent),
+                                    sample_count,
+                                    stop_time,
+                                );
                             } else {
                                 let ah_clone = ah.clone();
                                 let paste_time = Instant::now();
@@ -910,9 +970,8 @@ impl ShortcutAction for TranscribeAction {
                                 // Taken before the paste thread exists, and so
                                 // before the next session can start.
                                 let session = RECORDING_SESSION.load(Ordering::SeqCst);
-                                // Paste on its own thread, not the main one: it
-                                // sleeps between steps, and a paste into Handy's
-                                // own windows needs the main thread free to land.
+                                // Off the main thread: paste sleeps between steps, and a
+                                // paste into Handy's own windows needs the main thread free.
                                 std::thread::Builder::new()
                                     .name("paste".into())
                                     .spawn(move || {
@@ -926,56 +985,73 @@ impl ShortcutAction for TranscribeAction {
                                         }
 
                                         // The user may have moved to another window while the text was being prepared.
-                                        if get_settings(&ah_clone).paste_focus_guard {
+                                        let moved_to = if get_settings(&ah_clone).paste_focus_guard {
                                             let now = crate::context::foreground();
-                                            if crate::context::focus_moved(
+                                            crate::context::focus_moved(
                                                 started_in_for_paste.as_ref(),
                                                 now.as_ref(),
-                                            ) {
-                                                use tauri_plugin_clipboard_manager::ClipboardExt;
-                                                let _ = ah_clone.clipboard().write_text(final_text.clone());
-                                                utils::hide_recording_overlay(&ah_clone);
-                                                set_tray_state(&ah_clone, TrayIconState::Idle);
-                                                crate::learn::announce_with(
-                                                    &ah_clone,
-                                                    "paste-moved",
-                                                    "The window changed, so the dictation is on the clipboard".to_string(),
-                                                    format!(
-                                                        "You started speaking in {}; when the text was ready the active window was {}. It was not pasted, to keep it out of the wrong window. It is on the clipboard (and in History):\n\n{}",
-                                                        crate::context::describe(started_in_for_paste.as_ref()),
-                                                        crate::context::describe(now.as_ref()),
-                                                        final_text
-                                                    ),
-                                                );
-                                                return;
-                                            }
-                                        }
+                                            )
+                                            .then_some(now)
+                                        } else {
+                                            None
+                                        };
 
-                                        match utils::paste(final_text.clone(), ah_clone.clone()) {
-                                            Ok(()) => {
-                                                crate::context::note_paste(&ah_clone, &final_text);
-                                                debug!(
-                                                    "Text pasted successfully in {:?}",
-                                                    paste_time.elapsed()
-                                                )
+                                        let outcome = if let Some(now) = moved_to {
+                                            use tauri_plugin_clipboard_manager::ClipboardExt;
+                                            let _ = ah_clone.clipboard().write_text(final_text.clone());
+                                            crate::learn::announce_with(
+                                                &ah_clone,
+                                                "paste-moved",
+                                                "The window changed, so the dictation is on the clipboard".to_string(),
+                                                format!(
+                                                    "You started speaking in {}; when the text was ready the active window was {}. It was not pasted, to keep it out of the wrong window. It is on the clipboard (and in History):\n\n{}",
+                                                    crate::context::describe(started_in_for_paste.as_ref()),
+                                                    crate::context::describe(now.as_ref()),
+                                                    final_text
+                                                ),
+                                            );
+                                            TranscriptionOutcome::Empty
+                                        } else {
+                                            match utils::paste(final_text.clone(), ah_clone.clone()) {
+                                                Ok(()) => {
+                                                    crate::context::note_paste(&ah_clone, &final_text);
+                                                    debug!(
+                                                        "Text pasted successfully in {:?}",
+                                                        paste_time.elapsed()
+                                                    );
+                                                    TranscriptionOutcome::Typed
+                                                }
+                                                Err(e) => {
+                                                    error!("Failed to paste transcription: {}", e);
+                                                    let _ = ah_clone.emit("paste-error", ());
+                                                    TranscriptionOutcome::Failed
+                                                }
                                             }
-                                            Err(e) => {
-                                                error!("Failed to paste transcription: {}", e);
-                                                let _ = ah_clone.emit("paste-error", ());
-                                            }
-                                        }
+                                        };
                                         // A new session may have started while
                                         // this paste ran; the UI is now its.
                                         if RECORDING_SESSION.load(Ordering::SeqCst) == session {
                                             utils::hide_recording_overlay(&ah_clone);
                                             set_tray_state(&ah_clone, TrayIconState::Idle);
                                         }
+                                        emit_transcription_complete(
+                                            &ah_clone,
+                                            outcome,
+                                            sample_count,
+                                            stop_time,
+                                        );
                                     })
                                     .map(|_| ())
                                     .unwrap_or_else(|e| {
                                         error!("Failed to start the paste thread: {:?}", e);
                                         utils::hide_recording_overlay(&ah);
                                         set_tray_state(&ah, TrayIconState::Idle);
+                                        emit_transcription_complete(
+                                            &ah,
+                                            TranscriptionOutcome::Failed,
+                                            sample_count,
+                                            stop_time,
+                                        );
                                     });
                             }
                         }
@@ -1007,6 +1083,12 @@ impl ShortcutAction for TranscribeAction {
                             }
                             utils::hide_recording_overlay(&ah);
                             set_tray_state(&ah, TrayIconState::Idle);
+                            emit_transcription_complete(
+                                &ah,
+                                TranscriptionOutcome::Failed,
+                                sample_count,
+                                stop_time,
+                            );
                         }
                     }
                 }
@@ -1016,6 +1098,9 @@ impl ShortcutAction for TranscribeAction {
                 tm.cancel_stream();
                 utils::hide_recording_overlay(&ah);
                 set_tray_state(&ah, TrayIconState::Idle);
+                if !rm.was_cancelled_since(cancel_generation) {
+                    emit_transcription_complete(&ah, TranscriptionOutcome::Empty, 0, stop_time);
+                }
             }
         });
 

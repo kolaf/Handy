@@ -2502,6 +2502,7 @@ dependencies = [
  "specta-typescript",
  "strsim",
  "symphonia",
+ "sys-locale",
  "tauri",
  "tauri-build",
  "tauri-nspanel",
