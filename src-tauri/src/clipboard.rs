@@ -15,9 +15,8 @@ use tauri_plugin_clipboard_manager::ClipboardExt;
 #[cfg(target_os = "linux")]
 use crate::utils::{is_gnome_wayland, is_kde_wayland, is_wayland};
 
-/// Serializes pastes. Each one snapshots and restores the clipboard, so two
-/// overlapping pastes would save each other's transcript as "the user's
-/// clipboard". Only taken by `paste`, which never runs on the main thread.
+/// Serializes pastes: overlapping ones would restore each other's transcript as
+/// the user's clipboard. Only taken by `paste`, which never runs on the main thread.
 static PASTE_LOCK: Mutex<()> = Mutex::new(());
 
 /// Runs `f` with the shared Enigo on the main thread and waits for its result.
@@ -800,9 +799,8 @@ fn should_send_auto_submit(auto_submit: bool, paste_method: PasteMethod) -> bool
     auto_submit && paste_method != PasteMethod::None
 }
 
-/// Pastes `text` into the focused application. Call it from a worker thread,
-/// never the main thread: it sleeps between steps, and only the input
-/// injection hops to the main thread (see `with_enigo`).
+/// Pastes `text` into the focused app. Call from a worker thread, never the main
+/// thread: it sleeps between steps (input injection hops via `with_enigo`).
 pub fn paste(text: String, app_handle: AppHandle) -> Result<(), String> {
     let _paste = PASTE_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
     let settings = get_settings(&app_handle);
