@@ -802,8 +802,25 @@ fn should_send_auto_submit(auto_submit: bool, paste_method: PasteMethod) -> bool
 /// Pastes `text` into the focused app. Call from a worker thread, never the main
 /// thread: it sleeps between steps (input injection hops via `with_enigo`).
 pub fn paste(text: String, app_handle: AppHandle) -> Result<(), String> {
+    paste_with(text, app_handle, None)
+}
+
+/// Like `paste`, but leaves `text` on the clipboard whatever the clipboard setting says. For text the user cannot
+/// otherwise get back: if the focused text is read-only, the paste goes nowhere and the clipboard is the only copy.
+pub fn paste_keeping_on_clipboard(text: String, app_handle: AppHandle) -> Result<(), String> {
+    paste_with(text, app_handle, Some(ClipboardHandling::CopyToClipboard))
+}
+
+fn paste_with(
+    text: String,
+    app_handle: AppHandle,
+    clipboard_handling: Option<ClipboardHandling>,
+) -> Result<(), String> {
     let _paste = PASTE_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
-    let settings = get_settings(&app_handle);
+    let mut settings = get_settings(&app_handle);
+    if let Some(handling) = clipboard_handling {
+        settings.clipboard_handling = handling;
+    }
     let paste_method = settings.paste_method;
     let paste_delay_ms = settings.paste_delay_ms;
     let paste_delay_after_ms = settings.paste_delay_after_ms;

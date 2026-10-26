@@ -7,7 +7,7 @@ use crate::actions::{
 };
 use crate::managers::history::HistoryManager;
 use crate::settings::{get_settings, AppSettings, Correction, Snippet};
-use log::warn;
+use log::{debug, warn};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::sync::Arc;
@@ -708,38 +708,42 @@ async fn reformat_selection(
     crate::utils::show_processing_overlay(app);
     let prompt_settings = expand_prompt_variables(app, settings.clone(), None);
     let result = crate::actions::post_process_transcription(&prompt_settings, &text).await;
-    let handle = app.clone();
     match result {
         Some(out) => {
             let (out, _) = crate::actions::extract_vocab_commands(&out);
             let out = expand_snippets(&out, &settings.snippets);
-            let _ = app.run_on_main_thread(move || {
-                if !out.trim().is_empty() {
-                    // The last dictation is replaced by Backspace (checked again now); a selection is simply pasted over.
-                    let ready = if replace_last {
-                        take_back_last_paste(&handle).map(|_| ())
-                    } else {
-                        Ok(())
-                    };
-                    match ready {
-                        Ok(()) => match crate::utils::paste(out.clone(), handle.clone()) {
+            debug!(
+                "Reformat: {} chars in, {} chars out",
+                text.chars().count(),
+                out.chars().count()
+            );
+            // Pasted from this worker thread: paste sleeps between steps and must not block the main thread.
+            if !out.trim().is_empty() {
+                // The last dictation is replaced by Backspace (checked again now); a selection is simply pasted over.
+                let ready = if replace_last {
+                    take_back_last_paste(app).map(|_| ())
+                } else {
+                    Ok(())
+                };
+                match ready {
+                    // A selection may be read-only (a web page, a received message), where the paste goes nowhere,
+                    // so the result stays on the clipboard to be pasted by hand.
+                    Ok(()) => {
+                        match crate::utils::paste_keeping_on_clipboard(out.clone(), app.clone()) {
                             Ok(()) => {
                                 if replace_last {
-                                    crate::context::note_paste(&handle, &out);
+                                    crate::context::note_paste(app, &out);
                                 }
                             }
                             Err(err) => warn!("Reformat: failed to paste: {}", err),
-                        },
-                        Err(reason) => crate::learn::announce_with(
-                            &handle,
-                            "transform-moved",
-                            String::new(),
-                            reason,
-                        ),
+                        }
+                    }
+                    Err(reason) => {
+                        crate::learn::announce_with(app, "transform-moved", String::new(), reason)
                     }
                 }
-                crate::utils::hide_recording_overlay(&handle);
-            });
+            }
+            crate::utils::hide_recording_overlay(app);
         }
         None => {
             warn!("Reformat: the post-processing request failed");
