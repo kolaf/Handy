@@ -12,7 +12,7 @@ import type {
 import i18n, { syncLanguageFromSettings } from "@/i18n";
 import type { ModelStateEvent } from "@/lib/types/events";
 import { getLanguageDirection } from "@/lib/utils/rtl";
-import { getLanguageLabel } from "@/lib/constants/languages";
+import { languageName as uiLanguageName } from "@/lib/constants/languages";
 
 type OverlayState =
   | "recording"
@@ -320,8 +320,9 @@ const RecordingOverlay: React.FC = () => {
   );
 
   const languageName = (code: string) =>
-    getLanguageLabel(code) ??
-    (code === "auto" ? t("settings.general.language.auto") : code);
+    code === "auto"
+      ? t("settings.general.language.auto")
+      : uiLanguageName(code, i18n.language);
 
   // Language (and prompt, when post-processing will run) for this recording.
   const captionText = [
