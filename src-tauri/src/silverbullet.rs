@@ -59,10 +59,12 @@ impl Space {
         if token.trim().is_empty() {
             return Err("No SilverBullet token is set.".into());
         }
-        let http = Client::builder()
-            .timeout(Duration::from_secs(30))
-            .build()
-            .map_err(|e| e.to_string())?;
+        let mut builder = Client::builder().timeout(Duration::from_secs(30));
+        // A system or corporate proxy cannot reach this computer's own loopback, so a local space is always contacted directly.
+        if is_loopback(&base) {
+            builder = builder.no_proxy();
+        }
+        let http = builder.build().map_err(|e| e.to_string())?;
         Ok(Space {
             base,
             token: token.trim().to_string(),
@@ -77,6 +79,20 @@ impl Space {
 
     fn file_url(&self, file: &str) -> String {
         format!("{}/.fs/{}", self.base, encode_path(file))
+    }
+
+    /// Why a request did not get an answer, with the whole cause chain (`connection refused`, `dns error`, ...): reqwest's own
+    /// message is only "error sending request for url (...)". Also logged, so the reason is in the log file of the machine it happened on.
+    fn unreachable(e: &reqwest::Error) -> String {
+        let mut reason = e.to_string();
+        let mut source = std::error::Error::source(e);
+        while let Some(cause) = source {
+            reason.push_str(": ");
+            reason.push_str(&cause.to_string());
+            source = cause.source();
+        }
+        log::warn!("Cannot reach SilverBullet: {reason}");
+        format!("Cannot reach SilverBullet: {reason}")
     }
 
     fn explain(status: StatusCode) -> String {
@@ -95,7 +111,7 @@ impl Space {
             .header("X-Sync-Mode", "true")
             .send()
             .await
-            .map_err(|e| format!("Cannot reach SilverBullet: {e}"))?;
+            .map_err(|e| Self::unreachable(&e))?;
         if !response.status().is_success() {
             return Err(Self::explain(response.status()));
         }
@@ -113,7 +129,7 @@ impl Space {
             .header("X-Sync-Mode", "true")
             .send()
             .await
-            .map_err(|e| format!("Cannot reach SilverBullet: {e}"))?;
+            .map_err(|e| Self::unreachable(&e))?;
         if !response.status().is_success() {
             return Err(format!("{file}: {}", Self::explain(response.status())));
         }
@@ -129,7 +145,7 @@ impl Space {
             .header("X-Sync-Mode", "true")
             .send()
             .await
-            .map_err(|e| format!("Cannot reach SilverBullet: {e}"))?;
+            .map_err(|e| Self::unreachable(&e))?;
         if response.status() == StatusCode::NOT_FOUND {
             return Ok(None);
         }
@@ -166,7 +182,7 @@ impl Space {
             .body(content.to_string())
             .send()
             .await
-            .map_err(|e| format!("Cannot reach SilverBullet: {e}"))?;
+            .map_err(|e| Self::unreachable(&e))?;
         match response.status() {
             s if s.is_success() => Ok(()),
             StatusCode::PRECONDITION_FAILED => Err("The page changed while you were dictating, so nothing was written (the page is as you left it)".into()),
@@ -245,7 +261,7 @@ impl Space {
             .body(content.to_string())
             .send()
             .await
-            .map_err(|e| CreateError::Other(format!("Cannot reach SilverBullet: {e}")))?;
+            .map_err(|e| CreateError::Other(Self::unreachable(&e)))?;
         match response.status() {
             s if s.is_success() => Ok(()),
             StatusCode::PRECONDITION_FAILED => Err(CreateError::Exists),
@@ -403,6 +419,22 @@ impl ProjectContext {
 
 pub fn page_name(file: &str) -> String {
     file.strip_suffix(".md").unwrap_or(file).to_string()
+}
+
+/// Whether the space is on this computer (`localhost`, `127.x.x.x`, `::1`).
+fn is_loopback(url: &str) -> bool {
+    let Some(host) = reqwest::Url::parse(url)
+        .ok()
+        .and_then(|u| u.host_str().map(str::to_owned))
+    else {
+        return false;
+    };
+    host.eq_ignore_ascii_case("localhost")
+        || host
+            .trim_start_matches('[')
+            .trim_end_matches(']')
+            .parse::<std::net::IpAddr>()
+            .is_ok_and(|ip| ip.is_loopback())
 }
 
 /// Percent-encodes a path for the URL, keeping the `/` between folders and the name.
@@ -968,6 +1000,11 @@ mod tests {
             "http://h:3000/notes/Meeting%20Notes/a%20b"
         );
         assert!(Space::new("h:3000", "t").is_err());
+        assert!(is_loopback("http://localhost:3000/notes"));
+        assert!(is_loopback("http://127.0.0.1:3000/notes"));
+        assert!(is_loopback("http://[::1]:3000/notes"));
+        assert!(!is_loopback("http://100.64.0.1:3000/notes"));
+        assert!(!is_loopback("https://notes.example.com"));
         assert!(Space::new("http://h", "").is_err());
     }
 
