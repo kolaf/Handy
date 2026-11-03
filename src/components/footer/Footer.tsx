@@ -4,6 +4,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import ModelSelector from "../model-selector";
 import UpdateChecker from "../update-checker";
 import NoticeChip from "./NoticeChip";
+import RecordingStatus from "./RecordingStatus";
 import TranscriptionStatus from "./TranscriptionStatus";
 
 interface FooterProps {
@@ -32,11 +33,11 @@ const Footer: React.FC<FooterProps> = ({ onShowHistory }) => {
       <div className="flex justify-between items-center text-xs px-4 pb-3 text-ink-2">
         <div className="flex items-center gap-4">
           <ModelSelector />
+          <RecordingStatus />
           <TranscriptionStatus onShowHistory={onShowHistory} />
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Update Status */}
           <div className="flex items-center gap-1">
             <UpdateChecker />
             <span>•</span>
