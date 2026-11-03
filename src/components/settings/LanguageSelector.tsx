@@ -61,6 +61,8 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   const detector = useLanguageDetector();
 
   useEffect(() => {
+    // The alternate language is always a concrete one: no status to resolve.
+    if (isAlternate) return;
     let cancelled = false;
     const refresh = () =>
       commands.getLanguageStatus(modelId).then((next) => {
@@ -73,10 +75,10 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
       cancelled = true;
       unlisten.then((stop) => stop());
     };
-  }, [modelId, intent, spokenKey, detectionMode]);
+  }, [modelId, intent, spokenKey, detectionMode, isAlternate]);
 
   const selectedLanguage =
-    status === null
+    isAlternate || status === null
       ? languageIdentity(intent)
       : status.kind === "auto"
         ? "auto"
@@ -147,9 +149,9 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
         ? t("settings.general.language.detectorMissing")
         : undefined;
   const filteredLanguages = useMemo(() => {
-    const showAuto = autoLabel
-      .toLowerCase()
-      .includes(searchQuery.trim().toLowerCase());
+    const showAuto =
+      !isAlternate &&
+      autoLabel.toLowerCase().includes(searchQuery.trim().toLowerCase());
     return [
       ...(showAuto
         ? [
@@ -168,7 +170,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
         note: undefined,
       })),
     ];
-  }, [searchQuery, ui, autoLabel, autoNote, availableLanguages]);
+  }, [searchQuery, ui, autoLabel, autoNote, availableLanguages, isAlternate]);
 
   const selectedLanguageName =
     selectedLanguage === "auto"
