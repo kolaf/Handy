@@ -385,16 +385,6 @@ pub(crate) fn local_cleanup(text: &str) -> String {
     out.trim().to_string()
 }
 
-/// Tells the user that only basic local cleanup was applied. Shown after the overlay has
-/// finished with the current dictation.
-pub(crate) fn notify_fallback(app: &AppHandle) {
-    let handle = app.clone();
-    std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_millis(700));
-        crate::overlay::show_notice_overlay(&handle, "fallback", "");
-    });
-}
-
 /// Pastes the most recent dictation again (the final text, after any post-processing).
 pub(crate) struct PasteLastAction;
 
@@ -709,7 +699,7 @@ async fn reformat_selection(
     let prompt_settings = expand_prompt_variables(app, settings.clone(), None);
     let result = crate::actions::post_process_transcription(&prompt_settings, &text).await;
     match result {
-        Some(out) => {
+        crate::actions::PostProcessOutcome::Done(out) => {
             let (out, _) = crate::actions::extract_vocab_commands(&out);
             let out = expand_snippets(&out, &settings.snippets);
             debug!(
@@ -745,7 +735,8 @@ async fn reformat_selection(
             }
             crate::utils::hide_recording_overlay(app);
         }
-        None => {
+        crate::actions::PostProcessOutcome::Skipped
+        | crate::actions::PostProcessOutcome::Failed => {
             warn!("Reformat: the post-processing request failed");
             crate::utils::hide_recording_overlay(app);
             crate::learn::announce(app, "reformat-failed", String::new());

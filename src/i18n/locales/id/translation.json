@@ -7,7 +7,10 @@
     "model": "Model",
     "quit": "Keluar",
     "cancel": "Batal",
-    "secureInputWarning": "⚠ Pintasan diblokir oleh Secure Input"
+    "secureInputWarning": "⚠ Pintasan diblokir oleh Secure Input",
+    "language": "Bahasa",
+    "autoLanguage": "Otomatis",
+    "otherLanguages": "Bahasa Lain"
   },
   "sidebar": {
     "general": "Umum",
@@ -356,7 +359,16 @@
         "description": "Pilih bahasa untuk pengenalan ucapan. Opsi Otomatis akan mendeteksi bahasa, sedangkan memilih bahasa tertentu dapat meningkatkan akurasi untuk bahasa tersebut.",
         "searchPlaceholder": "Cari bahasa...",
         "noResults": "Bahasa tidak ditemukan",
-        "auto": "Otomatis"
+        "auto": "Otomatis",
+        "autoUnavailable": {
+          "title": "Otomatis dinonaktifkan",
+          "oneLanguage": "Hanya satu bahasa Anda yang berfungsi dengan model ini",
+          "undetectable": "Tidak tersedia untuk {{languages}}",
+          "noMatch": "Tidak ada bahasa Anda yang berfungsi dengan model ini"
+        },
+        "detectorMissingTitle": "Otomatis memerlukan unduhan terpisah",
+        "detectorMissing": "Model ini tidak dapat mengenali bahasa yang Anda ucapkan. Otomatis memerlukan pendeteksi bahasa kecil untuk mengenalinya",
+        "stopDetectorDownload": "Hentikan unduhan pendeteksi bahasa"
       },
       "preferredLanguages": {
         "title": "Bahasa Pilihan",
@@ -414,7 +426,6 @@
         "title": "Model lama tidak lagi berfungsi dengan Handy",
         "description": "Model tersebut memakan {{size}} di komputer Anda.",
         "delete": "Hapus model",
-        "deleted": "Model lama telah dihapus",
         "deleteFailed": "Beberapa model lama tidak dapat dihapus. Periksa log untuk detailnya."
       },
       "rescan": {
@@ -469,6 +480,10 @@
       "lazyStreamClose": {
         "label": "Biarkan Mikrofon Tetap Aktif di Antara Transkripsi",
         "description": "Membiarkan aliran mikrofon tetap terbuka selama 30 detik setelah perekaman berhenti untuk mengurangi latensi pada transkripsi beruntun. Dapat menurunkan kualitas audio Bluetooth saat aktif."
+      },
+      "airpodsMode": {
+        "label": "Mode AirPods",
+        "description": "Secara otomatis mengalihkan AirPods ke Mac untuk transkripsi saat iPhone sedang memutar audio. Tanpa ini, rekaman bisa jadi senyap."
       },
       "acceleration": {
         "transcribe": {
@@ -583,6 +598,12 @@
         "title": "Pemisahan Audio Panjang",
         "description": "Memisahkan rekaman panjang pada jeda sebelum ditranskripsi, yang biasanya meningkatkan kinerja transkripsi. File yang ditranskripsi dan transkripsi ulang yang panjang selalu dipisahkan."
       },
+      "languageDetection": {
+        "title": "Batasi Otomatis ke bahasa saya",
+        "description": "Otomatis hanya memilih dari bahasa pilihan Anda, menggunakan pendeteksi bahasa kecil. Aktifkan jika Otomatis terus memilih bahasa yang tidak Anda gunakan",
+        "downloadHint": "Mengaktifkan ini akan mengunduh pendeteksi bahasa kecil",
+        "downloadingHint": "Mengunduh pendeteksi bahasa. Nonaktifkan untuk membatalkan"
+      },
       "vadBackend": {
         "title": "Backend Deteksi Aktivitas Suara",
         "description": "Pilih detektor yang digunakan untuk menyaring keheningan. Earshot bersifat eksperimental; kembali ke Silero jika ucapan terpotong atau kebisingan tetap terekam.",
@@ -688,10 +709,10 @@
       "transcribeFile": "Transkripsikan File",
       "mediaFiles": "Audio dan video",
       "fileUnsupported": "Tidak dapat membaca audio dari {{name}}.",
-      "readingFile": "Membaca {{name}}...",
       "transcribeFailed": "Transkripsi gagal. Silakan coba lagi.",
       "waiting": "Menunggu untuk ditranskripsi",
       "transcribingPercent": "Mentranskripsi, {{percent}}%",
+      "readingFile": "Membaca file...",
       "showMore": "Tampilkan lebih banyak",
       "showLess": "Tampilkan lebih sedikit",
       "dropTitle": "Lepaskan untuk mentranskripsi",
@@ -726,9 +747,7 @@
       "whatsNewPreview": {
         "title": "Pratinjau Yang Baru",
         "description": "Buka catatan rilis terbaru yang disertakan tanpa menandainya sebagai telah dilihat",
-        "button": "Pratinjau",
-        "noNotes": "Tidak ada catatan rilis yang disertakan",
-        "error": "Gagal menampilkan pratinjau catatan rilis"
+        "button": "Pratinjau"
       },
       "onboardingPreview": {
         "title": "Pratinjau Penyiapan Awal",
@@ -752,8 +771,7 @@
       "modelMigration": {
         "title": "Migrasi Model",
         "description": "Buka layar pembaruan model format lama secara sungguhan: mengunduh pengganti, beralih model, dan menghapus file lama",
-        "button": "Buka",
-        "noRetired": "Tidak ada model format lama di disk"
+        "button": "Buka"
       },
       "soundTheme": {
         "label": "Tema Suara",
@@ -822,6 +840,10 @@
       "recordingBuffer": {
         "title": "Buffer Perekaman Tambahan",
         "description": "Waktu tambahan (dalam milidetik) untuk terus merekam setelah Anda melepas tombol agar audio di bagian akhir tetap tertangkap. 0 = tanpa buffer tambahan."
+      },
+      "languageDetectionWindow": {
+        "title": "Audio Deteksi Bahasa",
+        "description": "Detik ucapan yang didengar pendeteksi bahasa. Lebih lama lebih akurat tetapi lebih lambat."
       },
       "keyboardDiagnostic": {
         "title": "Diagnostik Keyboard",
@@ -897,6 +919,8 @@
     "title": "Baru di Handy v{{version}}"
   },
   "common": {
+    "playbackPosition": "Posisi pemutaran",
+    "resetSetting": "Atur ulang {{setting}} ke nilai bawaan",
     "loading": "Memuat...",
     "delete": "Hapus",
     "close": "Tutup",
@@ -916,12 +940,25 @@
     },
     "noInputDeviceTitle": "Mikrofon Tidak Ditemukan",
     "noInputDevice": "Tidak ada perangkat masukan audio yang terdeteksi. Hubungkan mikrofon atau headset lalu coba lagi.",
-    "recordingFailed": "Gagal memulai perekaman: {{error}}",
-    "modelLoadFailed": "Gagal memuat model: {{model}}",
-    "modelLoadFailedUnknown": "model tidak dikenal",
+    "recordingFailedTitle": "Gagal Memulai Perekaman",
+    "modelLoadFailed": "Handy tidak dapat memuat model ini. Coba lagi atau pilih model lain.",
+    "modelLoadFailedTitle": "Gagal Memuat Model",
+    "modelDownloadFailed": "Unduhan gagal",
     "pasteFailedTitle": "Gagal Menempelkan Teks",
     "pasteFailed": "Teks tidak dapat ditempelkan ke aplikasi aktif.",
+    "postProcessFailedTitle": "Ditempel Tanpa Pascaproses",
+    "postProcessFailed": "Pascaproses tidak selesai, jadi transkrip ditempelkan apa adanya.",
+    "filePostProcessFailedTitle": "Ditranskripsi Tanpa Pascaproses",
+    "filePostProcessFailed": "Pascaproses tidak selesai, jadi transkrip disimpan apa adanya.",
+    "fileTranscriptionFailedTitle": "Transkripsi File Gagal",
     "transcriptionFailedTitle": "Transkripsi Gagal"
+  },
+  "notices": {
+    "errorOne": "{{n}} kesalahan",
+    "errorMany": "{{n}} kesalahan",
+    "warningOne": "{{n}} peringatan",
+    "warningMany": "{{n}} peringatan",
+    "errorsAndWarnings": "{{errors}}, {{warnings}}"
   },
   "appLanguage": {
     "title": "Bahasa Aplikasi",

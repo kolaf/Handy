@@ -7,7 +7,10 @@
     "model": "Model",
     "quit": "Ukončit",
     "cancel": "Zrušit",
-    "secureInputWarning": "⚠ Zkratky blokuje Secure Input"
+    "secureInputWarning": "⚠ Zkratky blokuje Secure Input",
+    "language": "Jazyk",
+    "autoLanguage": "Automaticky",
+    "otherLanguages": "Další jazyky"
   },
   "sidebar": {
     "general": "Obecné",
@@ -356,7 +359,16 @@
         "description": "Vyberte jazyk rozpoznávání řeči. Auto jazyk určí automaticky, zatímco výběr konkrétního jazyka může zlepšit přesnost.",
         "searchPlaceholder": "Hledat jazyky...",
         "noResults": "Žádné jazyky nenalezeny",
-        "auto": "Automaticky"
+        "auto": "Automaticky",
+        "autoUnavailable": {
+          "title": "Automaticky je vypnuto",
+          "oneLanguage": "S tímto modelem funguje jen jeden z vašich jazyků",
+          "undetectable": "Není k dispozici pro {{languages}}",
+          "noMatch": "Žádný z vašich jazyků s tímto modelem nefunguje"
+        },
+        "detectorMissingTitle": "Automaticky vyžaduje samostatné stažení",
+        "detectorMissing": "Tento model nepozná, jakým jazykem mluvíte. Režim Automaticky potřebuje malý detektor jazyka, který to zjistí",
+        "stopDetectorDownload": "Zastavit stahování detektoru jazyka"
       },
       "preferredLanguages": {
         "title": "Preferované jazyky",
@@ -414,7 +426,6 @@
         "title": "Staré modely už s Handy nefungují",
         "description": "Zabírají {{size}} na vašem počítači.",
         "delete": "Smazat modely",
-        "deleted": "Staré modely byly smazány",
         "deleteFailed": "Některé staré modely se nepodařilo smazat. Podrobnosti najdete v protokolu."
       },
       "rescan": {
@@ -469,6 +480,10 @@
       "lazyStreamClose": {
         "label": "Ponechat mikrofon zapnutý mezi přepisy",
         "description": "Ponechá stream mikrofonu otevřený po dobu 30 sekund po zastavení nahrávání, čímž se sníží latence při opakovaném přepisu. Může zhoršit kvalitu zvuku Bluetooth."
+      },
+      "airpodsMode": {
+        "label": "Režim AirPods",
+        "description": "Automaticky přepne AirPods na Mac kvůli přepisu, když iPhone přehrává zvuk. Bez toho mohou nahrávky zůstat tiché."
       },
       "acceleration": {
         "transcribe": {
@@ -583,6 +598,12 @@
         "title": "Dělení dlouhého zvuku",
         "description": "Před přepisem rozdělí dlouhé nahrávky v pauzách, což obvykle zlepšuje kvalitu přepisu. Přepisované soubory a dlouhé opakované přepisy se rozdělují vždy."
       },
+      "languageDetection": {
+        "title": "Omezit Automaticky na mé jazyky",
+        "description": "Automaticky vybírá jen z vašich preferovaných jazyků pomocí malého detektoru jazyka. Zapněte to, pokud Automaticky stále volí jazyk, kterým nemluvíte",
+        "downloadHint": "Zapnutím se stáhne malý detektor jazyka",
+        "downloadingHint": "Stahuje se detektor jazyka. Vypnutím stahování zrušíte"
+      },
       "vadBackend": {
         "title": "Backend detekce hlasu",
         "description": "Vyberte detektor používaný k filtrování ticha. Earshot je experimentální; pokud je řeč ořezávána nebo zůstává šum, přepněte zpět na Silero.",
@@ -688,10 +709,10 @@
       "transcribeFile": "Přepsat soubor",
       "mediaFiles": "Zvuk a video",
       "fileUnsupported": "Ze souboru {{name}} se nepodařilo načíst zvuk.",
-      "readingFile": "Načítání {{name}}...",
       "transcribeFailed": "Přepis se nezdařil. Zkuste to prosím znovu.",
       "waiting": "Čeká na přepis",
       "transcribingPercent": "Přepisuji, {{percent}} %",
+      "readingFile": "Načítám soubor...",
       "showMore": "Zobrazit více",
       "showLess": "Zobrazit méně",
       "dropTitle": "Pusťte pro přepis",
@@ -726,9 +747,7 @@
       "whatsNewPreview": {
         "title": "Náhled novinek",
         "description": "Otevřít nejnovější přibalené poznámky k vydání bez označení jako zobrazené",
-        "button": "Náhled",
-        "noNotes": "Nebyly nalezeny žádné přibalené poznámky k vydání",
-        "error": "Nepodařilo se zobrazit náhled poznámek k vydání"
+        "button": "Náhled"
       },
       "onboardingPreview": {
         "title": "Náhled úvodního nastavení",
@@ -752,8 +771,7 @@
       "modelMigration": {
         "title": "Migrace modelů",
         "description": "Doopravdy otevře obrazovku aktualizace modelů starého formátu: stáhne náhrady, přepne modely a smaže staré soubory",
-        "button": "Otevřít",
-        "noRetired": "Na disku nejsou žádné modely starého formátu"
+        "button": "Otevřít"
       },
       "soundTheme": {
         "label": "Zvukový motiv",
@@ -822,6 +840,10 @@
       "recordingBuffer": {
         "title": "Extra vyrovnávací paměť nahrávání",
         "description": "Extra čas (v milisekundách) pro pokračování nahrávání po uvolnění klávesy, pro zachycení zbývajícího zvuku. 0 = žádná extra vyrovnávací paměť."
+      },
+      "languageDetectionWindow": {
+        "title": "Zvuk pro rozpoznání jazyka",
+        "description": "Kolik sekund řeči detektor jazyka slyší. Delší je přesnější, ale pomalejší."
       },
       "keyboardDiagnostic": {
         "title": "Diagnostika klávesnice",
@@ -897,6 +919,8 @@
     "title": "Novinky v Handy v{{version}}"
   },
   "common": {
+    "playbackPosition": "Pozice přehrávání",
+    "resetSetting": "Obnovit výchozí hodnotu: {{setting}}",
     "loading": "Načítání...",
     "delete": "Smazat",
     "close": "Zavřít",
@@ -916,12 +940,25 @@
     },
     "noInputDeviceTitle": "Mikrofon nebyl nalezen",
     "noInputDevice": "Nebylo detekováno žádné zvukové vstupní zařízení. Připojte mikrofon nebo sluchátka a zkuste to znovu.",
-    "recordingFailed": "Nepodařilo se spustit nahrávání: {{error}}",
-    "modelLoadFailed": "Nepodařilo se načíst model: {{model}}",
-    "modelLoadFailedUnknown": "neznámý model",
+    "recordingFailedTitle": "Nepodařilo se spustit nahrávání",
+    "modelLoadFailed": "Handy nemohl načíst tento model. Zkuste to znovu nebo vyberte jiný.",
+    "modelLoadFailedTitle": "Nepodařilo se načíst model",
+    "modelDownloadFailed": "Stahování selhalo",
     "pasteFailedTitle": "Vložení textu se nezdařilo",
     "pasteFailed": "Text nebylo možné vložit do aktivní aplikace.",
+    "postProcessFailedTitle": "Vloženo bez následného zpracování",
+    "postProcessFailed": "Následné zpracování se nedokončilo, takže byl přepis vložen beze změn.",
+    "filePostProcessFailedTitle": "Přepsáno bez následného zpracování",
+    "filePostProcessFailed": "Následné zpracování se nedokončilo, takže byl přepis uložen beze změn.",
+    "fileTranscriptionFailedTitle": "Přepis souboru selhal",
     "transcriptionFailedTitle": "Přepis selhal"
+  },
+  "notices": {
+    "errorOne": "{{n}} chyba",
+    "errorMany": "{{n}} chyby",
+    "warningOne": "{{n}} upozornění",
+    "warningMany": "{{n}} upozornění",
+    "errorsAndWarnings": "{{errors}}, {{warnings}}"
   },
   "appLanguage": {
     "title": "Jazyk aplikace",

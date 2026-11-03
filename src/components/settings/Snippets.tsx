@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { notify } from "@/stores/noticeStore";
 import { useSettings } from "../../hooks/useSettings";
 import { Input } from "../ui/Input";
 import { Textarea } from "../ui/Textarea";
@@ -42,9 +42,11 @@ export const Snippets: React.FC<SnippetsProps> = React.memo(
           (s) => s.name.toLowerCase() === normalizedName.toLowerCase(),
         )
       ) {
-        toast.error(
-          t("settings.advanced.snippets.duplicate", { name: normalizedName }),
-        );
+        notify({
+          title: t("settings.advanced.snippets.duplicate", {
+            name: normalizedName,
+          }),
+        });
         return;
       }
       updateSetting("snippets", [...snippets, { name: normalizedName, text }]);

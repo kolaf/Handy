@@ -7,7 +7,10 @@
     "model": "מודל",
     "quit": "יציאה",
     "cancel": "ביטול",
-    "secureInputWarning": "⚠ קיצורי המקשים חסומים על ידי Secure Input"
+    "secureInputWarning": "⚠ קיצורי המקשים חסומים על ידי Secure Input",
+    "language": "שפה",
+    "autoLanguage": "אוטומטי",
+    "otherLanguages": "שפות אחרות"
   },
   "sidebar": {
     "general": "כללי",
@@ -356,7 +359,16 @@
         "description": "בחר את שפת זיהוי הדיבור. מצב אוטומטי יזהה את השפה לבד, בעוד שבחירת שפה מסוימת יכולה לשפר את הדיוק עבורה.",
         "searchPlaceholder": "חפש שפות...",
         "noResults": "לא נמצאו שפות",
-        "auto": "אוטומטי"
+        "auto": "אוטומטי",
+        "autoUnavailable": {
+          "title": "אוטומטי מושבת",
+          "oneLanguage": "רק אחת מהשפות שלך עובדת עם המודל הזה",
+          "undetectable": "לא זמין עם {{languages}}",
+          "noMatch": "אף אחת מהשפות שלך לא עובדת עם המודל הזה"
+        },
+        "detectorMissingTitle": "אוטומטי דורש הורדה נפרדת",
+        "detectorMissing": "המודל הזה לא יכול לזהות באיזו שפה מדברים. אוטומטי צריך גלאי שפה קטן כדי לזהות אותה",
+        "stopDetectorDownload": "עצירת ההורדה של גלאי השפה"
       },
       "preferredLanguages": {
         "title": "שפות מועדפות",
@@ -414,7 +426,6 @@
         "title": "מודלים ישנים כבר לא עובדים עם Handy",
         "description": "הם תופסים {{size}} במחשב שלך.",
         "delete": "מחיקת מודלים",
-        "deleted": "המודלים הישנים נמחקו",
         "deleteFailed": "לא ניתן היה למחוק חלק מהמודלים הישנים. פרטים נוספים ביומן."
       },
       "rescan": {
@@ -469,6 +480,10 @@
       "lazyStreamClose": {
         "label": "השאר את המיקרופון פתוח בין תמלולים",
         "description": "משאיר את זרם המיקרופון פתוח למשך 30 שניות אחרי סיום ההקלטה, וכך מפחית השהיה בתמלולים רצופים. עשוי לפגוע באיכות שמע Bluetooth בזמן שהאפשרות פעילה."
+      },
+      "airpodsMode": {
+        "label": "מצב AirPods",
+        "description": "מעביר את ה-AirPods אוטומטית ל-Mac לצורך תמלול כאשר iPhone מנגן אודיו. בלי זה, ההקלטות עלולות לצאת שקטות."
       },
       "acceleration": {
         "transcribe": {
@@ -583,6 +598,12 @@
         "title": "פיצול שמע ארוך",
         "description": "מפצל הקלטות ארוכות בהפסקות לפני התמלול, מה שבדרך כלל משפר את איכות התמלול. קבצים מתומללים ותמלולים חוזרים ארוכים מפוצלים תמיד."
       },
+      "languageDetection": {
+        "title": "הגבלת אוטומטי לשפות שלי",
+        "description": "אוטומטי בוחר רק מתוך השפות המועדפות שלך, בעזרת גלאי שפה קטן. כדאי להפעיל אם אוטומטי ממשיך לבחור שפה שאינך מדבר",
+        "downloadHint": "ההפעלה מורידה גלאי שפה קטן",
+        "downloadingHint": "גלאי השפה בהורדה. כבו כדי לבטל"
+      },
       "vadBackend": {
         "title": "מנוע זיהוי פעילות קולית",
         "description": "בחרו את הגלאי המשמש לסינון שקט. Earshot ניסיוני; חזרו ל-Silero אם הדיבור נחתך או שרעש נשמר.",
@@ -688,10 +709,10 @@
       "transcribeFile": "תמלול קובץ",
       "mediaFiles": "שמע ווידאו",
       "fileUnsupported": "לא ניתן לקרוא שמע מ-{{name}}.",
-      "readingFile": "קורא את {{name}}...",
       "transcribeFailed": "התמלול נכשל. נסו שוב.",
       "waiting": "ממתין לתמלול",
       "transcribingPercent": "מתמלל, {{percent}}%",
+      "readingFile": "קורא קובץ...",
       "showMore": "הצג עוד",
       "showLess": "הצג פחות",
       "dropTitle": "שחררו כדי לתמלל",
@@ -726,9 +747,7 @@
       "whatsNewPreview": {
         "title": "תצוגה מקדימה של מה חדש",
         "description": "פתח את הערת הגרסה המצורפת האחרונה בלי לסמן אותה כנצפתה",
-        "button": "תצוגה מקדימה",
-        "noNotes": "לא נמצאו הערות גרסה מצורפות",
-        "error": "הצגת התצוגה המקדימה של הערות הגרסה נכשלה"
+        "button": "תצוגה מקדימה"
       },
       "onboardingPreview": {
         "title": "תצוגה מקדימה של ההגדרה הראשונית",
@@ -752,8 +771,7 @@
       "modelMigration": {
         "title": "העברת מודלים",
         "description": "פתח באמת את מסך עדכון המודלים בפורמט הישן: הוא מוריד תחליפים, מחליף מודלים ומוחק קבצים ישנים",
-        "button": "פתח",
-        "noRetired": "אין מודלים בפורמט ישן בדיסק"
+        "button": "פתח"
       },
       "soundTheme": {
         "label": "ערכת צלילים",
@@ -822,6 +840,10 @@
       "recordingBuffer": {
         "title": "באפר הקלטה נוסף",
         "description": "זמן נוסף (במילישניות) להמשך הקלטה אחרי שחרור המקש, כדי ללכוד סוף דיבור. 0 = בלי באפר נוסף."
+      },
+      "languageDetectionWindow": {
+        "title": "שמע לזיהוי שפה",
+        "description": "כמה שניות דיבור גלאי השפה שומע. ארוך יותר מדויק יותר אך איטי יותר."
       },
       "keyboardDiagnostic": {
         "title": "אבחון מקלדת",
@@ -897,6 +919,8 @@
     "title": "חדש ב-Handy v{{version}}"
   },
   "common": {
+    "playbackPosition": "מיקום ההשמעה",
+    "resetSetting": "איפוס {{setting}} לערך ברירת המחדל",
     "loading": "טוען...",
     "delete": "מחק",
     "close": "סגור",
@@ -916,12 +940,25 @@
     },
     "noInputDeviceTitle": "לא נמצא מיקרופון",
     "noInputDevice": "לא זוהה התקן קלט שמע. חבר מיקרופון או אוזנייה ונסה שוב.",
-    "recordingFailed": "הפעלת ההקלטה נכשלה: {{error}}",
-    "modelLoadFailed": "טעינת המודל נכשלה: {{model}}",
-    "modelLoadFailedUnknown": "מודל לא ידוע",
+    "recordingFailedTitle": "הפעלת ההקלטה נכשלה",
+    "modelLoadFailed": "Handy לא הצליח לטעון את המודל הזה. נסו שוב או בחרו מודל אחר.",
+    "modelLoadFailedTitle": "טעינת המודל נכשלה",
+    "modelDownloadFailed": "ההורדה נכשלה",
     "pasteFailedTitle": "ההדבקה נכשלה",
     "pasteFailed": "לא ניתן היה להדביק את הטקסט ביישום הפעיל.",
+    "postProcessFailedTitle": "הודבק ללא עיבוד משלים",
+    "postProcessFailed": "העיבוד המשלים לא הסתיים, ולכן התמלול הודבק כפי שהוא.",
+    "filePostProcessFailedTitle": "תומלל ללא עיבוד משלים",
+    "filePostProcessFailed": "העיבוד המשלים לא הסתיים, ולכן התמלול נשמר כפי שהוא.",
+    "fileTranscriptionFailedTitle": "תמלול הקובץ נכשל",
     "transcriptionFailedTitle": "התמלול נכשל"
+  },
+  "notices": {
+    "errorOne": "{{n}} שגיאה",
+    "errorMany": "{{n}} שגיאות",
+    "warningOne": "{{n}} אזהרה",
+    "warningMany": "{{n}} אזהרות",
+    "errorsAndWarnings": "{{errors}}, {{warnings}}"
   },
   "appLanguage": {
     "title": "שפת האפליקציה",

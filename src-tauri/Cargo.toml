@@ -1,6 +1,6 @@
 [package]
 name = "handy"
-version = "0.9.8-hotkeys.1"
+version = "0.10.0-hotkeys.1"
 description = "Handy"
 authors = ["cjpais"]
 edition = "2021"
@@ -51,7 +51,7 @@ anyhow = "1.0.95"
 hound = "3.5.1"
 log = "0.4.25"
 env_filter = "0.1.0"
-tokio = "1.43.0"
+tokio = { version = "1.43.0", features = ["process"] }
 earshot = "1.2.2"
 enigo = "0.6.1"
 # Feedback sounds. No `recording`: microphone capture is handy-recorder's.
@@ -147,9 +147,20 @@ transcribe-cpp = { version = "0.4.0", default-features = false, features = [
 [target.'cfg(all(windows, target_arch = "aarch64"))'.dependencies]
 transcribe-cpp = { version = "0.4.0", default-features = false }
 
+# Whisper backend per macOS arch. Apple Silicon links the static Metal build.
+# Intel Macs are CPU-only: ggml-metal compiles its embedded shader library at
+# backend init (app launch, regardless of the selected accelerator), and on
+# some AMD GPUs that compile never finishes, hanging every model load (#2340).
+# Metal on Intel/AMD buys little at these model sizes anyway. With no features,
+# transcribe-cpp-sys sets TRANSCRIBE_METAL=OFF and pins a portable x86 CPU floor.
+[target.'cfg(all(target_os = "macos", target_arch = "aarch64"))'.dependencies]
+transcribe-cpp = { version = "0.4.0", default-features = false, features = ["metal"] }
+
+[target.'cfg(all(target_os = "macos", target_arch = "x86_64"))'.dependencies]
+transcribe-cpp = { version = "0.4.0", default-features = false }
+
 [target.'cfg(target_os = "macos")'.dependencies]
 tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel", branch = "v2.1" }
-transcribe-cpp = { version = "0.4.0", default-features = false, features = ["metal"] }
 # Used by the receipt-sequenced ("reliable") paste path for lazy NSPasteboard
 # promises. Versions track what Tauri already pulls in.
 objc2 = "0.6"
@@ -161,6 +172,9 @@ objc2-service-management = "0.3.2"
 # Active window (program, title, window id) under X11, for per-app prompts and the paste guard; see context.rs.
 x11rb = "0.13"
 gtk-layer-shell = { version = "0.8", features = ["v0_6"] }
+# Renderer policy in src/webkit_renderer.rs compares the linked WebKitGTK
+# version against the release that introduced damage-based compositing.
+webkit2gtk-sys = "2.0"
 gtk = "0.18"
 transcribe-cpp = { version = "0.4.0", default-features = false, features = [
   "dynamic-backends",

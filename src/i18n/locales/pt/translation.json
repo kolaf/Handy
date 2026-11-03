@@ -7,7 +7,10 @@
     "model": "Modelo",
     "quit": "Sair",
     "cancel": "Cancelar",
-    "secureInputWarning": "⚠ Atalhos bloqueados pelo Secure Input"
+    "secureInputWarning": "⚠ Atalhos bloqueados pelo Secure Input",
+    "language": "Idioma",
+    "autoLanguage": "Automático",
+    "otherLanguages": "Outros idiomas"
   },
   "sidebar": {
     "general": "Geral",
@@ -356,7 +359,16 @@
         "description": "Selecione o idioma para reconhecimento de fala. Auto detectará automaticamente o idioma, enquanto selecionar um idioma específico pode melhorar a precisão para esse idioma.",
         "searchPlaceholder": "Buscar idiomas...",
         "noResults": "Nenhum idioma encontrado",
-        "auto": "Automático"
+        "auto": "Automático",
+        "autoUnavailable": {
+          "title": "Automático está desativado",
+          "oneLanguage": "Apenas um dos seus idiomas funciona com este modelo",
+          "undetectable": "Indisponível com {{languages}}",
+          "noMatch": "Nenhum dos seus idiomas funciona com este modelo"
+        },
+        "detectorMissingTitle": "Automático precisa de um download separado",
+        "detectorMissing": "Este modelo não consegue identificar o idioma que você está falando. O Automático precisa de um pequeno detector de idioma para descobrir",
+        "stopDetectorDownload": "Parar o download do detector de idioma"
       },
       "preferredLanguages": {
         "title": "Idiomas preferidos",
@@ -414,7 +426,6 @@
         "title": "Os modelos antigos não funcionam mais com o Handy",
         "description": "Eles estão ocupando {{size}} no seu computador.",
         "delete": "Excluir modelos",
-        "deleted": "Modelos antigos excluídos",
         "deleteFailed": "Não foi possível excluir alguns modelos antigos. Verifique o log para mais detalhes."
       },
       "rescan": {
@@ -469,6 +480,10 @@
       "lazyStreamClose": {
         "label": "Manter microfone aberto entre transcrições",
         "description": "Mantém o fluxo do microfone aberto por 30 segundos após parar a gravação, reduzindo a latência em transcrições consecutivas. Pode degradar a qualidade do áudio Bluetooth enquanto ativo."
+      },
+      "airpodsMode": {
+        "label": "Modo AirPods",
+        "description": "Alterna automaticamente os AirPods para o Mac para a transcrição quando um iPhone está a reproduzir áudio. Sem isto, as gravações podem ficar em silêncio."
       },
       "acceleration": {
         "transcribe": {
@@ -583,6 +598,12 @@
         "title": "Divisão de áudio longo",
         "description": "Divide gravações longas nas pausas antes da transcrição, o que normalmente melhora o desempenho da transcrição. Arquivos transcritos e re-transcrições longas são sempre divididos."
       },
+      "languageDetection": {
+        "title": "Limitar o Automático aos meus idiomas",
+        "description": "O Automático só escolhe entre seus idiomas preferidos, usando um pequeno detector de idioma. Ative se o Automático continuar escolhendo um idioma que você não fala",
+        "downloadHint": "Ativar isto baixa um pequeno detector de idioma",
+        "downloadingHint": "Baixando o detector de idioma. Desative para cancelar"
+      },
       "vadBackend": {
         "title": "Backend de detecção de voz",
         "description": "Escolha o detector usado para filtrar o silêncio. O Earshot é experimental; volte para o Silero se a fala for cortada ou o ruído for mantido.",
@@ -688,10 +709,10 @@
       "transcribeFile": "Transcrever arquivo",
       "mediaFiles": "Áudio e vídeo",
       "fileUnsupported": "Não foi possível ler o áudio de {{name}}.",
-      "readingFile": "Lendo {{name}}...",
       "transcribeFailed": "A transcrição falhou. Tente novamente.",
       "waiting": "Aguardando transcrição",
       "transcribingPercent": "Transcrevendo, {{percent}}%",
+      "readingFile": "Lendo arquivo...",
       "showMore": "Mostrar mais",
       "showLess": "Mostrar menos",
       "dropTitle": "Solte para transcrever",
@@ -726,9 +747,7 @@
       "whatsNewPreview": {
         "title": "Pré-visualizar novidades",
         "description": "Abrir a nota de versão incorporada mais recente sem marcá-la como vista",
-        "button": "Pré-visualizar",
-        "noNotes": "Nenhuma nota de versão incorporada encontrada",
-        "error": "Falha ao pré-visualizar as notas de versão"
+        "button": "Pré-visualizar"
       },
       "onboardingPreview": {
         "title": "Pré-visualizar configuração inicial",
@@ -752,8 +771,7 @@
       "modelMigration": {
         "title": "Migração de modelos",
         "description": "Abre de verdade a tela de atualização de modelos do formato antigo: baixa os substitutos, troca de modelo e exclui os arquivos antigos",
-        "button": "Abrir",
-        "noRetired": "Nenhum modelo do formato antigo no disco"
+        "button": "Abrir"
       },
       "soundTheme": {
         "label": "Tema de Som",
@@ -822,6 +840,10 @@
       "recordingBuffer": {
         "title": "Buffer de gravação extra",
         "description": "Tempo extra (em milissegundos) para continuar gravando após soltar a tecla, para capturar áudio restante. 0 = sem buffer extra."
+      },
+      "languageDetectionWindow": {
+        "title": "Áudio de detecção de idioma",
+        "description": "Segundos de fala que o detector de idioma ouve. Mais longo é mais preciso, porém mais lento."
       },
       "keyboardDiagnostic": {
         "title": "Diagnóstico do teclado",
@@ -897,6 +919,8 @@
     "title": "Novidades no Handy v{{version}}"
   },
   "common": {
+    "playbackPosition": "Posição de reprodução",
+    "resetSetting": "Redefinir {{setting}} para o padrão",
     "loading": "Carregando...",
     "delete": "Excluir",
     "close": "Fechar",
@@ -916,12 +940,25 @@
     },
     "noInputDeviceTitle": "Nenhum microfone encontrado",
     "noInputDevice": "Nenhum dispositivo de entrada de áudio foi detectado. Conecte um microfone ou fone de ouvido e tente novamente.",
-    "recordingFailed": "Falha ao iniciar a gravação: {{error}}",
-    "modelLoadFailed": "Falha ao carregar o modelo: {{model}}",
-    "modelLoadFailedUnknown": "modelo desconhecido",
+    "recordingFailedTitle": "Falha ao iniciar a gravação",
+    "modelLoadFailed": "O Handy não conseguiu carregar este modelo. Tente novamente ou escolha outro.",
+    "modelLoadFailedTitle": "Falha ao carregar o modelo",
+    "modelDownloadFailed": "Falha no download",
     "pasteFailedTitle": "Falha ao colar o texto",
     "pasteFailed": "Não foi possível colar o texto no aplicativo ativo.",
+    "postProcessFailedTitle": "Colado sem pós-processamento",
+    "postProcessFailed": "O pós-processamento não terminou, então a transcrição foi colada como está.",
+    "filePostProcessFailedTitle": "Transcrito sem pós-processamento",
+    "filePostProcessFailed": "O pós-processamento não terminou, então a transcrição foi salva como está.",
+    "fileTranscriptionFailedTitle": "Falha na transcrição do arquivo",
     "transcriptionFailedTitle": "Falha na transcrição"
+  },
+  "notices": {
+    "errorOne": "{{n}} erro",
+    "errorMany": "{{n}} erros",
+    "warningOne": "{{n}} aviso",
+    "warningMany": "{{n}} avisos",
+    "errorsAndWarnings": "{{errors}}, {{warnings}}"
   },
   "appLanguage": {
     "title": "Idioma da Aplicação",

@@ -7,7 +7,10 @@
     "model": "模型",
     "quit": "結束",
     "cancel": "取消",
-    "secureInputWarning": "⚠ 快捷鍵被 Secure Input 阻擋"
+    "secureInputWarning": "⚠ 快捷鍵被 Secure Input 阻擋",
+    "language": "語言",
+    "autoLanguage": "自動",
+    "otherLanguages": "其他語言"
   },
   "sidebar": {
     "general": "一般",
@@ -356,7 +359,16 @@
         "description": "選擇語音辨識的語言。選擇自動將自動判定語言，選擇特定語言可以提高該語言的準確度",
         "searchPlaceholder": "搜尋語言...",
         "noResults": "未找到語言",
-        "auto": "自動"
+        "auto": "自動",
+        "autoUnavailable": {
+          "title": "自動已停用",
+          "oneLanguage": "你的語言中只有一種適用於此模型",
+          "undetectable": "不支援{{languages}}",
+          "noMatch": "你的語言都不適用於此模型"
+        },
+        "detectorMissingTitle": "自動模式需要另外下載",
+        "detectorMissing": "此模型無法分辨你說的是哪種語言。自動模式需要一個小型語言偵測器來判斷",
+        "stopDetectorDownload": "停止下載語言偵測器"
       },
       "preferredLanguages": {
         "title": "偏好語言",
@@ -414,7 +426,6 @@
         "title": "舊模型已無法在 Handy 中使用",
         "description": "它們佔用了您電腦上 {{size}} 的空間。",
         "delete": "刪除模型",
-        "deleted": "已刪除舊模型",
         "deleteFailed": "部分舊模型無法刪除。請查看記錄檔以了解詳情。"
       },
       "rescan": {
@@ -469,6 +480,10 @@
       "lazyStreamClose": {
         "label": "在轉錄之間保持麥克風開啟",
         "description": "錄音停止後保持麥克風串流開啟30秒，減少連續轉錄時的延遲。啟用時可能會降低藍牙音訊品質。"
+      },
+      "airpodsMode": {
+        "label": "AirPods 模式",
+        "description": "當 iPhone 正在播放音訊時，自動將 AirPods 切換到 Mac 進行轉錄。否則錄音可能會是靜音的。"
       },
       "acceleration": {
         "transcribe": {
@@ -583,6 +598,12 @@
         "title": "長音訊分段",
         "description": "在轉錄前依停頓處將長錄音分段，通常可以提升轉錄效果。轉錄檔案與較長的重新轉錄一律會分段。"
       },
+      "languageDetection": {
+        "title": "將自動模式限制為我的語言",
+        "description": "自動模式會藉助一個小型語言偵測器，只從你的偏好語言中選擇。如果自動模式總是選到你不說的語言，請開啟此項",
+        "downloadHint": "開啟後會下載一個小型語言偵測器",
+        "downloadingHint": "正在下載語言偵測器。關閉此項即可取消"
+      },
       "vadBackend": {
         "title": "語音活動偵測後端",
         "description": "選擇用於過濾靜音的偵測器。Earshot 為實驗性功能；若語音被截斷或雜訊被保留，請切換回 Silero。",
@@ -688,10 +709,10 @@
       "transcribeFile": "轉錄檔案",
       "mediaFiles": "音訊和影片",
       "fileUnsupported": "無法讀取 {{name}} 中的音訊。",
-      "readingFile": "正在讀取 {{name}}...",
       "transcribeFailed": "轉錄失敗，請重試。",
       "waiting": "等待轉錄",
       "transcribingPercent": "正在轉錄，{{percent}}%",
+      "readingFile": "正在讀取檔案...",
       "showMore": "顯示更多",
       "showLess": "收合",
       "dropTitle": "拖放到此處進行轉錄",
@@ -726,9 +747,7 @@
       "whatsNewPreview": {
         "title": "預覽新功能",
         "description": "開啟最新內建版本資訊，且不標記為已看過",
-        "button": "預覽",
-        "noNotes": "找不到內建版本資訊",
-        "error": "無法預覽版本資訊"
+        "button": "預覽"
       },
       "onboardingPreview": {
         "title": "預覽新手引導",
@@ -752,8 +771,7 @@
       "modelMigration": {
         "title": "模型遷移",
         "description": "實際開啟舊格式模型更新畫面：會下載替代模型、切換模型並刪除舊檔案",
-        "button": "開啟",
-        "noRetired": "磁碟上沒有舊格式模型"
+        "button": "開啟"
       },
       "soundTheme": {
         "label": "聲音主題",
@@ -822,6 +840,10 @@
       "recordingBuffer": {
         "title": "額外錄音緩衝",
         "description": "放開按鍵後繼續錄音的額外時間（毫秒），以捕捉尾音。0 = 無額外緩衝。"
+      },
+      "languageDetectionWindow": {
+        "title": "語言偵測音訊",
+        "description": "語言偵測器聆聽的語音秒數。越長越準確，但越慢。"
       },
       "keyboardDiagnostic": {
         "title": "鍵盤診斷",
@@ -897,6 +919,8 @@
     "title": "Handy v{{version}} 新功能"
   },
   "common": {
+    "playbackPosition": "播放位置",
+    "resetSetting": "將{{setting}}重設為預設值",
     "loading": "載入中...",
     "delete": "刪除",
     "close": "關閉",
@@ -916,12 +940,25 @@
     },
     "noInputDeviceTitle": "找不到麥克風",
     "noInputDevice": "未偵測到音訊輸入裝置。請連接麥克風或耳機後重試。",
-    "recordingFailed": "錄音啟動失敗: {{error}}",
-    "modelLoadFailed": "載入模型失敗: {{model}}",
-    "modelLoadFailedUnknown": "未知模型",
+    "recordingFailedTitle": "錄音啟動失敗",
+    "modelLoadFailed": "Handy 無法載入此模型。請再試一次或選擇其他模型。",
+    "modelLoadFailedTitle": "載入模型失敗",
+    "modelDownloadFailed": "下載失敗",
     "pasteFailedTitle": "貼上文字失敗",
     "pasteFailed": "無法將文字貼上至目前作用中的應用程式。",
+    "postProcessFailedTitle": "已貼上，未經後處理",
+    "postProcessFailed": "後處理未完成，因此按原樣貼上轉錄內容。",
+    "filePostProcessFailedTitle": "已轉錄，未經後處理",
+    "filePostProcessFailed": "後處理未完成，因此按原樣儲存轉錄內容。",
+    "fileTranscriptionFailedTitle": "檔案轉錄失敗",
     "transcriptionFailedTitle": "轉錄失敗"
+  },
+  "notices": {
+    "errorOne": "{{n}} 個錯誤",
+    "errorMany": "{{n}} 個錯誤",
+    "warningOne": "{{n}} 個警告",
+    "warningMany": "{{n}} 個警告",
+    "errorsAndWarnings": "{{errors}}，{{warnings}}"
   },
   "appLanguage": {
     "title": "應用程式語言",

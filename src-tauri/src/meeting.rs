@@ -409,7 +409,7 @@ async fn run_job(
     if !speakers {
         let manager = app.state::<Arc<crate::managers::transcription::TranscriptionManager>>();
         if !manager.is_model_loaded() {
-            manager.initiate_model_load();
+            manager.initiate_model_load(false);
         }
     }
 

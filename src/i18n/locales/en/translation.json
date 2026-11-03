@@ -7,7 +7,10 @@
     "model": "Model",
     "quit": "Quit",
     "cancel": "Cancel",
-    "secureInputWarning": "⚠ Shortcuts blocked by Secure Input"
+    "secureInputWarning": "⚠ Shortcuts blocked by Secure Input",
+    "language": "Language",
+    "autoLanguage": "Auto",
+    "otherLanguages": "Other Languages"
   },
   "sidebar": {
     "general": "General",
@@ -391,7 +394,16 @@
         "description": "Select the language for speech recognition. Auto will automatically determine the language, while selecting a specific language can improve accuracy for that language.",
         "searchPlaceholder": "Search languages...",
         "noResults": "No languages found",
-        "auto": "Auto"
+        "auto": "Auto",
+        "autoUnavailable": {
+          "title": "Auto is disabled",
+          "oneLanguage": "Only one of your languages works with this model",
+          "undetectable": "Not available with {{languages}}",
+          "noMatch": "None of your languages work with this model"
+        },
+        "detectorMissingTitle": "Auto needs a separate download",
+        "detectorMissing": "This model can't tell which language you're speaking. Auto needs a small language detector to figure it out",
+        "stopDetectorDownload": "Stop downloading the language detector"
       },
       "preferredLanguages": {
         "title": "Preferred Languages",
@@ -459,7 +471,6 @@
         "title": "Old models no longer work with Handy",
         "description": "They're taking up {{size}} on your computer.",
         "delete": "Delete models",
-        "deleted": "Deleted old models",
         "deleteFailed": "Some old models couldn't be deleted. Check the log for details."
       },
       "rescan": {
@@ -514,6 +525,10 @@
       "lazyStreamClose": {
         "label": "Keep Mic Open Between Transcriptions",
         "description": "Keeps the microphone stream open for 30 seconds after recording stops, reducing latency for back-to-back transcriptions. May degrade Bluetooth audio quality while active."
+      },
+      "airpodsMode": {
+        "label": "AirPods Mode",
+        "description": "Automatically switches AirPods to the Mac for transcription when an iPhone is playing audio. Without this, recordings can come back silent."
       },
       "acceleration": {
         "transcribe": {
@@ -647,6 +662,12 @@
         "title": "Long Audio Chunking",
         "description": "Splits long recordings at pauses before transcribing, which typically improves transcription performance. Transcribed files and long re-transcriptions are always split."
       },
+      "languageDetection": {
+        "title": "Limit Auto to My Languages",
+        "description": "Auto only picks from your preferred languages, using a small language detector. Turn this on if Auto keeps choosing a language you don't speak",
+        "downloadHint": "Turning this on downloads a small language detector",
+        "downloadingHint": "Downloading the language detector. Turn this off to cancel"
+      },
       "vadBackend": {
         "title": "Voice Activity Backend",
         "description": "Choose the detector used to filter silence. Earshot is experimental; switch back to Silero if speech is clipped or noise is retained.",
@@ -775,10 +796,10 @@
       "transcribeFile": "Transcribe File",
       "mediaFiles": "Audio and video",
       "fileUnsupported": "Couldn't read audio from {{name}}.",
-      "readingFile": "Reading {{name}}...",
       "transcribeFailed": "Transcription failed. Please try again.",
       "waiting": "Waiting to transcribe",
       "transcribingPercent": "Transcribing, {{percent}}%",
+      "readingFile": "Reading file...",
       "showMore": "Show more",
       "showLess": "Show less",
       "dropTitle": "Drop to transcribe",
@@ -813,9 +834,7 @@
       "whatsNewPreview": {
         "title": "Preview What's New",
         "description": "Open the latest bundled release note without marking it as seen",
-        "button": "Preview",
-        "noNotes": "No bundled release notes found",
-        "error": "Failed to preview release notes"
+        "button": "Preview"
       },
       "onboardingPreview": {
         "title": "Preview Onboarding",
@@ -839,8 +858,7 @@
       "modelMigration": {
         "title": "Model Migration",
         "description": "Open the old-format model update screen for real: it downloads replacements, switches models and deletes old files",
-        "button": "Open",
-        "noRetired": "No old-format models on disk"
+        "button": "Open"
       },
       "soundTheme": {
         "label": "Sound Theme",
@@ -909,6 +927,10 @@
       "recordingBuffer": {
         "title": "Extra Recording Buffer",
         "description": "Extra time (in milliseconds) to keep recording after you release the key, to capture trailing audio. 0 = no extra buffer."
+      },
+      "languageDetectionWindow": {
+        "title": "Language Detection Audio",
+        "description": "Seconds of speech the language detector hears. Longer is more accurate but slower."
       },
       "keyboardDiagnostic": {
         "title": "Keyboard Diagnostic",
@@ -1065,6 +1087,8 @@
     "title": "New in Handy v{{version}}"
   },
   "common": {
+    "playbackPosition": "Playback position",
+    "resetSetting": "Reset {{setting}} to default",
     "loading": "Loading...",
     "delete": "Delete",
     "close": "Close",
@@ -1084,12 +1108,25 @@
     },
     "noInputDeviceTitle": "No Microphone Found",
     "noInputDevice": "No audio input device was detected. Please connect a microphone or headset and try again.",
-    "recordingFailed": "Failed to start recording: {{error}}",
-    "modelLoadFailed": "Failed to load model: {{model}}",
-    "modelLoadFailedUnknown": "unknown model",
+    "recordingFailedTitle": "Failed to Start Recording",
+    "modelLoadFailed": "Handy couldn't load this model. Try again or choose a different one.",
+    "modelLoadFailedTitle": "Failed to Load Model",
+    "modelDownloadFailed": "Download failed",
     "pasteFailedTitle": "Failed to Paste Text",
     "pasteFailed": "Text could not be pasted into the active application.",
+    "postProcessFailedTitle": "Pasted Without Post-Processing",
+    "postProcessFailed": "Post Process didn't finish, so the transcript was pasted as is.",
+    "filePostProcessFailedTitle": "Transcribed Without Post-Processing",
+    "filePostProcessFailed": "Post Process didn't finish, so the transcript was saved as is.",
+    "fileTranscriptionFailedTitle": "File Transcription Failed",
     "transcriptionFailedTitle": "Transcription Failed"
+  },
+  "notices": {
+    "errorOne": "{{n}} error",
+    "errorMany": "{{n}} errors",
+    "warningOne": "{{n}} warning",
+    "warningMany": "{{n}} warnings",
+    "errorsAndWarnings": "{{errors}}, {{warnings}}"
   },
   "appLanguage": {
     "title": "Application Language",
