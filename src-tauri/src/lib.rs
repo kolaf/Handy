@@ -383,6 +383,7 @@ fn initialize_core_logic(app_handle: &AppHandle) {
 
     // Apply show_tray_icon setting
     let settings = settings::get_settings(app_handle);
+    tray::refresh_language_tray_label(app_handle, &settings.selected_language);
     if !settings.show_tray_icon {
         tray::set_tray_visibility(app_handle, false);
     }
