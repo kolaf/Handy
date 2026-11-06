@@ -1,6 +1,5 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { type } from "@tauri-apps/plugin-os";
 import { MicrophoneSelector } from "../MicrophoneSelector";
 import { ChannelSelector } from "../ChannelSelector";
 import { ShortcutInput } from "../ShortcutInput";
@@ -20,7 +19,6 @@ import { isChinese } from "@/lib/utils/languageSuggestions";
 export const GeneralSettings: React.FC = () => {
   const { t } = useTranslation();
   const { audioFeedbackEnabled, getSetting } = useSettings();
-  const isLinux = type() === "linux";
   // Only for Chinese speakers, or anyone who already picked a script.
   const speaksChinese =
     (getSetting("spoken_languages") ?? []).some(isChinese) ||
@@ -33,8 +31,7 @@ export const GeneralSettings: React.FC = () => {
         <ShortcutInput shortcutId="model_picker" grouped={true} />
         <ShortcutInput shortcutId="paste_last" grouped={true} />
         <ShortcutActivationSetting descriptionMode="tooltip" grouped={true} />
-        {/* Cancel shortcut remains hidden on Linux because of dynamic shortcut instability. */}
-        {!isLinux && <ShortcutInput shortcutId="cancel" grouped={true} />}
+        <ShortcutInput shortcutId="cancel" grouped={true} />
       </SettingsGroup>
       <SettingsGroup title={t("settings.languages.title")}>
         <PreferredLanguages descriptionMode="tooltip" grouped={true} />

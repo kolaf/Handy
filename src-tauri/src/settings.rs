@@ -1299,8 +1299,8 @@ pub fn get_default_settings() -> AppSettings {
             id: "cancel".to_string(),
             name: "Cancel".to_string(),
             description: "Cancels the current recording.".to_string(),
-            default_binding: "escape".to_string(),
-            current_binding: "escape".to_string(),
+            default_binding: "ctrl+alt+space".to_string(),
+            current_binding: "ctrl+alt+space".to_string(),
         },
     );
 
@@ -1891,8 +1891,8 @@ mod tests {
                     "id": "cancel",
                     "name": "Cancel",
                     "description": "Cancels the current recording.",
-                    "default_binding": "escape",
-                    "current_binding": "escape"
+                    "default_binding": "ctrl+alt+space",
+                    "current_binding": "ctrl+alt+space"
                 }
             },
             "push_to_talk": false,
