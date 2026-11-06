@@ -120,10 +120,10 @@ pub fn plan_for_language(
     current_model: &str,
     downloaded_ids: &[String],
 ) -> LanguagePlan {
-    let Some(rule) = rules
-        .iter()
-        .find(|r| r.language.eq_ignore_ascii_case(language.trim()))
-    else {
+    let wanted = crate::catalog::language_identity(language.trim());
+    let Some(rule) = rules.iter().find(|r| {
+        crate::catalog::language_identity(r.language.trim()).eq_ignore_ascii_case(&wanted)
+    }) else {
         return LanguagePlan::Nothing;
     };
     if rule.model_id == current_model {

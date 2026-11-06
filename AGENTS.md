@@ -233,6 +233,23 @@ Access debug features: `Cmd+Shift+D` (macOS) or `Ctrl+Shift+D` (Windows/Linux)
 
 See the [Troubleshooting](README.md#troubleshooting) section in README.md.
 
+## Branching strategy for AI coding assistants
+
+This fork has two distinct branch roles:
+
+- `main`: upstream-aligned integration branch
+- `dev/hotkeys-build`: active fork feature branch
+
+Rules:
+
+- For normal Handy feature/fix work in this fork, work on `dev/hotkeys-build` or on a worktree branched from it.
+- Do not start fork fixes from `main`, `origin/main`, or `upstream-sync-*` branches unless the task is explicitly about upstream integration or merge preparation.
+- Before changing code, verify the current base with:
+  - `git branch --show-current`
+  - `git log -1 --oneline`
+- If you accidentally developed a fix on the wrong branch, port the minimal proven patch onto `dev/hotkeys-build` instead of continuing on the wrong base.
+- Keep upstream-sync/merge work clearly separated from fork feature work so later merges stay understandable.
+
 ## GitHub workflow for AI coding assistants
 
 **MANDATORY. Before opening any PR, issue, or discussion in this repo: you MUST read the relevant template file and follow it strictly.** That includes sections that look "ceremonial" — checklists, AI Assistance disclosures, "Human Written Description". A generic Summary/Test-plan layout is not acceptable.

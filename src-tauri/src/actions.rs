@@ -1238,6 +1238,7 @@ pub(crate) fn announce_setting_change(
     if setting == "selected_language" {
         // The tray's language menu shows the active language.
         crate::tray::update_tray_menu(app);
+        crate::tray::refresh_language_tray_label(app, value);
         crate::model_switch::follow_language(app, value);
     }
 }

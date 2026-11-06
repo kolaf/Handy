@@ -26,6 +26,7 @@ use crate::managers::transcription::TranscriptionManager;
 use crate::notices::{self, NoticeCode};
 use crate::settings;
 use crate::tray_i18n::get_tray_translations;
+use isolang::Language;
 use log::{debug, error, info, trace, warn};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -260,6 +261,50 @@ pub fn refresh_tray_icon(app: &AppHandle) {
 /// list/selection/loaded state, language, settings).
 pub fn update_tray_menu(app: &AppHandle) {
     sync_tray(app);
+}
+
+pub fn refresh_language_tray_label(app: &AppHandle, selected_language: &str) {
+    #[cfg(target_os = "linux")]
+    if let Some(tray) = app.try_state::<TrayIcon>() {
+        if let Err(err) = tray.set_title(linux_tray_title(selected_language).as_deref()) {
+            error!("Failed to set tray title: {err}");
+        }
+    }
+}
+
+fn linux_tray_title(selected_language: &str) -> Option<String> {
+    #[cfg(target_os = "linux")]
+    {
+        Some(if selected_language.eq_ignore_ascii_case("auto") {
+            "Auto".to_string()
+        } else {
+            let identity = selected_language
+                .split(&['-', '_'][..])
+                .next()
+                .unwrap_or(selected_language)
+                .to_ascii_lowercase();
+            match identity.as_str() {
+                "el" => "Greek".to_string(),
+                "ht" => "Haitian Creole".to_string(),
+                "nb" | "no" => "Norwegian".to_string(),
+                "pa" => "Punjabi".to_string(),
+                "ps" => "Pashto".to_string(),
+                "yue" => "Cantonese".to_string(),
+                _ => match identity.len() {
+                    2 => Language::from_639_1(&identity),
+                    3 => Language::from_639_3(&identity),
+                    _ => None,
+                }
+                .map(|l| l.to_name().to_string())
+                .unwrap_or(identity),
+            }
+        })
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = selected_language;
+        None
+    }
 }
 
 /// Rebuild the menu even if nothing it shows changed: clicking a check item

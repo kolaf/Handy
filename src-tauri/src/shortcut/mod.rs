@@ -704,6 +704,7 @@ pub fn change_selected_language_setting(app: AppHandle, language: String) -> Res
     settings.selected_language = language.clone();
     settings::write_settings(&app, settings);
     tray::update_tray_menu(&app);
+    tray::refresh_language_tray_label(&app, &language);
 
     // The tray can change it too; keep the settings window in sync.
     let _ = app.emit(
