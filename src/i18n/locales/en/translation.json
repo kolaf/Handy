@@ -609,6 +609,10 @@
           "ctrlEnter": "Ctrl+Enter"
         }
       },
+      "pushToTalkAutoSubmit": {
+        "title": "Auto Submit for Push-to-Talk",
+        "description": "Automatically send the selected key combination after text insertion for dictation sessions started in push-to-talk mode. Cmd+Enter applies on macOS, while Windows/Linux use Super+Enter."
+      },
       "translateToEnglish": {
         "label": "Translate to English",
         "description": "Automatically translate speech from other languages to English during transcription."

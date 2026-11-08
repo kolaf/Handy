@@ -52,6 +52,14 @@ export const AdvancedSettings: React.FC = () => {
         <ClipboardHandlingSetting descriptionMode="tooltip" grouped={true} />
         <PasteFocusGuard descriptionMode="tooltip" grouped={true} />
         <AutoSubmit descriptionMode="tooltip" grouped={true} />
+        <AutoSubmit
+          descriptionMode="tooltip"
+          grouped={true}
+          titleKey="settings.advanced.pushToTalkAutoSubmit.title"
+          descriptionKey="settings.advanced.pushToTalkAutoSubmit.description"
+          enabledSettingKey="push_to_talk_auto_submit"
+          keySettingKey="push_to_talk_auto_submit_key"
+        />
       </SettingsGroup>
 
       <SettingsGroup title={t("settings.advanced.groups.transcription")}>
