@@ -9,7 +9,9 @@ use crate::managers::transcription::policy::{live_decode, LiveDecode, ModelTrait
 use crate::managers::transcription::StreamWorkKind;
 use crate::managers::transcription::{Transcription, TranscriptionManager};
 use crate::notices::{self, Notice, NoticeCode, NoticeSource};
-use crate::settings::{get_settings, AppSettings, OverlayStyle, APPLE_INTELLIGENCE_PROVIDER_ID};
+use crate::settings::{
+    get_settings, AppSettings, OverlayStyle, ShortcutActivation, APPLE_INTELLIGENCE_PROVIDER_ID,
+};
 use crate::shortcut;
 use crate::tray::{set_tray_state, TrayIconState};
 use crate::utils::{
@@ -23,7 +25,7 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 use std::collections::HashMap;
 use std::future::Future;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager};
@@ -82,6 +84,7 @@ const CANCELLATION_POLL_INTERVAL: Duration = Duration::from_millis(25);
 /// Bumped per recording session, so a late paste from an earlier session
 /// doesn't reset the tray or hide the overlay of a newer one.
 static RECORDING_SESSION: AtomicU64 = AtomicU64::new(0);
+static RECORDING_WAS_PUSH_TO_TALK: AtomicBool = AtomicBool::new(false);
 
 /// Drop guard that finishes the transcription pipeline, including immediate
 /// model unloading on early exits.
@@ -672,6 +675,10 @@ impl ShortcutAction for TranscribeAction {
         // Get the microphone mode to determine audio feedback timing
         let plan_started = Instant::now();
         let settings = get_settings(app);
+        RECORDING_WAS_PUSH_TO_TALK.store(
+            settings.shortcut_activation == ShortcutActivation::PushToTalk,
+            Ordering::SeqCst,
+        );
         let is_always_on = settings.always_on_microphone;
 
         let selected_model_info = app
@@ -1017,6 +1024,14 @@ impl ShortcutAction for TranscribeAction {
                                 let post_process_failed = processed.post_process_failed;
                                 let rm_for_paste = Arc::clone(&rm);
                                 let started_in_for_paste = started_in.clone();
+                                let paste_settings = get_settings(&ah);
+                                let auto_submit_override = crate::clipboard::effective_auto_submit(
+                                    RECORDING_WAS_PUSH_TO_TALK.load(Ordering::SeqCst),
+                                    paste_settings.auto_submit,
+                                    paste_settings.auto_submit_key,
+                                    paste_settings.push_to_talk_auto_submit,
+                                    paste_settings.push_to_talk_auto_submit_key,
+                                );
                                 // Taken before the paste thread exists, and so
                                 // before the next session can start.
                                 let session = RECORDING_SESSION.load(Ordering::SeqCst);
@@ -1065,7 +1080,11 @@ impl ShortcutAction for TranscribeAction {
                                         let owns_ui =
                                             || RECORDING_SESSION.load(Ordering::SeqCst) == session;
                                         let (outcome, notice) =
-                                            match utils::paste(final_text.clone(), ah_clone.clone()) {
+                                            match crate::clipboard::paste_with_auto_submit(
+                                                final_text.clone(),
+                                                ah_clone.clone(),
+                                                auto_submit_override,
+                                            ) {
                                                 Ok(()) => {
                                                     crate::context::note_paste(&ah_clone, &final_text);
                                                     debug!(

@@ -822,22 +822,57 @@ fn should_send_auto_submit(auto_submit: bool, paste_method: PasteMethod) -> bool
     auto_submit && paste_method != PasteMethod::None
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct AutoSubmitOverride {
+    pub enabled: bool,
+    pub key: AutoSubmitKey,
+}
+
+pub fn effective_auto_submit(
+    is_push_to_talk: bool,
+    auto_submit: bool,
+    auto_submit_key: AutoSubmitKey,
+    push_to_talk_auto_submit: bool,
+    push_to_talk_auto_submit_key: AutoSubmitKey,
+) -> AutoSubmitOverride {
+    if is_push_to_talk {
+        AutoSubmitOverride {
+            enabled: push_to_talk_auto_submit,
+            key: push_to_talk_auto_submit_key,
+        }
+    } else {
+        AutoSubmitOverride {
+            enabled: auto_submit,
+            key: auto_submit_key,
+        }
+    }
+}
+
 /// Pastes `text` into the focused app. Call from a worker thread, never the main
 /// thread: it sleeps between steps (input injection hops via `with_enigo`).
 pub fn paste(text: String, app_handle: AppHandle) -> Result<(), String> {
-    paste_with(text, app_handle, None)
+    paste_with(text, app_handle, None, None)
 }
 
 /// Like `paste`, but leaves `text` on the clipboard whatever the clipboard setting says. For text the user cannot
 /// otherwise get back: if the focused text is read-only, the paste goes nowhere and the clipboard is the only copy.
 pub fn paste_keeping_on_clipboard(text: String, app_handle: AppHandle) -> Result<(), String> {
-    paste_with(text, app_handle, Some(ClipboardHandling::CopyToClipboard))
+    paste_with(text, app_handle, Some(ClipboardHandling::CopyToClipboard), None)
+}
+
+pub fn paste_with_auto_submit(
+    text: String,
+    app_handle: AppHandle,
+    auto_submit_override: AutoSubmitOverride,
+) -> Result<(), String> {
+    paste_with(text, app_handle, None, Some(auto_submit_override))
 }
 
 fn paste_with(
     text: String,
     app_handle: AppHandle,
     clipboard_handling: Option<ClipboardHandling>,
+    auto_submit_override: Option<AutoSubmitOverride>,
 ) -> Result<(), String> {
     let _paste = PASTE_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
     let mut settings = get_settings(&app_handle);
@@ -847,6 +882,10 @@ fn paste_with(
     let paste_method = settings.paste_method;
     let paste_delay_ms = settings.paste_delay_ms;
     let paste_delay_after_ms = settings.paste_delay_after_ms;
+    let auto_submit_override = auto_submit_override.unwrap_or(AutoSubmitOverride {
+        enabled: settings.auto_submit,
+        key: settings.auto_submit_key,
+    });
 
     // Append trailing space if setting is enabled
     let text = if settings.append_trailing_space {
@@ -884,8 +923,8 @@ fn paste_with(
                 // Runs entirely on the main thread, as it requires.
                 let (text, app) = (text.clone(), app_handle.clone());
                 let (auto_submit, auto_submit_key, clipboard_handling) = (
-                    settings.auto_submit,
-                    settings.auto_submit_key,
+                    auto_submit_override.enabled,
+                    auto_submit_override.key,
                     settings.clipboard_handling,
                 );
                 let reliable_result = with_enigo(&app_handle, move |enigo| {
@@ -924,9 +963,9 @@ fn paste_with(
         }
     }
 
-    if should_send_auto_submit(settings.auto_submit, paste_method) {
+    if should_send_auto_submit(auto_submit_override.enabled, paste_method) {
         std::thread::sleep(Duration::from_millis(50));
-        let auto_submit_key = settings.auto_submit_key;
+        let auto_submit_key = auto_submit_override.key;
         if let Err(error) = with_enigo(&app_handle, move |enigo| {
             send_return_key(enigo, auto_submit_key)
         }) {
@@ -1059,6 +1098,40 @@ e.g. 28:1 28:0 means pressing on the Enter button on a standard US keyboard.
         assert!(should_send_auto_submit(true, PasteMethod::Direct));
         assert!(should_send_auto_submit(true, PasteMethod::CtrlShiftV));
         assert!(should_send_auto_submit(true, PasteMethod::ShiftInsert));
+    }
+
+    #[test]
+    fn push_to_talk_sessions_use_push_to_talk_auto_submit() {
+        assert_eq!(
+            effective_auto_submit(
+                true,
+                false,
+                AutoSubmitKey::Enter,
+                true,
+                AutoSubmitKey::CmdEnter,
+            ),
+            AutoSubmitOverride {
+                enabled: true,
+                key: AutoSubmitKey::CmdEnter,
+            }
+        );
+    }
+
+    #[test]
+    fn non_push_to_talk_sessions_use_default_auto_submit() {
+        assert_eq!(
+            effective_auto_submit(
+                false,
+                true,
+                AutoSubmitKey::CtrlEnter,
+                false,
+                AutoSubmitKey::Enter,
+            ),
+            AutoSubmitOverride {
+                enabled: true,
+                key: AutoSubmitKey::CtrlEnter,
+            }
+        );
     }
 
     #[test]
