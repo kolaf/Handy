@@ -825,6 +825,10 @@ impl ShortcutAction for TranscribeAction {
         let stop_time = Instant::now();
         debug!("TranscribeAction::stop called for binding: {}", binding_id);
 
+        if get_settings(app).shortcut_activation == ShortcutActivation::HoldOrToggle {
+            RECORDING_WAS_PUSH_TO_TALK.store(true, Ordering::SeqCst);
+        }
+
         let ah = app.clone();
         let rm = Arc::clone(&app.state::<Arc<AudioRecordingManager>>());
         let tm = Arc::clone(&app.state::<Arc<TranscriptionManager>>());
