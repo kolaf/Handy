@@ -640,6 +640,10 @@ pub struct AppSettings {
     pub auto_submit: bool,
     #[serde(default)]
     pub auto_submit_key: AutoSubmitKey,
+    #[serde(default = "default_push_to_talk_auto_submit")]
+    pub push_to_talk_auto_submit: bool,
+    #[serde(default)]
+    pub push_to_talk_auto_submit_key: AutoSubmitKey,
     #[serde(default = "default_post_process_enabled")]
     pub post_process_enabled: bool,
     #[serde(default = "default_post_process_provider_id")]
@@ -867,6 +871,10 @@ fn default_paste_delay_after_ms() -> u64 {
 }
 
 fn default_auto_submit() -> bool {
+    false
+}
+
+fn default_push_to_talk_auto_submit() -> bool {
     false
 }
 
@@ -1340,6 +1348,8 @@ pub fn get_default_settings() -> AppSettings {
         clipboard_handling: ClipboardHandling::default(),
         auto_submit: default_auto_submit(),
         auto_submit_key: AutoSubmitKey::default(),
+        push_to_talk_auto_submit: default_push_to_talk_auto_submit(),
+        push_to_talk_auto_submit_key: AutoSubmitKey::default(),
         post_process_enabled: default_post_process_enabled(),
         post_process_provider_id: default_post_process_provider_id(),
         post_process_providers: default_post_process_providers(),
@@ -2112,6 +2122,27 @@ mod tests {
             settings.settings_schema_version,
             CURRENT_SETTINGS_SCHEMA_VERSION
         );
+    }
+
+    #[test]
+    fn default_settings_disable_push_to_talk_auto_submit() {
+        let settings = get_default_settings();
+        assert!(!settings.push_to_talk_auto_submit);
+        assert_eq!(settings.push_to_talk_auto_submit_key, AutoSubmitKey::Enter);
+    }
+
+    #[test]
+    fn missing_push_to_talk_auto_submit_settings_use_defaults() {
+        let settings: AppSettings = serde_json::from_value(serde_json::json!({
+            "auto_submit": true,
+            "auto_submit_key": "ctrl_enter"
+        }))
+        .expect("missing push-to-talk keys should use defaults");
+
+        assert!(!settings.push_to_talk_auto_submit);
+        assert_eq!(settings.push_to_talk_auto_submit_key, AutoSubmitKey::Enter);
+        assert!(settings.auto_submit);
+        assert_eq!(settings.auto_submit_key, AutoSubmitKey::CtrlEnter);
     }
 
     #[cfg(not(target_os = "linux"))]

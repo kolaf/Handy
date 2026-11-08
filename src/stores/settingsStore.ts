@@ -180,6 +180,10 @@ const settingUpdaters: {
   auto_submit: (value) => commands.changeAutoSubmitSetting(value as boolean),
   auto_submit_key: (value) =>
     commands.changeAutoSubmitKeySetting(value as string),
+  push_to_talk_auto_submit: (value) =>
+    commands.changePushToTalkAutoSubmitSetting(value as boolean),
+  push_to_talk_auto_submit_key: (value) =>
+    commands.changePushToTalkAutoSubmitKeySetting(value as string),
   history_limit: (value) => commands.updateHistoryLimit(value as number),
   post_process_enabled: (value) =>
     commands.changePostProcessEnabledSetting(value as boolean),

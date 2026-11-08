@@ -1127,6 +1127,42 @@ pub fn change_auto_submit_key_setting(app: AppHandle, key: String) -> Result<(),
 
 #[tauri::command]
 #[specta::specta]
+pub fn change_push_to_talk_auto_submit_setting(
+    app: AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.push_to_talk_auto_submit = enabled;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn change_push_to_talk_auto_submit_key_setting(
+    app: AppHandle,
+    key: String,
+) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    let parsed = match key.as_str() {
+        "enter" => AutoSubmitKey::Enter,
+        "ctrl_enter" => AutoSubmitKey::CtrlEnter,
+        "cmd_enter" => AutoSubmitKey::CmdEnter,
+        other => {
+            warn!(
+                "Invalid push-to-talk auto submit key '{}', defaulting to enter",
+                other
+            );
+            AutoSubmitKey::Enter
+        }
+    };
+    settings.push_to_talk_auto_submit_key = parsed;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
 pub fn change_post_process_enabled_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
     settings.post_process_enabled = enabled;
