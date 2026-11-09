@@ -13,6 +13,7 @@ use crate::settings::{
     get_settings, AppSettings, OverlayStyle, ShortcutActivation, APPLE_INTELLIGENCE_PROVIDER_ID,
 };
 use crate::shortcut;
+use crate::transcription_coordinator::{RecordingPhase, RecordingStateEvent};
 use crate::tray::{set_tray_state, TrayIconState};
 use crate::utils::{
     self, show_processing_overlay, show_recording_overlay, show_transcribing_overlay,
@@ -85,6 +86,19 @@ const CANCELLATION_POLL_INTERVAL: Duration = Duration::from_millis(25);
 /// doesn't reset the tray or hide the overlay of a newer one.
 static RECORDING_SESSION: AtomicU64 = AtomicU64::new(0);
 static RECORDING_WAS_PUSH_TO_TALK: AtomicBool = AtomicBool::new(false);
+static RECORDING_WAS_LOCKED: AtomicBool = AtomicBool::new(false);
+
+fn classify_hold_or_toggle_submit(locked: bool) -> bool {
+    !locked
+}
+
+pub fn init_recording_phase_tracking(app: &AppHandle) {
+    RecordingStateEvent::listen(app, move |event| {
+        if event.payload.phase == RecordingPhase::Locked {
+            RECORDING_WAS_LOCKED.store(true, Ordering::SeqCst);
+        }
+    });
+}
 
 /// Drop guard that finishes the transcription pipeline, including immediate
 /// model unloading on early exits.
@@ -630,6 +644,7 @@ impl ShortcutAction for TranscribeAction {
     fn start(&self, app: &AppHandle, binding_id: &str, _shortcut_str: &str) {
         let start_time = Instant::now();
         debug!("TranscribeAction::start called for binding: {}", binding_id);
+        RECORDING_WAS_LOCKED.store(false, Ordering::SeqCst);
         // Where the user is when they start speaking; see `context::begin_recording_context`.
         crate::context::begin_recording_context();
         // "update journal": is this recording the journal dictation?
@@ -826,7 +841,10 @@ impl ShortcutAction for TranscribeAction {
         debug!("TranscribeAction::stop called for binding: {}", binding_id);
 
         if get_settings(app).shortcut_activation == ShortcutActivation::HoldOrToggle {
-            RECORDING_WAS_PUSH_TO_TALK.store(true, Ordering::SeqCst);
+            RECORDING_WAS_PUSH_TO_TALK.store(
+                classify_hold_or_toggle_submit(RECORDING_WAS_LOCKED.load(Ordering::SeqCst)),
+                Ordering::SeqCst,
+            );
         }
 
         let ah = app.clone();
@@ -1440,9 +1458,10 @@ pub static ACTION_MAP: Lazy<HashMap<String, Arc<dyn ShortcutAction>>> = Lazy::ne
 #[cfg(test)]
 mod tests {
     use super::{
-        complete_unless_cancelled, extract_vocab_commands, is_blank_transcription, next_in_cycle,
-        non_blank_post_processed_text, post_process_transcription, should_use_streaming_overlay,
-        strip_invisible_chars, strip_think_block, PostProcessOutcome,
+        classify_hold_or_toggle_submit, complete_unless_cancelled, extract_vocab_commands,
+        is_blank_transcription, next_in_cycle, non_blank_post_processed_text,
+        post_process_transcription, should_use_streaming_overlay, strip_invisible_chars,
+        strip_think_block, PostProcessOutcome,
     };
     use crate::settings::{get_default_settings, AppSettings, OverlayStyle};
     use std::future;
@@ -1517,6 +1536,12 @@ mod tests {
             run_post_process(&post_process_settings(&url), "hello"),
             PostProcessOutcome::Done("polished".to_string())
         );
+    }
+
+    #[test]
+    fn hold_or_toggle_submit_uses_push_to_talk_only_when_not_locked() {
+        assert!(classify_hold_or_toggle_submit(false));
+        assert!(!classify_hold_or_toggle_submit(true));
     }
 
     #[test]

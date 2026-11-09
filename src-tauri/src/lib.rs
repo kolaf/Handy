@@ -1203,6 +1203,7 @@ pub fn run(cli_args: CliArgs) {
             WEBVIEW_LOG_STREAMING.store(settings.debug_mode, Ordering::Relaxed);
             let app_handle = app.handle().clone();
             app.manage(TranscriptionCoordinator::new(app_handle.clone()));
+            actions::init_recording_phase_tracking(&app_handle);
             context::start_state_writer(&app_handle);
 
             initialize_core_logic(&app_handle);
