@@ -2,6 +2,34 @@ use enigo::{Enigo, Key, Keyboard, Mouse, Settings};
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager};
 
+/// RAII helper to guarantee that any modifiers we press get released.
+///
+/// Implementation note: we *don't* store `&mut Enigo` here, because that would
+/// keep a mutable borrow alive across the rest of the function, preventing
+/// further use of `enigo`. Instead we store only which keys were pressed and
+/// provide an explicit `release_with(enigo)`.
+#[derive(Default)]
+struct PressedKeysGuard {
+    keys: Vec<Key>,
+}
+
+impl PressedKeysGuard {
+    fn press(&mut self, enigo: &mut Enigo, key: Key, err_context: &str) -> Result<(), String> {
+        enigo
+            .key(key, enigo::Direction::Press)
+            .map_err(|e| format!("{err_context}: {e}"))?;
+        self.keys.push(key);
+        Ok(())
+    }
+
+    fn release_with(mut self, enigo: &mut Enigo) {
+        // Release in reverse order, like unwinding a stack.
+        while let Some(key) = self.keys.pop() {
+            let _ = enigo.key(key, enigo::Direction::Release);
+        }
+    }
+}
+
 #[cfg(target_os = "macos")]
 mod macos {
     use super::Key;
@@ -185,21 +213,20 @@ pub fn send_paste_ctrl_v(enigo: &mut Enigo, hold_ms: u64) -> Result<(), String> 
     #[cfg(target_os = "linux")]
     let (modifier_key, v_key_code) = (Key::Control, Key::Unicode('v'));
 
-    // Press modifier + V
-    enigo
-        .key(modifier_key, enigo::Direction::Press)
-        .map_err(|e| format!("Failed to press modifier key: {}", e))?;
-    enigo
-        .key(v_key_code, enigo::Direction::Click)
-        .map_err(|e| format!("Failed to click V key: {}", e))?;
+    // Press modifier + V, always releasing the modifier even if something fails mid-chord.
+    let mut guard = PressedKeysGuard::default();
+    guard.press(enigo, modifier_key, "Failed to press modifier key")?;
 
-    std::thread::sleep(std::time::Duration::from_millis(hold_ms));
+    let result = (|| {
+        enigo
+            .key(v_key_code, enigo::Direction::Click)
+            .map_err(|e| format!("Failed to click V key: {}", e))?;
+        std::thread::sleep(std::time::Duration::from_millis(hold_ms));
+        Ok(())
+    })();
 
-    enigo
-        .key(modifier_key, enigo::Direction::Release)
-        .map_err(|e| format!("Failed to release modifier key: {}", e))?;
-
-    Ok(())
+    guard.release_with(enigo);
+    result
 }
 
 /// Releases Alt, Shift and Meta before a shortcut is typed. A hotkey like Ctrl+Alt+K triggers its action while the user's
@@ -222,17 +249,19 @@ pub fn send_copy_ctrl_c(enigo: &mut Enigo, hold_ms: u64) -> Result<(), String> {
     let (modifier_key, c_key) = (Key::Control, Key::Unicode('c'));
 
     release_stray_modifiers(enigo);
-    enigo
-        .key(modifier_key, enigo::Direction::Press)
-        .map_err(|e| format!("Failed to press modifier key: {}", e))?;
-    enigo
-        .key(c_key, enigo::Direction::Click)
-        .map_err(|e| format!("Failed to click C key: {}", e))?;
-    std::thread::sleep(std::time::Duration::from_millis(hold_ms));
-    enigo
-        .key(modifier_key, enigo::Direction::Release)
-        .map_err(|e| format!("Failed to release modifier key: {}", e))?;
-    Ok(())
+    let mut guard = PressedKeysGuard::default();
+    guard.press(enigo, modifier_key, "Failed to press modifier key")?;
+
+    let result = (|| {
+        enigo
+            .key(c_key, enigo::Direction::Click)
+            .map_err(|e| format!("Failed to click C key: {}", e))?;
+        std::thread::sleep(std::time::Duration::from_millis(hold_ms));
+        Ok(())
+    })();
+
+    guard.release_with(enigo);
+    result
 }
 
 /// Presses Backspace `count` times: takes back what was typed or pasted, the way Talon's "scratch that" does. Works in
@@ -257,23 +286,20 @@ pub fn send_copy_ctrl_shift_c(enigo: &mut Enigo, hold_ms: u64) -> Result<(), Str
     let (modifier_key, c_key) = (Key::Control, Key::Unicode('c'));
 
     release_stray_modifiers(enigo);
-    enigo
-        .key(modifier_key, enigo::Direction::Press)
-        .map_err(|e| format!("Failed to press modifier key: {}", e))?;
-    enigo
-        .key(Key::Shift, enigo::Direction::Press)
-        .map_err(|e| format!("Failed to press Shift key: {}", e))?;
-    enigo
-        .key(c_key, enigo::Direction::Click)
-        .map_err(|e| format!("Failed to click C key: {}", e))?;
-    std::thread::sleep(std::time::Duration::from_millis(hold_ms));
-    enigo
-        .key(Key::Shift, enigo::Direction::Release)
-        .map_err(|e| format!("Failed to release Shift key: {}", e))?;
-    enigo
-        .key(modifier_key, enigo::Direction::Release)
-        .map_err(|e| format!("Failed to release modifier key: {}", e))?;
-    Ok(())
+    let mut guard = PressedKeysGuard::default();
+    guard.press(enigo, modifier_key, "Failed to press modifier key")?;
+    guard.press(enigo, Key::Shift, "Failed to press Shift key")?;
+
+    let result = (|| {
+        enigo
+            .key(c_key, enigo::Direction::Click)
+            .map_err(|e| format!("Failed to click C key: {}", e))?;
+        std::thread::sleep(std::time::Duration::from_millis(hold_ms));
+        Ok(())
+    })();
+
+    guard.release_with(enigo);
+    result
 }
 
 /// Sends a Ctrl+Shift+V paste command.
@@ -288,27 +314,21 @@ pub fn send_paste_ctrl_shift_v(enigo: &mut Enigo, hold_ms: u64) -> Result<(), St
     #[cfg(target_os = "linux")]
     let (modifier_key, v_key_code) = (Key::Control, Key::Unicode('v'));
 
-    // Press Ctrl/Cmd + Shift + V
-    enigo
-        .key(modifier_key, enigo::Direction::Press)
-        .map_err(|e| format!("Failed to press modifier key: {}", e))?;
-    enigo
-        .key(Key::Shift, enigo::Direction::Press)
-        .map_err(|e| format!("Failed to press Shift key: {}", e))?;
-    enigo
-        .key(v_key_code, enigo::Direction::Click)
-        .map_err(|e| format!("Failed to click V key: {}", e))?;
+    // Press Ctrl/Cmd + Shift + V, always releasing modifiers even if something fails mid-chord.
+    let mut guard = PressedKeysGuard::default();
+    guard.press(enigo, modifier_key, "Failed to press modifier key")?;
+    guard.press(enigo, Key::Shift, "Failed to press Shift key")?;
 
-    std::thread::sleep(std::time::Duration::from_millis(hold_ms));
+    let result = (|| {
+        enigo
+            .key(v_key_code, enigo::Direction::Click)
+            .map_err(|e| format!("Failed to click V key: {}", e))?;
+        std::thread::sleep(std::time::Duration::from_millis(hold_ms));
+        Ok(())
+    })();
 
-    enigo
-        .key(Key::Shift, enigo::Direction::Release)
-        .map_err(|e| format!("Failed to release Shift key: {}", e))?;
-    enigo
-        .key(modifier_key, enigo::Direction::Release)
-        .map_err(|e| format!("Failed to release modifier key: {}", e))?;
-
-    Ok(())
+    guard.release_with(enigo);
+    result
 }
 
 /// Sends a Shift+Insert paste command (Windows and Linux only).
@@ -320,21 +340,20 @@ pub fn send_paste_shift_insert(enigo: &mut Enigo, hold_ms: u64) -> Result<(), St
     #[cfg(not(target_os = "windows"))]
     let insert_key_code = Key::Other(0x76); // XK_Insert (keycode 118 / 0x76, also used as fallback)
 
-    // Press Shift + Insert
-    enigo
-        .key(Key::Shift, enigo::Direction::Press)
-        .map_err(|e| format!("Failed to press Shift key: {}", e))?;
-    enigo
-        .key(insert_key_code, enigo::Direction::Click)
-        .map_err(|e| format!("Failed to click Insert key: {}", e))?;
+    // Press Shift + Insert, always releasing Shift even if something fails mid-chord.
+    let mut guard = PressedKeysGuard::default();
+    guard.press(enigo, Key::Shift, "Failed to press Shift key")?;
 
-    std::thread::sleep(std::time::Duration::from_millis(hold_ms));
+    let result = (|| {
+        enigo
+            .key(insert_key_code, enigo::Direction::Click)
+            .map_err(|e| format!("Failed to click Insert key: {}", e))?;
+        std::thread::sleep(std::time::Duration::from_millis(hold_ms));
+        Ok(())
+    })();
 
-    enigo
-        .key(Key::Shift, enigo::Direction::Release)
-        .map_err(|e| format!("Failed to release Shift key: {}", e))?;
-
-    Ok(())
+    guard.release_with(enigo);
+    result
 }
 
 /// Pastes text directly using the enigo text method.

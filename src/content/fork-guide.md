@@ -4,6 +4,7 @@ This build (`0.10.0-hotkeys.1`) adds features on top of Handy. Details for every
 
 ## Switching quickly
 
+- **Shortcut caution on GNOME X11 (Tauri backend):** avoid cancel shortcuts that use `Alt` — `Ctrl+Alt+Space` was observed to leave modifiers stuck on some systems. `Ctrl+Shift+Space` also saved correctly but did not fire reliably in this setup. Prefer another non-`Alt`, non-`Space` cancel shortcut.
 - **Swap language** (`Ctrl+Alt+L`): swaps the language with the _Alternate Language_ (General page).
 - **Prompt picker** (`Ctrl+Alt+P`): numbered list of your prompts; press a number or click. The window never takes focus.
 - **Model picker** (`Ctrl+Alt+M`) and `handy --set-model NAME`: switch the speech model among the downloaded ones. **Model per language** (General, optional) switches the model when the language changes.

@@ -94,6 +94,12 @@ was a recognition mistake (`fork/prompts/learn_prompt.md`). Names and terms go i
 rules applied to future transcripts. Proposals are validated locally (the word must really appear in your text, ordinary-word
 swaps and rewordings are refused). Benchmark: `python3 fork/prompts/learn_bench.py --from-handy`.
 
+**Shortcut caution on GNOME X11.** In local testing with the Tauri keyboard backend, `Ctrl+Alt+Space` as the cancel shortcut was
+consistent with a stuck-Alt / lost-KeyRelease symptom after cancelling dictation (for example terminal paste degrading until Alt
+was tapped again). Rebinding cancel away from `Alt` avoids that class of failure. `Ctrl+Shift+Space` parsed, saved and was
+registered on Linux after the explicit-cancel fix, but still did not fire reliably in that GNOME X11 setup, while other non-`Alt`,
+non-`Space` bindings did. Treat this as an environment/backend limitation unless later evidence shows a reproducible Handy-side fix.
+
 How the selection is copied (learn, reformat, transform, "edit this"/"reply to this"): Handy first releases any Alt, Shift or
 Meta key that your hotkey may still be holding (otherwise the app would receive Ctrl+Alt+C), then sends Ctrl+C, or Ctrl+Shift+C
 when the active window is a terminal (a plain Ctrl+C there would interrupt the running program). If the clipboard does not change
