@@ -728,6 +728,8 @@ pub fn run(cli_args: CliArgs) {
             shortcut::change_auto_submit_key_setting,
             shortcut::change_push_to_talk_auto_submit_setting,
             shortcut::change_push_to_talk_auto_submit_key_setting,
+            context::update_app_paste_methods,
+            context::change_app_paste_methods_enabled_setting,
             shortcut::change_post_process_enabled_setting,
             shortcut::change_experimental_enabled_setting,
             shortcut::change_post_process_base_url_setting,

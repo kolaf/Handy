@@ -480,6 +480,31 @@ pub fn update_app_prompts(app: tauri::AppHandle, rules: Vec<AppPrompt>) -> Resul
 
 #[tauri::command]
 #[specta::specta]
+pub fn update_app_paste_methods(
+    app: tauri::AppHandle,
+    rules: Vec<AppPasteMethod>,
+) -> Result<(), String> {
+    let mut settings = get_settings(&app);
+    validate_app_paste_method_rules(&rules)?;
+    settings.app_paste_methods = rules;
+    crate::settings::write_settings(&app, settings);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn change_app_paste_methods_enabled_setting(
+    app: tauri::AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    let mut settings = get_settings(&app);
+    settings.app_paste_methods_enabled = enabled;
+    crate::settings::write_settings(&app, settings);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
 pub fn change_paste_focus_guard_setting(
     app: tauri::AppHandle,
     enabled: bool,
@@ -708,6 +733,13 @@ mod tests {
             resolve_paste_method(&settings, Some(&ctx("gnome-terminal-server", "shell"))),
             PasteMethod::CtrlShiftV
         );
+    }
+
+    #[test]
+    fn app_paste_method_validation_accepts_valid_rules_and_rejects_invalid_ones() {
+        assert!(validate_app_paste_method_rules(&[paste_rule("slack.exe", "", PasteMethod::CtrlV)]).is_ok());
+        assert!(validate_app_paste_method_rules(&[paste_rule("  ", "", PasteMethod::CtrlV)]).is_err());
+        assert!(validate_app_paste_method_rules(&[paste_rule("a\tb", "", PasteMethod::CtrlV)]).is_err());
     }
 
     #[test]

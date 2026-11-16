@@ -93,17 +93,17 @@ async changeTranslateToEnglishSetting(enabled: boolean) : Promise<Result<null, s
     else return { status: "error", error: e  as any };
 }
 },
-async changeAlternateLanguageSetting(language: string) : Promise<Result<null, string>> {
+async changeSelectedLanguageSetting(language: string) : Promise<Result<null, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("change_alternate_language_setting", { language }) };
+    return { status: "ok", data: await TAURI_INVOKE("change_selected_language_setting", { language }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
 },
-async changeSelectedLanguageSetting(language: string) : Promise<Result<null, string>> {
+async changeAlternateLanguageSetting(language: string) : Promise<Result<null, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("change_selected_language_setting", { language }) };
+    return { status: "ok", data: await TAURI_INVOKE("change_alternate_language_setting", { language }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -264,6 +264,22 @@ async changePushToTalkAutoSubmitKeySetting(key: string) : Promise<Result<null, s
     else return { status: "error", error: e  as any };
 }
 },
+async updateAppPasteMethods(rules: AppPasteMethod[]) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("update_app_paste_methods", { rules }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async changeAppPasteMethodsEnabledSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_app_paste_methods_enabled_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async changePostProcessEnabledSetting(enabled: boolean) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("change_post_process_enabled_setting", { enabled }) };
@@ -360,14 +376,25 @@ async setPostProcessSelectedPrompt(id: string) : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
-async changePostProcessMinWordsSetting(words: number) : Promise<Result<null, string>> {
+async updateCustomWords(words: string[]) : Promise<Result<null, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("change_post_process_min_words_setting", { words }) };
+    return { status: "ok", data: await TAURI_INVOKE("update_custom_words", { words }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
 },
+async updateSnippets(snippets: Snippet[]) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("update_snippets", { snippets }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Saves a replacement list of learned corrections (the settings page edits it).
+ */
 async updateCorrections(corrections: Correction[]) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("update_corrections", { corrections }) };
@@ -376,35 +403,79 @@ async updateCorrections(corrections: Correction[]) : Promise<Result<null, string
     else return { status: "error", error: e  as any };
 }
 },
-async updateAppPrompts(rules: AppPrompt[]) : Promise<Result<null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("update_app_prompts", { rules }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async changePasteFocusGuardSetting(enabled: boolean) : Promise<Result<null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("change_paste_focus_guard_setting", { enabled }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async changeAppPromptsEnabledSetting(enabled: boolean) : Promise<Result<null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("change_app_prompts_enabled_setting", { enabled }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
+/**
+ * Newest first.
+ */
 async getActivity() : Promise<ActivityEntry[]> {
     return await TAURI_INVOKE("get_activity");
 },
-async clearActivity() : Promise<null> {
-    return await TAURI_INVOKE("clear_activity");
+async clearActivity() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("clear_activity") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async startMeeting(files: string[], language: string, project: string | null) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("start_meeting", { files, language, project }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * The projects (pages tagged `project`) of the SilverBullet space set on the Meetings page.
+ */
+async listSilverbulletProjects() : Promise<Result<string[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_silverbullet_projects") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * The button on the Meetings page: arms journal mode and starts a post-processed dictation, as if the shortcut had been pressed.
+ */
+async startJournalDictation() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("start_journal_dictation") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cancelMeeting() : Promise<void> {
+    await TAURI_INVOKE("cancel_meeting");
+},
+async findLatestRecordings(single: boolean) : Promise<Result<string[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("find_latest_recordings", { single }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Opens a saved minutes or transcript file, but only one inside the minutes folder.
+ */
+async openMeetingFile(path: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("open_meeting_file", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async updateMeetingSettings(meeting: MeetingSettings) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("update_meeting_settings", { meeting }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 },
 async updateLanguageModels(rules: LanguageModel[]) : Promise<Result<null, string>> {
     try {
@@ -422,68 +493,48 @@ async changeLanguageModelsEnabledSetting(enabled: boolean) : Promise<Result<null
     else return { status: "error", error: e  as any };
 }
 },
-async startMeeting(files: string[], language: string, project: string | null) : Promise<Result<null, string>> {
+async updateAppPrompts(rules: AppPrompt[]) : Promise<Result<null, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("start_meeting", { files, language, project }) };
+    return { status: "ok", data: await TAURI_INVOKE("update_app_prompts", { rules }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
 },
-async startJournalDictation() : Promise<Result<null, string>> {
+async changeAppPromptsEnabledSetting(enabled: boolean) : Promise<Result<null, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("start_journal_dictation") };
+    return { status: "ok", data: await TAURI_INVOKE("change_app_prompts_enabled_setting", { enabled }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
 },
-async listSilverbulletProjects() : Promise<Result<string[], string>> {
+async changePasteFocusGuardSetting(enabled: boolean) : Promise<Result<null, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("list_silverbullet_projects") };
+    return { status: "ok", data: await TAURI_INVOKE("change_paste_focus_guard_setting", { enabled }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
 },
-async openMeetingFile(path: string) : Promise<Result<null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("open_meeting_file", { path }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
+/**
+ * The window's own click handler.
+ */
+async pickerSelect(number: number) : Promise<void> {
+    await TAURI_INVOKE("picker_select", { number });
 },
-async findLatestRecordings(single: boolean) : Promise<Result<string[], string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("find_latest_recordings", { single }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
+async pickerClose() : Promise<void> {
+    await TAURI_INVOKE("picker_close");
 },
-async cancelMeeting() : Promise<null> {
-    return await TAURI_INVOKE("cancel_meeting");
+/**
+ * The list to show right now, or nothing when the picker is closed (asked for by the page when it starts).
+ */
+async pickerState() : Promise<OpenPayload | null> {
+    return await TAURI_INVOKE("picker_state");
 },
-async updateMeetingSettings(meeting: MeetingSettings) : Promise<Result<null, string>> {
+async changePostProcessMinWordsSetting(words: number) : Promise<Result<null, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("update_meeting_settings", { meeting }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async updateSnippets(snippets: Snippet[]) : Promise<Result<null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("update_snippets", { snippets }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async updateCustomWords(words: string[]) : Promise<Result<null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("update_custom_words", { words }) };
+    return { status: "ok", data: await TAURI_INVOKE("change_post_process_min_words_setting", { words }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -1168,10 +1219,8 @@ async updateRecordingRetentionPeriod(period: string) : Promise<Result<null, stri
 }
 },
 /**
- * Checks if the Mac is a laptop by detecting battery presence
- * 
- * This uses pmset to check for battery information.
- * Returns true if a battery is detected (laptop), false otherwise (desktop)
+ * Stub implementation for non-macOS platforms
+ * Always returns false since laptop detection is macOS-specific
  */
 async isLaptop() : Promise<Result<boolean, string>> {
     try {
@@ -1226,6 +1275,33 @@ transcriptionJob: "transcription-job"
 
 /** user-defined types **/
 
+export type ActivityEntry = { 
+/**
+ * Milliseconds since the Unix epoch.
+ */
+timestamp: number; 
+/**
+ * The notice kind: learned, learned-none, synced, reformat-failed, fallback, ...
+ */
+kind: string; 
+/**
+ * What the toast said (the full text).
+ */
+title: string; 
+/**
+ * More detail, possibly several lines. Empty if there is none.
+ */
+details: string }
+/**
+ * A per-app paste override: when the foreground app is `app` (its program name, e.g. `slack.exe`) and its window title
+ * contains `title` (if given), Handy pastes with `paste_method` instead of the global default. See `context.rs`.
+ */
+export type AppPasteMethod = { app: string; title?: string; paste_method: PasteMethod }
+/**
+ * A per-app prompt choice: when the foreground app is `app` (its program name, e.g. `slack.exe`) and its window title
+ * contains `title` (if given), dictation is post-processed with `prompt_id`. See `context.rs`.
+ */
+export type AppPrompt = { app: string; title?: string; prompt_id: string }
 /**
  * The container-level `serde(default)` (backed by the `Default` impl below)
  * guarantees every field — including ones added in the future — falls back to
@@ -1266,12 +1342,45 @@ whats_new_last_seen_version?: string; selected_model?: string; onboarding_comple
  * Which input channel to use on the selected microphone device.
  * None means "average all channels" (original behavior).
  */
-selected_channel?: number | null; clamshell_microphone?: string | null; selected_output_device?: string | null; translate_to_english?: boolean; selected_language?: string; alternate_language?: string; 
+selected_channel?: number | null; clamshell_microphone?: string | null; selected_output_device?: string | null; translate_to_english?: boolean; selected_language?: string; 
+/**
+ * The "Swap Language" shortcut swaps `selected_language` with this one.
+ */
+alternate_language?: string; 
 /**
  * Every language the person dictates in (codes, e.g. ["en", "zh"]),
  * picked during onboarding. Empty until then.
  */
-spoken_languages?: string[]; overlay_position?: OverlayPosition; debug_mode?: boolean; log_level?: LogLevel; custom_words?: string[]; model_unload_timeout?: ModelUnloadTimeout; word_correction_threshold?: number; history_limit?: number; recording_retention_period?: RecordingRetentionPeriod; paste_method?: PasteMethod; clipboard_handling?: ClipboardHandling; auto_submit?: boolean; auto_submit_key?: AutoSubmitKey; push_to_talk_auto_submit?: boolean; push_to_talk_auto_submit_key?: AutoSubmitKey; post_process_enabled?: boolean; post_process_provider_id?: string; post_process_providers?: PostProcessProvider[]; post_process_api_keys?: SecretMap; post_process_models?: Partial<{ [key in string]: string }>; post_process_prompts?: LLMPrompt[]; post_process_selected_prompt_id?: string | null; snippets?: Snippet[]; corrections?: Correction[]; meeting?: MeetingSettings; language_models_enabled?: boolean; language_models?: LanguageModel[]; paste_focus_guard?: boolean; app_prompts_enabled?: boolean; app_prompts?: AppPrompt[]; post_process_min_words?: number; mute_while_recording?: boolean; append_trailing_space?: boolean; app_language?: string; theme?: Theme; experimental_enabled?: boolean; lazy_stream_close?: boolean; 
+spoken_languages?: string[]; overlay_position?: OverlayPosition; debug_mode?: boolean; log_level?: LogLevel; custom_words?: string[]; model_unload_timeout?: ModelUnloadTimeout; word_correction_threshold?: number; history_limit?: number; recording_retention_period?: RecordingRetentionPeriod; paste_method?: PasteMethod; clipboard_handling?: ClipboardHandling; auto_submit?: boolean; auto_submit_key?: AutoSubmitKey; push_to_talk_auto_submit?: boolean; push_to_talk_auto_submit_key?: AutoSubmitKey; post_process_enabled?: boolean; post_process_provider_id?: string; post_process_providers?: PostProcessProvider[]; post_process_api_keys?: SecretMap; post_process_models?: Partial<{ [key in string]: string }>; snippets?: Snippet[]; 
+/**
+ * Learned `wrong -> right` fixes applied to each new transcript.
+ */
+corrections?: Correction[]; 
+/**
+ * Meeting minutes from audio files.
+ */
+meeting?: MeetingSettings; 
+/**
+ * Switch the speech model together with the dictation language, following `language_models`.
+ */
+language_models_enabled?: boolean; language_models?: LanguageModel[]; 
+/**
+ * Do not paste a dictation into another window than the one it was started in (Windows only): keep it on the
+ * clipboard and say so instead.
+ */
+paste_focus_guard?: boolean; 
+/**
+ * Use a different post-processing prompt depending on the foreground app (Windows only).
+ */
+app_prompts_enabled?: boolean; app_prompts?: AppPrompt[]; 
+/**
+ * Use a different paste method depending on the foreground app.
+ */
+app_paste_methods_enabled?: boolean; app_paste_methods?: AppPasteMethod[]; 
+/**
+ * Dictations with fewer words than this skip the language model (0 = always use it).
+ */
+post_process_min_words?: number; post_process_prompts?: LLMPrompt[]; post_process_selected_prompt_id?: string | null; mute_while_recording?: boolean; append_trailing_space?: boolean; app_language?: string; theme?: Theme; experimental_enabled?: boolean; lazy_stream_close?: boolean; 
 /**
  * Experimental, macOS only: move a Bluetooth headset (AirPods) to this
  * Mac while recording, so its microphone does not return silence while
@@ -1351,6 +1460,12 @@ export type ChineseScript =
  */
 "traditional_hk"
 export type ClipboardHandling = "dont_modify" | "copy_to_clipboard"
+/**
+ * A learned fix for a recurring mishearing: `wrong` (as the recognizer spells it) becomes `right` in every new
+ * transcript, as a whole word and ignoring case. A `hint` rule is not applied literally: it is only listed to the
+ * post-processing model (`${corrections}`), which applies it when it fits the sentence. See `learn.rs`.
+ */
+export type Correction = { wrong: string; right: string; hint: boolean }
 export type CustomSounds = { start: boolean; stop: boolean }
 export type GpuDeviceOption = { id: string; name: string; total_vram_mb: number }
 export type HistoryEntry = { id: number; file_name: string; timestamp: number; saved: boolean; title: string; transcription_text: string; post_processed_text: string | null; post_process_prompt: string | null; post_process_requested: boolean; 
@@ -1376,6 +1491,7 @@ export type ImplementationChangeResult = { success: boolean;
  * List of binding IDs that were reset to defaults due to incompatibility
  */
 reset_bindings: string[] }
+export type Item = { number: number; id: string; name: string }
 export type KeyboardDiagnosticReport = { secure_input_enabled: boolean; culprit_pid: number | null; culprit_name: string | null; 
 /**
  * Counts only — key identity is deliberately never captured.
@@ -1387,7 +1503,12 @@ export type KeyboardImplementation = "tauri" | "handy_keys" |
  * (e.g. from a Wayland compositor keybinding).
  */
 "none"
-export type LLMPrompt = { id: string; name: string; prompt: string; examples: string }
+export type LLMPrompt = { id: string; name: string; prompt: string; 
+/**
+ * Optional examples (dictation -> expected output) shown to the model after the
+ * instructions, or placed where the prompt says `${examples}`.
+ */
+examples?: string }
 /**
  * When Handy's spoken-language detector picks the language for Auto.
  */
@@ -1401,6 +1522,10 @@ export type LanguageDetectionMode =
  * the person speaks.
  */
 "always"
+/**
+ * Which speech model goes with a dictation language (optional): choosing `language` also switches to `model_id`.
+ */
+export type LanguageModel = { language: string; model_id: string }
 /**
  * How a transcription's language was chosen.
  */
@@ -1446,13 +1571,73 @@ export type LanguageStatus =
  * Auto can't work here; `language` is used instead.
  */
 { kind: "auto_unavailable"; language: string; reason: AutoUnavailableReason }
-export type ActivityEntry = { timestamp: number; kind: string; title: string; details: string }
-export type MeetingSettings = { language?: string; output_dir?: string; model_id?: string; recordings_dir?: string; group_minutes?: number; skip_silence?: boolean; speakers?: boolean; name_speakers?: boolean; diarize_model?: string; silverbullet_url?: string; silverbullet_token?: SecretString; silverbullet_folder?: string; silverbullet_tag?: string; silverbullet_journal_folder?: string }
-export type LanguageModel = { language: string; model_id: string }
-export type AppPrompt = { app: string; title?: string; prompt_id: string }
-export type Correction = { wrong: string; right: string; hint?: boolean }
-export type Snippet = { name: string; text: string }
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error"
+/**
+ * Settings of the meeting minutes feature (`meeting.rs`).
+ */
+export type MeetingSettings = { 
+/**
+ * Language of the recording and of the minutes, e.g. "en" or "no".
+ */
+language?: string; 
+/**
+ * Where the minutes are saved; empty = a "meeting_notes" folder in the home folder.
+ */
+output_dir?: string; 
+/**
+ * Speech model for the transcription; empty = the one used for dictation. A different one is loaded for the job
+ * and the dictation model is put back afterwards.
+ */
+model_id?: string; 
+/**
+ * Where the recorder (OBS Studio...) puts its files; empty = the Videos folder in the home folder.
+ */
+recordings_dir?: string; 
+/**
+ * Identify the speakers: the audio is sent to the post-processing endpoint's diarizing transcription model
+ * (`diarize_model`) instead of being transcribed locally. Off by default; the audio leaves the computer.
+ */
+speakers?: boolean; 
+/**
+ * Cut long silences before local transcription (voice-activity detection): speech models tend to invent text over silence
+ * and noise. Not used with speaker identification, where the cloud model does its own.
+ */
+skip_silence?: boolean; 
+/**
+ * With speaker identification: replace "Speaker 2" by a name when the conversation itself makes the name clear
+ * (introductions, being addressed by name). The language model is asked; it must not guess.
+ */
+name_speakers?: boolean; 
+/**
+ * The transcription model that labels speakers, served by the same endpoint as the post-processing model.
+ */
+diarize_model?: string; 
+/**
+ * Recording files that follow each other within this many minutes (the gap between the end of one and the start of
+ * the next) count as parts of the same recording.
+ */
+group_minutes?: number; 
+/**
+ * SilverBullet space (https://silverbullet.md) for meeting notes with project context, including the space's path:
+ * `http://host:3000/notes`. Empty = the feature is off.
+ */
+silverbullet_url?: string; 
+/**
+ * API token of the SilverBullet account (Bearer). Needs write access to the space to create pages.
+ */
+silverbullet_token?: SecretString; 
+/**
+ * Folder in the space where the meeting pages are created.
+ */
+silverbullet_folder?: string; 
+/**
+ * Hashtag on the proposed tasks (without #), so they can be found and reviewed.
+ */
+silverbullet_tag?: string; 
+/**
+ * Folder of the daily journal pages (`<folder>/YYYY-MM-DD`); SilverBullet's own default is `Journal`.
+ */
+silverbullet_journal_folder?: string }
 export type ModelInfo = { id: string; name: string; description: string; filename: string; source: ModelSource; size_mb: number; is_downloaded: boolean; is_downloading: boolean; partial_size: number; accuracy_score: number; speed_score: number; supports_translation: boolean; is_recommended: boolean; supported_languages: string[]; supports_language_selection: boolean; is_custom: boolean; supports_streaming: boolean; supports_language_detection: boolean }
 export type ModelLoadStatus = { is_loaded: boolean; current_model: string | null }
 /**
@@ -1513,6 +1698,11 @@ notices: Notice[];
  * `None` when a notice was cleared.
  */
 raised: Notice | null }
+export type OpenPayload = { 
+/**
+ * "prompts" or "models": what is listed, so the window can say so.
+ */
+mode: string; items: Item[]; selected: string | null }
 export type OverlayPosition = "top" | "bottom"
 /**
  * Which recording overlay to display. `Minimal` and `Live` share one base
@@ -1621,6 +1811,11 @@ export type ShortcutActivation =
  */
 "hold_or_toggle"
 export type ShortcutBinding = { id: string; name: string; description: string; default_binding: string; current_binding: string }
+/**
+ * A named block of text that the post-processing prompt can insert by name
+ * (`[[snippet: NAME]]`); see `extras.rs`.
+ */
+export type Snippet = { name: string; text: string }
 export type SoundTheme = "marimba" | "pop" | "custom"
 /**
  * Phase of the streaming overlay card, emitted to drive its UI state.

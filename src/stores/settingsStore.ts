@@ -3,6 +3,7 @@ import { subscribeWithSelector } from "zustand/middleware";
 import { listen } from "@tauri-apps/api/event";
 import type {
   AppSettings as Settings,
+  AppPasteMethod,
   AudioDevice,
   PostProcessApiFormat,
   ChineseScript,
@@ -161,6 +162,10 @@ const settingUpdaters: {
   app_prompts: (value) => commands.updateAppPrompts(value as AppPrompt[]),
   app_prompts_enabled: (value) =>
     commands.changeAppPromptsEnabledSetting(value as boolean),
+  app_paste_methods: (value) =>
+    commands.updateAppPasteMethods(value as AppPasteMethod[]),
+  app_paste_methods_enabled: (value) =>
+    commands.changeAppPasteMethodsEnabledSetting(value as boolean),
   post_process_min_words: (value) =>
     commands.changePostProcessMinWordsSetting(value as number),
   word_correction_threshold: (value) =>
