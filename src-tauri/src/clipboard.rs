@@ -167,17 +167,19 @@ fn try_send_key_combo_linux(paste_method: &PasteMethod) -> Result<bool, String> 
             return Ok(true);
         }
     } else {
-        // X11: prefer xdotool, then ydotool
-        if is_xdotool_available() {
-            info!("Using xdotool for key combo");
-            send_key_combo_via_xdotool(paste_method)?;
-            return Ok(true);
-        }
+        // X11: avoid xdotool for paste chords. `key --clearmodifiers` can leave
+        // modifiers latched on the XTEST keyboard, which then breaks both paste
+        // and general desktop interaction until the user clears the stuck state.
+        // Prefer ydotool's explicit chord injection when available.
         if is_ydotool_available() {
             info!("Using ydotool for key combo");
             send_key_combo_via_ydotool(paste_method)?;
             return Ok(true);
         }
+
+        // Without ydotool, fall back to enigo. Note that Linux/X11 Insert key
+        // synthesis via enigo can be layout/backend-sensitive, which is why the
+        // explicit ydotool path is preferred for Shift+Insert.
     }
 
     Ok(false)
@@ -822,6 +824,16 @@ fn should_send_auto_submit(auto_submit: bool, paste_method: PasteMethod) -> bool
     auto_submit && paste_method != PasteMethod::None
 }
 
+const PUSH_TO_TALK_PASTE_SETTLE_DELAY_MS: u64 = 80;
+
+fn pre_paste_settle_delay_ms(is_push_to_talk: bool) -> u64 {
+    if is_push_to_talk {
+        PUSH_TO_TALK_PASTE_SETTLE_DELAY_MS
+    } else {
+        0
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AutoSubmitOverride {
     pub enabled: bool,
@@ -851,21 +863,28 @@ pub fn effective_auto_submit(
 /// Pastes `text` into the focused app. Call from a worker thread, never the main
 /// thread: it sleeps between steps (input injection hops via `with_enigo`).
 pub fn paste(text: String, app_handle: AppHandle) -> Result<(), String> {
-    paste_with(text, app_handle, None, None)
+    paste_with(text, app_handle, None, None, false)
 }
 
 /// Like `paste`, but leaves `text` on the clipboard whatever the clipboard setting says. For text the user cannot
 /// otherwise get back: if the focused text is read-only, the paste goes nowhere and the clipboard is the only copy.
 pub fn paste_keeping_on_clipboard(text: String, app_handle: AppHandle) -> Result<(), String> {
-    paste_with(text, app_handle, Some(ClipboardHandling::CopyToClipboard), None)
+    paste_with(text, app_handle, Some(ClipboardHandling::CopyToClipboard), None, false)
 }
 
 pub fn paste_with_auto_submit(
     text: String,
     app_handle: AppHandle,
     auto_submit_override: AutoSubmitOverride,
+    is_push_to_talk: bool,
 ) -> Result<(), String> {
-    paste_with(text, app_handle, None, Some(auto_submit_override))
+    paste_with(
+        text,
+        app_handle,
+        None,
+        Some(auto_submit_override),
+        is_push_to_talk,
+    )
 }
 
 fn paste_with(
@@ -873,13 +892,14 @@ fn paste_with(
     app_handle: AppHandle,
     clipboard_handling: Option<ClipboardHandling>,
     auto_submit_override: Option<AutoSubmitOverride>,
+    is_push_to_talk: bool,
 ) -> Result<(), String> {
     let _paste = PASTE_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
     let mut settings = get_settings(&app_handle);
     if let Some(handling) = clipboard_handling {
         settings.clipboard_handling = handling;
     }
-    let paste_method = settings.paste_method;
+    let paste_method = crate::context::resolve_paste_method(&settings, None);
     let paste_delay_ms = settings.paste_delay_ms;
     let paste_delay_after_ms = settings.paste_delay_after_ms;
     let auto_submit_override = auto_submit_override.unwrap_or(AutoSubmitOverride {
@@ -944,6 +964,10 @@ fn paste_with(
                         log::warn!("Reliable paste unavailable ({e}); falling back to legacy paste")
                     }
                 }
+            }
+            let settle_delay_ms = pre_paste_settle_delay_ms(is_push_to_talk);
+            if settle_delay_ms > 0 {
+                std::thread::sleep(Duration::from_millis(settle_delay_ms));
             }
             paste_via_clipboard(
                 &text,
@@ -1061,6 +1085,12 @@ e.g. 28:1 28:0 means pressing on the Enter button on a standard US keyboard.
             ydotool_key_args(&PasteMethod::ShiftInsert, YdotoolKeySyntax::RawKeycodes).unwrap(),
             ["key", "42:1", "110:1", "110:0", "42:0"]
         );
+    }
+
+    #[test]
+    fn pre_paste_settle_delay_is_applied_only_for_push_to_talk() {
+        assert_eq!(pre_paste_settle_delay_ms(true), PUSH_TO_TALK_PASTE_SETTLE_DELAY_MS);
+        assert_eq!(pre_paste_settle_delay_ms(false), 0);
     }
 
     #[cfg(target_os = "linux")]

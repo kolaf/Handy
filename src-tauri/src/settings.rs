@@ -112,6 +112,16 @@ pub struct AppPrompt {
     pub prompt_id: String,
 }
 
+/// A per-app paste override: when the foreground app is `app` (its program name, e.g. `slack.exe`) and its window title
+/// contains `title` (if given), Handy pastes with `paste_method` instead of the global default. See `context.rs`.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Type)]
+pub struct AppPasteMethod {
+    pub app: String,
+    #[serde(default)]
+    pub title: String,
+    pub paste_method: PasteMethod,
+}
+
 /// Settings of the meeting minutes feature (`meeting.rs`).
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Type)]
 pub struct MeetingSettings {
@@ -676,6 +686,11 @@ pub struct AppSettings {
     pub app_prompts_enabled: bool,
     #[serde(default)]
     pub app_prompts: Vec<AppPrompt>,
+    /// Use a different paste method depending on the foreground app.
+    #[serde(default)]
+    pub app_paste_methods_enabled: bool,
+    #[serde(default)]
+    pub app_paste_methods: Vec<AppPasteMethod>,
     /// Dictations with fewer words than this skip the language model (0 = always use it).
     #[serde(default)]
     pub post_process_min_words: u32,
@@ -1363,6 +1378,8 @@ pub fn get_default_settings() -> AppSettings {
         language_models: Vec::new(),
         app_prompts_enabled: false,
         app_prompts: Vec::new(),
+        app_paste_methods_enabled: false,
+        app_paste_methods: Vec::new(),
         post_process_min_words: 0,
         post_process_prompts: default_post_process_prompts(),
         post_process_selected_prompt_id: Some("super".to_string()),

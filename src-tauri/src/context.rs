@@ -4,7 +4,7 @@
 //!
 //! It also keeps a small state file that tells other tools (Talon) whether Handy is recording.
 
-use crate::settings::{get_settings, AppPrompt, AppSettings};
+use crate::settings::{AppPasteMethod, AppPrompt, AppSettings, PasteMethod, get_settings};
 use log::{info, warn};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -316,6 +316,47 @@ pub fn matching_rule<'a>(rules: &'a [AppPrompt], ctx: &AppContext) -> Option<&'a
         })
 }
 
+/// The first paste-method rule that fits: rules with a title condition are tried before rules for the whole app.
+pub fn matching_paste_method_rule<'a>(
+    rules: &'a [AppPasteMethod],
+    ctx: &AppContext,
+) -> Option<&'a AppPasteMethod> {
+    let exe = normalize_exe(&ctx.exe);
+    let title = ctx.title.to_lowercase();
+    let fits = |rule: &&AppPasteMethod| {
+        normalize_exe(&rule.app) == exe
+            && (rule.title.trim().is_empty() || title.contains(&rule.title.trim().to_lowercase()))
+    };
+    rules.iter()
+        .filter(|r| !r.title.trim().is_empty())
+        .find(fits)
+        .or_else(|| {
+            rules
+                .iter()
+                .filter(|r| r.title.trim().is_empty())
+                .find(fits)
+        })
+}
+
+pub fn resolve_paste_method(settings: &AppSettings, started_in: Option<&AppContext>) -> PasteMethod {
+    if !settings.app_paste_methods_enabled || settings.app_paste_methods.is_empty() {
+        return settings.paste_method;
+    }
+    let Some(ctx) = started_in.cloned().or_else(foreground) else {
+        return settings.paste_method;
+    };
+    match matching_paste_method_rule(&settings.app_paste_methods, &ctx) {
+        Some(rule) => {
+            info!(
+                "Paste method for this dictation: {:?} (app rule for {} \"{}\")",
+                rule.paste_method, ctx.exe, ctx.title
+            );
+            rule.paste_method
+        }
+        None => settings.paste_method,
+    }
+}
+
 /// Terminal emulators: a plain Ctrl+C there interrupts the running program, so copying uses Ctrl+Shift+C.
 #[rustfmt::skip]
 const TERMINALS: &[&str] = &[
@@ -410,6 +451,18 @@ pub fn validate_rules(rules: &[AppPrompt], settings: &AppSettings) -> Result<(),
         }
         if !prompt_exists(settings, &rule.prompt_id) {
             return Err(format!("Unknown prompt '{}'", rule.prompt_id));
+        }
+    }
+    Ok(())
+}
+
+pub fn validate_app_paste_method_rules(rules: &[AppPasteMethod]) -> Result<(), String> {
+    if rules.len() > MAX_RULES {
+        return Err(format!("At most {MAX_RULES} app rules are allowed"));
+    }
+    for rule in rules {
+        if rule.app.trim().is_empty() || !clean_field(&rule.app) || !clean_field(&rule.title) {
+            return Err(format!("Invalid app paste rule for '{}'", rule.app));
         }
     }
     Ok(())
@@ -545,6 +598,14 @@ mod tests {
         }
     }
 
+    fn paste_rule(app: &str, title: &str, paste_method: PasteMethod) -> AppPasteMethod {
+        AppPasteMethod {
+            app: app.into(),
+            title: title.into(),
+            paste_method,
+        }
+    }
+
     fn ctx(exe: &str, title: &str) -> AppContext {
         AppContext {
             exe: exe.into(),
@@ -578,6 +639,74 @@ mod tests {
                 .unwrap()
                 .prompt_id,
             "simple"
+        );
+    }
+
+    #[test]
+    fn app_paste_method_rules_match_program_names_with_or_without_exe_and_ignoring_case() {
+        let rules = vec![paste_rule("Slack", "", PasteMethod::CtrlV)];
+        assert!(matching_paste_method_rule(&rules, &ctx("slack.exe", "x")).is_some());
+        assert!(matching_paste_method_rule(&rules, &ctx("SLACK.EXE", "")).is_some());
+        assert!(matching_paste_method_rule(&rules, &ctx("code.exe", "")).is_none());
+    }
+
+    #[test]
+    fn app_paste_method_title_rule_beats_the_rule_for_the_whole_app() {
+        let rules = vec![
+            paste_rule("msedge.exe", "", PasteMethod::CtrlV),
+            paste_rule("msedge.exe", "gmail", PasteMethod::ShiftInsert),
+        ];
+        assert_eq!(
+            matching_paste_method_rule(&rules, &ctx("msedge.exe", "Inbox - Gmail - Edge"))
+                .unwrap()
+                .paste_method,
+            PasteMethod::ShiftInsert
+        );
+        assert_eq!(
+            matching_paste_method_rule(&rules, &ctx("msedge.exe", "Docs"))
+                .unwrap()
+                .paste_method,
+            PasteMethod::CtrlV
+        );
+    }
+
+    #[test]
+    fn app_paste_method_resolution_keeps_global_default_when_disabled_or_no_match() {
+        let mut settings = AppSettings::default();
+        settings.paste_method = PasteMethod::CtrlV;
+        settings.app_paste_methods_enabled = false;
+        settings.app_paste_methods = vec![paste_rule(
+            "gnome-terminal-server",
+            "",
+            PasteMethod::CtrlShiftV,
+        )];
+
+        assert_eq!(
+            resolve_paste_method(&settings, Some(&ctx("gnome-terminal-server", "shell"))),
+            PasteMethod::CtrlV
+        );
+
+        settings.app_paste_methods_enabled = true;
+        assert_eq!(
+            resolve_paste_method(&settings, Some(&ctx("vivaldi-stable", "Teams"))),
+            PasteMethod::CtrlV
+        );
+    }
+
+    #[test]
+    fn app_paste_method_resolution_can_override_terminal_to_ctrl_shift_v() {
+        let mut settings = AppSettings::default();
+        settings.paste_method = PasteMethod::CtrlV;
+        settings.app_paste_methods_enabled = true;
+        settings.app_paste_methods = vec![paste_rule(
+            "gnome-terminal-server",
+            "",
+            PasteMethod::CtrlShiftV,
+        )];
+
+        assert_eq!(
+            resolve_paste_method(&settings, Some(&ctx("gnome-terminal-server", "shell"))),
+            PasteMethod::CtrlShiftV
         );
     }
 
