@@ -583,6 +583,17 @@
         },
         "externalScriptPlaceholder": "/path/to/your/script.sh"
       },
+      "appPasteMethods": {
+        "enabledLabel": "Choose the paste method by app",
+        "enabledDescription": "Use the paste method of the first matching rule below instead of the global paste method. Rules with a window title match beat rules for the whole app. The app name Handy sees is written to the log together with paste activity.",
+        "rulesTitle": "Paste method rules",
+        "rulesDescription": "The global paste method remains the default. Matching rules override it for specific applications.",
+        "appPlaceholder": "Program, e.g. gnome-terminal-server",
+        "titlePlaceholder": "Window title contains (optional)",
+        "pasteMethodPlaceholder": "Paste method",
+        "add": "Add rule",
+        "remove": "Remove"
+      },
       "typingTool": {
         "title": "Typing Tool",
         "description": "Choose which Linux typing tool to use for Direct paste method. Auto will automatically detect and use the best available tool for your system.",

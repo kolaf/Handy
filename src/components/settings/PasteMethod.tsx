@@ -6,6 +6,7 @@ import { Input } from "../ui/Input";
 import { useSettings } from "../../hooks/useSettings";
 import { useOsType } from "../../hooks/useOsType";
 import type { PasteMethod } from "@/bindings";
+import { AppPasteMethods } from "./AppPasteMethods";
 
 interface PasteMethodProps {
   descriptionMode?: "inline" | "tooltip";
@@ -111,6 +112,7 @@ export const PasteMethodSetting: React.FC<PasteMethodProps> = React.memo(
               disabled={isUpdating("external_script_path")}
             />
           )}
+          <AppPasteMethods descriptionMode={descriptionMode} grouped={grouped} />
         </div>
       </SettingContainer>
     );
