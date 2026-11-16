@@ -736,6 +736,29 @@ mod tests {
     }
 
     #[test]
+    fn terminal_paste_override_without_prepopulation_is_supported_explicitly() {
+        let mut settings = AppSettings::default();
+        settings.paste_method = PasteMethod::CtrlV;
+        settings.app_paste_methods_enabled = true;
+
+        assert_eq!(
+            resolve_paste_method(&settings, Some(&ctx("gnome-terminal-server", "shell"))),
+            PasteMethod::CtrlV
+        );
+
+        settings.app_paste_methods = vec![paste_rule(
+            "gnome-terminal-server",
+            "",
+            PasteMethod::CtrlShiftV,
+        )];
+
+        assert_eq!(
+            resolve_paste_method(&settings, Some(&ctx("gnome-terminal-server", "shell"))),
+            PasteMethod::CtrlShiftV
+        );
+    }
+
+    #[test]
     fn app_paste_method_validation_accepts_valid_rules_and_rejects_invalid_ones() {
         assert!(validate_app_paste_method_rules(&[paste_rule("slack.exe", "", PasteMethod::CtrlV)]).is_ok());
         assert!(validate_app_paste_method_rules(&[paste_rule("  ", "", PasteMethod::CtrlV)]).is_err());
