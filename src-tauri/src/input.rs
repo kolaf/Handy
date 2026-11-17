@@ -213,6 +213,10 @@ pub fn send_paste_ctrl_v(enigo: &mut Enigo, hold_ms: u64) -> Result<(), String> 
     #[cfg(target_os = "linux")]
     let (modifier_key, v_key_code) = (Key::Control, Key::Unicode('v'));
 
+    // Clear hotkey leftovers first; a still-held Alt/Shift/Meta from the trigger can
+    // corrupt the paste chord or leave applications seeing plain `v` instead of Ctrl+V.
+    release_stray_modifiers(enigo);
+
     // Press modifier + V, always releasing the modifier even if something fails mid-chord.
     let mut guard = PressedKeysGuard::default();
     guard.press(enigo, modifier_key, "Failed to press modifier key")?;
@@ -237,6 +241,7 @@ fn release_stray_modifiers(enigo: &mut Enigo) {
     }
     std::thread::sleep(std::time::Duration::from_millis(15));
 }
+
 
 /// Sends the platform's copy shortcut (Ctrl+C, Cmd+C on macOS) so the current selection lands on the clipboard.
 /// The macOS key code is not covered by a test; Windows and Linux mirror the paste helper above.
@@ -314,6 +319,9 @@ pub fn send_paste_ctrl_shift_v(enigo: &mut Enigo, hold_ms: u64) -> Result<(), St
     #[cfg(target_os = "linux")]
     let (modifier_key, v_key_code) = (Key::Control, Key::Unicode('v'));
 
+    // Clear hotkey leftovers first; otherwise the intended chord can be widened or broken.
+    release_stray_modifiers(enigo);
+
     // Press Ctrl/Cmd + Shift + V, always releasing modifiers even if something fails mid-chord.
     let mut guard = PressedKeysGuard::default();
     guard.press(enigo, modifier_key, "Failed to press modifier key")?;
@@ -340,6 +348,9 @@ pub fn send_paste_shift_insert(enigo: &mut Enigo, hold_ms: u64) -> Result<(), St
     #[cfg(not(target_os = "windows"))]
     let insert_key_code = Key::Other(0x76); // XK_Insert (keycode 118 / 0x76, also used as fallback)
 
+    // Clear hotkey leftovers first; otherwise the intended chord can be widened or broken.
+    release_stray_modifiers(enigo);
+
     // Press Shift + Insert, always releasing Shift even if something fails mid-chord.
     let mut guard = PressedKeysGuard::default();
     guard.press(enigo, Key::Shift, "Failed to press Shift key")?;
@@ -355,6 +366,7 @@ pub fn send_paste_shift_insert(enigo: &mut Enigo, hold_ms: u64) -> Result<(), St
     guard.release_with(enigo);
     result
 }
+
 
 /// Pastes text directly using the enigo text method.
 /// This tries to use system input methods if possible, otherwise simulates keystrokes one by one.

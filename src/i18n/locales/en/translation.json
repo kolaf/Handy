@@ -573,6 +573,8 @@
       "pasteMethod": {
         "title": "Paste Method",
         "description": "Choose how text is inserted. Direct: simulates typing via system input. None: skips paste, only updates history/clipboard.",
+        "x11HelperLabel": "Find app name on X11:",
+        "x11HelperCommand": "xprop WM_CLASS",
         "options": {
           "clipboard": "Clipboard ({{modifier}}+V)",
           "clipboardCtrlShiftV": "Clipboard (Ctrl+Shift+V)",

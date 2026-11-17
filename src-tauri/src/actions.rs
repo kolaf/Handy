@@ -1106,6 +1106,8 @@ impl ShortcutAction for TranscribeAction {
                                                 final_text.clone(),
                                                 ah_clone.clone(),
                                                 auto_submit_override,
+                                                RECORDING_WAS_PUSH_TO_TALK
+                                                    .load(Ordering::SeqCst),
                                             ) {
                                                 Ok(()) => {
                                                     crate::context::note_paste(&ah_clone, &final_text);

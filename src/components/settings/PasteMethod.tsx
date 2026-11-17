@@ -91,6 +91,16 @@ export const PasteMethodSetting: React.FC<PasteMethodProps> = React.memo(
         tooltipPosition="bottom"
       >
         <div className="flex flex-col gap-2">
+          {osType === "linux" && (
+            <div className="rounded-md border border-line bg-surface-secondary px-3 py-2 text-sm text-mid-gray">
+              <div className="font-medium text-primary">
+                {t("settings.advanced.pasteMethod.x11HelperLabel")}
+              </div>
+              <code className="mt-1 block select-all whitespace-pre-wrap break-all rounded border border-line bg-surface px-2 py-1 text-xs text-primary">
+                {t("settings.advanced.pasteMethod.x11HelperCommand")}
+              </code>
+            </div>
+          )}
           <Dropdown
             options={pasteMethodOptions}
             selectedValue={selectedMethod}
