@@ -411,7 +411,10 @@ impl ShortcutAction for PasteLastAction {
         let handle = app.clone();
         let _ = app.run_on_main_thread(move || {
             match crate::utils::paste(text.clone(), handle.clone()) {
-                Ok(()) => crate::context::note_paste(&handle, &text),
+                Ok(crate::utils::PasteOutcome::Pasted) => {
+                    crate::context::note_paste(&handle, &text)
+                }
+                Ok(crate::utils::PasteOutcome::Blocked) => {}
                 Err(err) => warn!("Paste last: failed to paste: {}", err),
             }
         });
@@ -597,7 +600,10 @@ pub(crate) fn run_redo(app: &AppHandle, prompt_id: String) {
                 // Checked again: the user may have moved on while the model worked.
                 match take_back_last_paste(&handle) {
                     Ok(_) => match crate::utils::paste(text.clone(), handle.clone()) {
-                        Ok(()) => crate::context::note_paste(&handle, &text),
+                        Ok(crate::utils::PasteOutcome::Pasted) => {
+                            crate::context::note_paste(&handle, &text)
+                        }
+                        Ok(crate::utils::PasteOutcome::Blocked) => {}
                         Err(err) => warn!("Redo: failed to paste: {}", err),
                     },
                     Err(reason) => crate::learn::announce_with(
@@ -720,7 +726,8 @@ async fn reformat_selection(
                     // so the result stays on the clipboard to be pasted by hand.
                     Ok(()) => {
                         match crate::utils::paste_keeping_on_clipboard(out.clone(), app.clone()) {
-                            Ok(()) => {
+                            Ok(crate::utils::PasteOutcome::Pasted)
+                            | Ok(crate::utils::PasteOutcome::Blocked) => {
                                 if replace_last {
                                     crate::context::note_paste(app, &out);
                                 }

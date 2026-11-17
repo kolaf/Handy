@@ -30,6 +30,7 @@ mod notices;
 mod overlay;
 mod paste_tx;
 mod picker;
+mod primary_selection;
 pub mod portable;
 mod repo_words;
 mod secure_input;
@@ -46,6 +47,8 @@ mod utils;
 pub mod webkit_renderer;
 
 pub use cli::CliArgs;
+#[cfg(target_os = "linux")]
+pub use utils::{apply_handy_gdk_backend, disable_gamescope_wsi_layer};
 #[cfg(debug_assertions)]
 use specta_typescript::{BigIntExportBehavior, Typescript};
 use tauri_specta::{collect_commands, collect_events, Builder};
