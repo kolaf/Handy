@@ -4,7 +4,8 @@
 //! frontend locale files (src/i18n/locales/*/translation.json).
 //!
 //! The English translation.json is the single source of truth:
-//! - TrayStrings struct fields are derived from the English "tray" keys
+//! - TrayStrings struct fields are derived from the English "tray" keys, plus
+//!   the notice titles (see `build.rs`)
 //! - All languages are auto-discovered from the locales directory
 //!
 //! To add a new tray menu item:
@@ -12,6 +13,8 @@
 //! 2. Add translations to other locale files
 //! 3. Update tray.rs to use the new field (e.g., strings.new_field)
 
+use crate::chinese_script::chinese_script_for_locale;
+use crate::settings::ChineseScript;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 
@@ -27,23 +30,15 @@ pub fn get_tray_translations(locale: Option<String>) -> TrayStrings {
         .unwrap_or("en")
         .to_lowercase()
         .replace('_', "-");
-    let subtags: Vec<_> = normalized.split('-').collect();
-    let language = subtags.first().copied().unwrap_or("en");
-    let is_hant = subtags.contains(&"hant");
-    let is_hans = subtags.contains(&"hans");
-    let is_traditional_region = ["tw", "hk", "mo"]
-        .iter()
-        .any(|region| subtags.contains(region));
+    let language = normalized.split('-').next().unwrap_or("en");
 
     let exact_match = TRANSLATIONS
         .iter()
         .find_map(|(code, strings)| code.eq_ignore_ascii_case(&normalized).then_some(strings));
-    let fallback = match language {
-        "zh" if is_hant || (!is_hans && is_traditional_region) => "zh-TW",
-        // Cantonese uses Traditional Chinese unless explicitly tagged as Hans.
-        "yue" if is_hans => "zh",
-        "yue" => "zh-TW",
-        _ => language,
+    let fallback = match chinese_script_for_locale(&normalized) {
+        Some(ChineseScript::TraditionalTw | ChineseScript::TraditionalHk) => "zh-TW",
+        Some(_) => "zh",
+        None => language,
     };
 
     exact_match
